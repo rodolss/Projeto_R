@@ -53,3 +53,8 @@ test('donoPadrao', () => {
   assert.equal(donoPadrao('fulano.github.io'), 'fulano');
   assert.equal(donoPadrao('localhost'), '');
 });
+test('tempo esgotado vira erro de rede (revisão I9)', { timeout: 2000 }, async () => {
+  const lento = (url, init) => new Promise((_, rejeitar) => init.signal?.addEventListener('abort', () => rejeitar(new Error('abortado'))));
+  const c = criarClienteGitHub({ token: 'tk', dono: 'fulano', fetch: lento, tempoLimite: 30 });
+  await assert.rejects(c.ler(), (e) => e.codigo === 'rede');
+});

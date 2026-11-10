@@ -4,7 +4,7 @@ import { formatarBRL, formatarPct } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
-import { calcularMes, registrarAplicacao, calcularPainel, saldosAtuais } from '../core/motor.js';
+import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 
 const ROTULOS_EXTRA = { 'decimo-terceiro': '13º', ferias: 'Férias', plr: 'PLR/bônus', outro: 'Outro' };
 
@@ -19,16 +19,20 @@ export function render(container, ctx) {
     recebido: existente?.recebido ?? null,
     tipoExtra: existente?.tipoExtra ?? null,
     proventos: existente?.proventos ?? null,
-    saldos: null, // { [ativoId]: { valor, cotas } } quando o usuário abre "Atualizar saldos"
+    saldos: null, // { [ativoId]: { valor, cotas } } só com os campos que o usuário editou de fato
+    alterou: false, // mudou algo desde que abriu a tela? (senão, reconfirmar usa o que já foi salvo)
   };
   let resposta = null;
 
   const resultado = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
   const confirmacao = h('div');
 
-  const saldosAtualizados = () => (est.saldos
-    ? Object.entries(est.saldos).map(([ativoId, s]) => ({ ativoId, valor: s.valor ?? 0, cotas: s.cotas ?? null }))
-    : null);
+  const saldosAtualizados = () => {
+    const lista = Object.entries(est.saldos ?? {})
+      .filter(([, s]) => s.valor != null) // campo apagado não vira saldo zero
+      .map(([ativoId, s]) => ({ ativoId, valor: s.valor, cotas: s.cotas ?? null }));
+    return lista.length ? lista : null;
+  };
 
   function ultimaAtualizacao() {
     const ids = new Set(estado.ativos.filter((a) => a.papel === 'carteira').map((a) => a.id));
@@ -55,7 +59,7 @@ export function render(container, ctx) {
         h('h3', {}, 'O que veio a mais este mês?'),
         h('div', { class: 'chips' }, ...TIPOS_EXTRA.map((t) => h('button', {
           type: 'button', class: `chip${est.tipoExtra === t ? ' ativo' : ''}`,
-          onclick: () => { est.tipoExtra = est.tipoExtra === t ? null : t; recalcular(); },
+          onclick: () => { est.tipoExtra = est.tipoExtra === t ? null : t; est.alterou = true; recalcular(); },
         }, ROTULOS_EXTRA[t]))),
         !est.tipoExtra && h('p', { class: 'suave pequeno' }, 'Sem escolher, o valor a mais é tratado como extra comum.')));
     }
@@ -73,6 +77,7 @@ export function render(container, ctx) {
 
     const extras = [
       r.paraAnuais > 0 && aviso('info', `Separe ${formatarBRL(r.paraAnuais)} para as despesas anuais (deixe na conta ou no Tesouro Selic).`),
+      r.provisao > 0 && aviso('info', `Separe ${formatarBRL(r.provisao)} deste mês para as despesas anuais: o 13º e as férias não cobrem todas (deixe na conta ou no Tesouro Selic).`),
       r.guardarParaProximoMes > 0 && aviso('info', `Guarde ${formatarBRL(r.guardarParaProximoMes)} para o mês que vem (adiantamento das férias: o próximo salário vem menor).`),
     ].filter(Boolean);
     blocos.push(...extras);
@@ -104,19 +109,29 @@ export function render(container, ctx) {
 
   function abrirConfirmacao(temAlgo) {
     const r = resposta;
-    const aplicado = [
-      ...r.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor })),
-      r.paraReserva > 0 && { destino: 'reserva', nome: 'Reserva de emergência', valor: r.paraReserva },
-      r.paraCaixa > 0 && { destino: 'caixa', nome: 'Caixa de oportunidade', valor: r.paraCaixa },
-    ].filter(Boolean);
-    const transferencia = { valor: r.daCaixaParaCarteira };
+    const nomeAtivo = (id) => estado.ativos.find((a) => a.id === id)?.nome ?? 'Investimento';
+    const papelAtivo = (id) => estado.ativos.find((a) => a.id === id)?.papel;
+    // Reconfirmar sem mudar nada parte do que já foi salvo, e não de uma sugestão nova.
+    const usarSalvo = existente && !est.alterou;
+    const aplicado = usarSalvo
+      ? existente.aplicado.filter((a) => a.valor > 0).map((a) => ({ ativoId: a.ativoId, nome: nomeAtivo(a.ativoId), valor: a.valor }))
+      : [
+        ...r.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor })),
+        r.paraReserva > 0 && { destino: 'reserva', nome: 'Reserva de emergência', valor: r.paraReserva },
+        r.paraCaixa > 0 && { destino: 'caixa', nome: 'Caixa de oportunidade', valor: r.paraCaixa },
+      ].filter(Boolean);
+    const transferencia = {
+      valor: usarSalvo
+        ? -existente.aplicado.filter((a) => a.valor < 0 && papelAtivo(a.ativoId) === 'caixa').reduce((s, a) => s + a.valor, 0)
+        : r.daCaixaParaCarteira,
+    };
 
     const confirmar = botao('Confirmar', async () => {
       confirmar.disabled = true;
       await ctx.salvar((e) => registrarAplicacao(e, {
         mes, data: hoje, recebido: est.recebido, tipoExtra: est.tipoExtra, proventos: est.proventos ?? 0,
         saldosAtualizados: saldosAtualizados(), resposta: r,
-        aplicado: aplicado.map(({ destino, valor }) => ({ destino, valor: valor ?? 0 })),
+        aplicado: aplicado.map(({ ativoId, destino, valor }) => ({ ativoId, destino, valor: valor ?? 0 })),
         transferidoDaCaixa: transferencia.valor ?? 0,
       }));
       ctx.aviso('Mês registrado! 👏', 'ok', 4000);
@@ -135,35 +150,45 @@ export function render(container, ctx) {
   function painelSaldos() {
     const lista = estado.ativos.filter((a) => a.papel !== 'fgts');
     if (!lista.length) return h('p', { class: 'suave' }, 'Nenhum investimento cadastrado ainda. Eles aparecem aqui depois do primeiro "Já apliquei".');
-    return h('div', {}, ...lista.map((a) => {
-      const atual = estimados[a.id]?.valor ?? 0;
+    const linhas = lista.map((a) => {
+      const atual = Math.round((estimados[a.id]?.valor ?? 0) * 100) / 100;
       const ultimo = estado.saldos.filter((s) => s.ativoId === a.id).sort((x, y) => (x.data < y.data ? -1 : 1)).at(-1);
-      const iniciar = () => {
-        if (!est.saldos) {
-          est.saldos = Object.fromEntries(lista.map((x) => {
-            const u = estado.saldos.filter((s) => s.ativoId === x.id).sort((p, q) => (p.data < q.data ? -1 : 1)).at(-1);
-            return [x.id, { valor: Math.round((estimados[x.id]?.valor ?? 0) * 100) / 100, cotas: u?.cotas ?? null }];
-          }));
-        }
+      // Só o que o usuário edita vira saldo real; o resto continua estimado.
+      const editar = (mudanca) => {
+        est.saldos ??= {};
+        est.saldos[a.id] = { valor: atual, cotas: ultimo?.cotas ?? null, ...est.saldos[a.id], ...mudanca };
+        est.alterou = true;
+        recalcular();
       };
       const comCotas = a.papel === 'carteira' && a.classe && a.classe !== 'rendaFixa';
       return h('div', { class: 'linha', style: 'flex-wrap:wrap' },
         h('div', { class: 'nome' }, h('span', {}, a.nome), h('small', {}, ultimo ? `informado em ${formatarMes(ultimo.data.slice(0, 7))}` : 'ainda sem saldo informado')),
         h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' },
-          h('div', { style: 'width:150px' }, campoMoeda({ rotulo: null, valor: Math.round(atual * 100) / 100, aoMudar: (v) => { iniciar(); est.saldos[a.id].valor = v; recalcular(); } })),
+          h('div', { style: 'width:150px' }, campoMoeda({ rotulo: null, valor: atual, aoMudar: (v) => editar({ valor: v }) })),
           comCotas && h('input', {
             class: 'entrada', type: 'number', min: '0', step: '1', style: 'width:96px', placeholder: 'cotas',
             value: ultimo?.cotas ?? '', 'aria-label': `Cotas de ${a.nome}`,
-            oninput: (e) => { iniciar(); est.saldos[a.id].cotas = Number(e.target.value) || null; },
+            oninput: (e) => editar({ cotas: Number(e.target.value) || null }),
           })));
-    }));
+    });
+    const salvarSaldos = botao('Salvar só os saldos', async () => {
+      const saldos = saldosAtualizados();
+      if (!saldos) { ctx.aviso('Edite pelo menos um saldo antes de salvar.', 'atencao', 3000); return; }
+      salvarSaldos.disabled = true;
+      await ctx.salvar((e) => registrarSaldos(e, { data: hoje, saldos }));
+      ctx.aviso('Saldos salvos.', 'ok', 3000);
+      ctx.rerender();
+    }, { secundario: true });
+    return h('div', {}, ...linhas,
+      h('p', { class: 'suave pequeno' }, 'Atualize todos de uma vez para o app medir bem o rendimento da carteira.'),
+      h('div', { class: 'botoes' }, salvarSaldos));
   }
 
   const progresso = painel.metas.independencia > 0 ? painel.patrimonio / painel.metas.independencia : 0;
   const campoRecebido = campoMoeda({
     rotulo: null, valor: est.recebido, grande: true, id: 'recebido',
     dica: 'O salário líquido que entrou, livre na mão.',
-    aoMudar: (v) => { est.recebido = v; recalcular(); },
+    aoMudar: (v) => { est.recebido = v; est.alterou = true; recalcular(); },
   });
 
   container.replaceChildren(...[
@@ -181,7 +206,7 @@ export function render(container, ctx) {
       h('div', { style: 'margin-top:8px' }, campoMoeda({
         rotulo: 'Proventos recebidos este mês', valor: est.proventos,
         dica: 'Veja no extrato da corretora: dividendos, juros e aluguéis de FII. Eles são reinvestidos.',
-        aoMudar: (v) => { est.proventos = v; recalcular(); },
+        aoMudar: (v) => { est.proventos = v; est.alterou = true; recalcular(); },
       }))),
     resultado,
     h('details', { class: 'cartao' }, h('summary', {}, 'Atualizar saldos (copie da corretora)'), painelSaldos()),

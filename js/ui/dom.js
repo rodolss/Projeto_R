@@ -69,6 +69,7 @@ const TEXTOS_CONEXAO = {
   'sem-permissao': 'A chave do GitHub não tem permissão para gravar no repositório de dados.',
   'repo-nao-encontrado': 'Repositório de dados não encontrado, ou a chave não tem acesso a ele.',
   'conflito-resolvido': 'Seus dados foram alterados em outro aparelho; juntei as alterações.',
+  'dados-locais-invalidos': 'Os dados guardados neste aparelho estavam danificados. Guardei uma cópia à parte e, se houver conexão, recarreguei do GitHub.',
   desconhecido: 'Não consegui falar com o GitHub agora. Seus dados estão salvos neste aparelho.',
 };
 

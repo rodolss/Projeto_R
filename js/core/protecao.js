@@ -11,7 +11,6 @@ export function calcularExcedente({
   recebido, pendenteDoMesAnterior = 0, salario, custoMensal, provisao, tipoExtra = null, anuaisFaltando,
 }) {
   const recebidoEfetivo = recebido + pendenteDoMesAnterior;
-  const base = Math.min(recebidoEfetivo, salario);
   let extra = Math.max(0, recebidoEfetivo - salario);
 
   // Férias: o excedente é salário de 30 dias + 1/3. Só o 1/3 (E/4) é extra;
@@ -22,16 +21,19 @@ export function calcularExcedente({
     extra /= 4;
   }
 
-  const disponivel = recebidoEfetivo - guardarParaProximoMes;
+  const disponivel = recebidoEfetivo - guardarParaProximoMes; // = min(R, S) + extra que sobrou
   if (disponivel <= custoMensal) {
     return {
-      recebidoEfetivo, semAporte: true, motivo: 'custo-de-vida', excedente: 0, paraAnuais: 0,
+      recebidoEfetivo, semAporte: true, motivo: 'custo-de-vida', excedente: 0, paraAnuais: 0, provisao: 0,
       guardarParaProximoMes, paraDiaADia: disponivel,
     };
   }
 
   const paraAnuais = Math.min(extra, anuaisFaltando);
-  const bruto = base - custoMensal - provisao + (extra - paraAnuais);
+  const livre = disponivel - custoMensal - paraAnuais;
+  // A provisão mensal para despesas anuais é separada e mostrada; não vira "dia a dia".
+  const provisaoDoMes = Math.min(provisao, Math.max(0, livre));
+  const bruto = livre - provisaoDoMes;
   const excedente = Math.max(0, bruto);
   return {
     recebidoEfetivo,
@@ -39,8 +41,9 @@ export function calcularExcedente({
     motivo: bruto <= 0 ? 'sem-sobra' : null,
     excedente,
     paraAnuais,
+    provisao: provisaoDoMes,
     guardarParaProximoMes,
-    paraDiaADia: disponivel - excedente - paraAnuais,
+    paraDiaADia: disponivel - excedente - paraAnuais - provisaoDoMes,
   };
 }
 

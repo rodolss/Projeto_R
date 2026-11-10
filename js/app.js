@@ -99,22 +99,41 @@ async function atualizarIpca() {
   }
 }
 
+// Troca o estado por um mais novo vindo do GitHub, sem atropelar quem está digitando.
+function receberEstado(novo) {
+  if (!novo || JSON.stringify(novo) === JSON.stringify(app.estado)) return;
+  const tinha = Boolean(app.estado);
+  app.estado = novo;
+  const digitando = document.activeElement?.matches?.('input, select, textarea');
+  if (!tinha || !digitando) renderizar();
+  else mostrarAviso('Chegaram dados de outro aparelho. Saia do campo e abra a tela de novo para ver.', 'info');
+}
+
+// Abre na hora com a cópia local; a sincronização com o GitHub acontece em segundo plano.
+async function sincronizarAoAbrir() {
+  const r = await app.armazem.carregar();
+  if (r.aviso) mostrarAviso(textoConexao(r.aviso), r.aviso === 'conflito-resolvido' ? 'info' : 'atencao');
+  receberEstado(r.estado);
+  await atualizarIpca();
+}
+
 async function iniciar() {
   const tema = new URLSearchParams(location.search).get('tema');
   if (tema === 'escuro' || tema === 'claro') document.documentElement.dataset.tema = tema;
 
   montarArmazem();
-  const r = await app.armazem.carregar();
-  app.estado = r.estado;
-  if (r.aviso) mostrarAviso(textoConexao(r.aviso), 'atencao');
+  const local = app.armazem.carregarLocal();
+  app.estado = local.estado;
+  if (local.aviso) mostrarAviso(textoConexao(local.aviso), 'atencao');
 
   window.addEventListener('hashchange', renderizar);
   window.addEventListener('online', async () => {
     const s = await app.armazem.sincronizarPendentes();
     if (s.sincronizado) mostrarAviso('Conexão de volta: dados sincronizados.', 'ok', 4000);
+    receberEstado(s.estado);
   });
-  await renderizar();
-  atualizarIpca();
+  if (app.estado || !app.conexao) await renderizar();
+  sincronizarAoAbrir().then(() => { if (!document.getElementById('tela').childElementCount) renderizar(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch((erro) => console.warn('Sem modo offline', erro));
 }
 

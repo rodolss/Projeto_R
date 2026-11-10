@@ -30,7 +30,7 @@ function erroPorStatus(status) {
   return new ErroGitHub('desconhecido');
 }
 
-export function criarClienteGitHub({ token, dono, repo = 'Projeto_R-dados', caminho = 'dados.json', fetch }) {
+export function criarClienteGitHub({ token, dono, repo = 'Projeto_R-dados', caminho = 'dados.json', fetch, tempoLimite = 15000 }) {
   const base = `https://api.github.com/repos/${dono}/${repo}`;
   const cabecalhos = {
     Authorization: `Bearer ${token}`,
@@ -38,11 +38,16 @@ export function criarClienteGitHub({ token, dono, repo = 'Projeto_R-dados', cami
     'X-GitHub-Api-Version': '2022-11-28',
   };
 
+  // Conexão lenta não pode travar o app: passado o limite, vira erro de rede.
   async function chamar(url, init = {}) {
+    const controle = new AbortController();
+    const relogio = setTimeout(() => controle.abort(), tempoLimite);
     try {
-      return await fetch(url, { cache: 'no-store', ...init, headers: { ...cabecalhos, ...(init.headers ?? {}) } });
+      return await fetch(url, { cache: 'no-store', ...init, signal: controle.signal, headers: { ...cabecalhos, ...(init.headers ?? {}) } });
     } catch {
       throw new ErroGitHub('rede');
+    } finally {
+      clearTimeout(relogio);
     }
   }
 

@@ -8,7 +8,7 @@ const CASCA = [
   './js/core/alocacao.js', './js/core/aporte.js', './js/core/checkup.js', './js/core/desempenho.js',
   './js/core/esquema.js', './js/core/financas.js', './js/core/formato.js', './js/core/ipca.js',
   './js/core/meses.js', './js/core/metas.js', './js/core/motor.js', './js/core/projecao.js', './js/core/protecao.js',
-  './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js',
+  './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/mesclar.js',
   './js/ui/config.js', './js/ui/dom.js', './js/ui/grafico.js', './js/ui/historico.js',
   './js/ui/inicio.js', './js/ui/mes.js', './js/ui/orcamento.js', './js/ui/painel.js',
 ];

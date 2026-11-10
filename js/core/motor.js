@@ -37,7 +37,7 @@ function ultimoSaldoAte(estado, ativoId, dataLimite) {
 }
 
 // Saldo estimado de cada ativo no mês `mes`, considerando só registros até `dataLimite`.
-function saldosEm(estado, { mes, dataLimite, serie, i, atualizados = null }) {
+function saldosEm(estado, { mes, dataLimite, serie, i, atualizados = null, excluirMes = null }) {
   const resultado = {};
   for (const ativo of estado.ativos) {
     const novo = atualizados?.find((s) => s.ativoId === ativo.id);
@@ -50,6 +50,7 @@ function saldosEm(estado, { mes, dataLimite, serie, i, atualizados = null }) {
     const mesSaldo = ultimo ? ultimo.data.slice(0, 7) : null;
     const aportesDepois = [];
     for (const m of estado.meses) {
+      if (excluirMes && m.mes === excluirMes) continue; // o próprio mês não entra ao recalcular a sugestão dele
       if ((m.data ?? fimDoMes(m.mes)) < desde || (m.data ?? fimDoMes(m.mes)) > dataLimite) continue;
       for (const a of m.aplicado ?? []) {
         if (a.ativoId === ativo.id) aportesDepois.push({ mes: m.mes, valor: paraReaisDeHoje(a.valor, m.mes, serie) });
@@ -91,25 +92,42 @@ function papelDe(estado, ativoId) {
   return estado.ativos.find((a) => a.id === ativoId)?.papel ?? null;
 }
 
-// Pontos para o índice de desempenho: datas em que os saldos da carteira foram atualizados de verdade.
-function pontosDesempenho(estado) {
-  const idsCarteira = new Set(estado.ativos.filter((a) => a.papel === 'carteira').map((a) => a.id));
-  const datas = [...new Set(estado.saldos.filter((s) => idsCarteira.has(s.ativoId)).map((s) => s.data))].sort();
+// Pontos para o índice de desempenho: só as datas em que TODA a carteira foi atualizada de verdade
+// (atualização parcial misturaria valores de datas diferentes). Os saldos digitados agora entram
+// como ponto provisório, para a queda ser percebida no próprio mês.
+function pontosDesempenho(estado, { atualizados = null, hoje = null } = {}) {
+  const idsCarteira = [...new Set(estado.ativos.filter((a) => a.papel === 'carteira').map((a) => a.id))];
+  const saldosCarteira = estado.saldos.filter((s) => idsCarteira.includes(s.ativoId));
+  const completo = (data, temNaData) => idsCarteira.every((id) => (
+    !saldosCarteira.some((s) => s.ativoId === id && s.data <= data) || temNaData(id)));
+  // Dinheiro novo entre duas datas: aplicações na carteira menos os proventos reinvestidos (que são rendimento).
+  const aportesEntre = (de, ate) => {
+    let total = 0;
+    for (const m of estado.meses) {
+      const d = m.data ?? fimDoMes(m.mes);
+      if (d < de || d >= ate) continue;
+      for (const a of m.aplicado ?? []) if (idsCarteira.includes(a.ativoId)) total += a.valor;
+      total -= m.proventos ?? 0;
+    }
+    return total;
+  };
+
+  const datas = [...new Set(saldosCarteira.map((s) => s.data))].sort()
+    .filter((data) => completo(data, (id) => saldosCarteira.some((s) => s.ativoId === id && s.data === data)));
   const pontos = [];
-  let dataAnterior = null;
+  let anterior = null;
   for (const data of datas) {
     let valor = 0;
     for (const id of idsCarteira) valor += ultimoSaldoAte(estado, id, data)?.valor ?? 0;
-    let aportes = 0;
-    if (dataAnterior) {
-      for (const m of estado.meses) {
-        const d = m.data ?? fimDoMes(m.mes);
-        if (d < dataAnterior || d >= data) continue;
-        for (const a of m.aplicado ?? []) if (idsCarteira.has(a.ativoId)) aportes += a.valor;
-      }
+    pontos.push({ mes: data.slice(0, 7), valor, aportesDesdeAnterior: anterior ? aportesEntre(anterior, data) : 0 });
+    anterior = data;
+  }
+  if (atualizados && hoje && anterior && hoje > anterior) {
+    const digitado = new Map(atualizados.map((s) => [s.ativoId, s.valor]));
+    if (completo(hoje, (id) => digitado.has(id))) {
+      const valor = idsCarteira.reduce((s, id) => s + (digitado.get(id) ?? 0), 0);
+      pontos.push({ mes: hoje.slice(0, 7), valor, aportesDesdeAnterior: aportesEntre(anterior, hoje) });
     }
-    pontos.push({ mes: data.slice(0, 7), valor, aportesDesdeAnterior: aportes });
-    dataAnterior = data;
   }
   return pontos;
 }
@@ -117,7 +135,8 @@ function pontosDesempenho(estado) {
 function precosPorClasse(estado) {
   const precos = {};
   for (const c of CLASSES) {
-    const ativo = estado.ativos.find((a) => a.papel === 'carteira' && a.classe === c);
+    // O preço vem do ativo sugerido (mesmo ticker), não de outro ativo qualquer da classe.
+    const ativo = estado.ativos.find((a) => a.papel === 'carteira' && a.classe === c && a.ticker === estado.carteiraAlvo[c].ticker);
     if (!ativo) continue;
     const comCotas = estado.saldos
       .filter((s) => s.ativoId === ativo.id && s.cotas > 0)
@@ -128,7 +147,7 @@ function precosPorClasse(estado) {
   return precos;
 }
 
-function contexto(estado, hoje, atualizados = null) {
+function contexto(estado, hoje, atualizados = null, { excluirMes = null } = {}) {
   const mes = hoje.slice(0, 7);
   const serie = serieEfetiva(estado);
   const cfg = estado.config;
@@ -140,7 +159,7 @@ function contexto(estado, hoje, atualizados = null) {
   const metas = calcularMetas({ custoTotal: custo.total, salario, swr: cfg.swr });
   const provisao = provisaoMensal({ anual: custo.anual, salario, recebe13: cfg.recebe13, recebeFerias: cfg.recebeFerias });
 
-  const saldos = saldosEm(estado, { mes, dataLimite: hoje, serie, i, atualizados });
+  const saldos = saldosEm(estado, { mes, dataLimite: hoje, serie, i, atualizados, excluirMes });
   const grupo = agrupar(estado, saldos);
 
   const datasCarteira = estado.ativos
@@ -155,7 +174,7 @@ function contexto(estado, hoje, atualizados = null) {
   const p0 = real(estado.plano.p0, estado.plano.mesP0);
   const pmtNec = pmtNecessario({ p: grupo.patrimonio, meta: metas.independencia, i, meses: cfg.prazoMeses - t });
 
-  const queda = situacaoQueda(indiceDesempenho(pontosDesempenho(estado), serie));
+  const queda = situacaoQueda(indiceDesempenho(pontosDesempenho(estado, { atualizados, hoje }), serie));
   let caixaNoInicioDaQueda = grupo.caixa;
   if (queda.emQueda) {
     for (const m of estado.meses) {
@@ -188,7 +207,7 @@ export function saldosAtuais(estado, hoje) {
 // ---------- tela do mês ----------
 
 export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje }) {
-  const cx = contexto(estado, hoje, saldosAtualizados);
+  const cx = contexto(estado, hoje, saldosAtualizados, { excluirMes: hoje.slice(0, 7) });
   const { mes, custo, salario, grupo } = cx;
 
   const anterior = estado.meses.find((m) => m.mes === somarMeses(mes, -1));
@@ -217,6 +236,7 @@ export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0,
     excedente: exc.excedente,
     paraDiaADia: exc.paraDiaADia,
     paraAnuais: exc.paraAnuais,
+    provisao: exc.provisao,
     guardarParaProximoMes: exc.guardarParaProximoMes,
     paraReserva: 0,
     paraCaixa: 0,
@@ -267,7 +287,7 @@ function resolverDestino(estado, destino) {
   const NOMES = { reserva: 'Reserva (Tesouro Selic)', caixa: 'Caixa de oportunidade (Tesouro Selic)' };
   const existente = destino === 'reserva' || destino === 'caixa'
     ? estado.ativos.find((a) => a.papel === destino)
-    : estado.ativos.find((a) => a.papel === 'carteira' && a.classe === destino);
+    : estado.ativos.find((a) => a.papel === 'carteira' && a.classe === destino && a.ticker === estado.carteiraAlvo[destino].ticker);
   if (existente) return existente.id;
   const novo = destino === 'reserva' || destino === 'caixa'
     ? { id: novoId(), nome: NOMES[destino], ticker: 'Tesouro Selic', papel: destino, classe: null, tipoForaDoPlano: null }
@@ -285,33 +305,44 @@ export function registrarAplicacao(estado, {
   const novo = structuredClone(estado);
   const itens = aplicado
     .filter((a) => a.valor)
-    .map((a) => ({ ativoId: resolverDestino(novo, a.destino), valor: a.valor, cotas: a.cotas ?? null }));
+    .map((a) => ({ ativoId: a.ativoId ?? resolverDestino(novo, a.destino), valor: a.valor, cotas: a.cotas ?? null }));
   if (transferidoDaCaixa > 0) itens.push({ ativoId: resolverDestino(novo, 'caixa'), valor: -transferidoDaCaixa, cotas: null });
 
   for (const s of saldosAtualizados ?? []) {
     novo.saldos.push({ ativoId: s.ativoId, data, valor: s.valor, cotas: s.cotas ?? null });
   }
 
+  // Reconfirmar mantém a data da primeira aplicação: saldos digitados depois já incluem esse dinheiro.
   const existente = novo.meses.find((m) => m.mes === mes);
-  let contadores = novo.contadoresAnuais;
-  if (existente) contadores = somarAoCiclo(contadores, mes, -(existente.paraAnuais ?? 0));
-  novo.contadoresAnuais = somarAoCiclo(contadores, mes, resposta.paraAnuais ?? 0);
+  const separadoAnuais = (x) => (x?.paraAnuais ?? 0) + (x?.provisao ?? 0);
+  novo.contadoresAnuais = somarAoCiclo(somarAoCiclo(novo.contadoresAnuais, mes, -separadoAnuais(existente)), mes, separadoAnuais(resposta));
 
   const entrada = {
-    mes, data, recebido, tipoExtra, proventos, sugestao: resposta, aplicado: itens,
-    guardarParaProximoMes: resposta.guardarParaProximoMes ?? 0, paraAnuais: resposta.paraAnuais ?? 0,
+    mes, data: existente?.data ?? data, recebido, tipoExtra, proventos, sugestao: resposta, aplicado: itens,
+    guardarParaProximoMes: resposta.guardarParaProximoMes ?? 0, paraAnuais: resposta.paraAnuais ?? 0, provisao: resposta.provisao ?? 0,
   };
   novo.meses = [...novo.meses.filter((m) => m.mes !== mes), entrada].sort((a, b) => (a.mes < b.mes ? -1 : 1));
   return novo;
 }
 
+// Atualização só dos saldos, sem mexer em nenhum lançamento.
+export function registrarSaldos(estado, { data, saldos }) {
+  const novo = structuredClone(estado);
+  for (const s of saldos) novo.saldos.push({ ativoId: s.ativoId, data, valor: s.valor, cotas: s.cotas ?? null });
+  return novo;
+}
+
 // ---------- painel ----------
 
-function trajetoria({ patrimonio, aporte, i, meta, mesAtual, ate }) {
+// Mesma regra de projetar(): o aporte completa primeiro o que falta da reserva.
+function trajetoria({ patrimonio, aporte, i, meta, mesAtual, ate, reservaFaltando = 0 }) {
   const pontos = [{ mes: mesAtual, valor: patrimonio }];
   let v = patrimonio;
+  let falta = reservaFaltando;
   for (let k = 1; k <= ate; k++) {
-    v = v * (1 + i) + aporte;
+    const paraReserva = Math.min(Math.max(aporte, 0), falta);
+    falta -= paraReserva;
+    v = v * (1 + i) + aporte - paraReserva;
     pontos.push({ mes: somarMeses(mesAtual, k), valor: v });
     if (v >= meta) break;
   }
@@ -378,7 +409,7 @@ export function calcularPainel({ estado, hoje }) {
     realSerie.push({ mes: m, valor: agrupar(estado, saldosEm(estado, { mes: m, dataLimite, serie: cx.serie, i })).patrimonio });
   }
   const ate = Math.max(0, diffMeses(mes, mesAlvo) + 24);
-  const caminho = (taxa) => trajetoria({ patrimonio: grupo.patrimonio, aporte: ritmo.valor, i: taxa, meta: metas.independencia, mesAtual: mes, ate });
+  const caminho = (taxa) => trajetoria({ patrimonio: grupo.patrimonio, aporte: ritmo.valor, i: taxa, meta: metas.independencia, mesAtual: mes, ate, reservaFaltando });
 
   return {
     status: classificarStatus({ mesProjetado: projecaoM1.mes, mesAlvo }),

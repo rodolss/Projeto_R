@@ -35,6 +35,17 @@ test('mês depois das férias usa o valor guardado', () => {
   assert.equal(r.semAporte, false);
 });
 test('provisão mensal sai do excedente', () => perto(calcularExcedente({ ...base, recebido: 7800, provisao: 666.67 }).excedente, 2133.33));
+test('provisão aparece separada e não vira dia a dia (revisão I7)', () => {
+  const r = calcularExcedente({ ...base, recebido: 7800, provisao: 666.67 });
+  perto(r.provisao, 666.67);
+  perto(r.paraDiaADia, 5000);
+  perto(r.excedente, 2133.33);
+});
+test('provisão parcial quando sobra pouco (revisão I7)', () => {
+  const r = calcularExcedente({ ...base, recebido: 5500, provisao: 600 });
+  perto(r.provisao, 500);
+  perto(r.paraDiaADia, 5000);
+});
 test('sem sobra', () => {
   const r = calcularExcedente({ ...base, recebido: 5500, provisao: 600 });
   assert.equal(r.semAporte, true);
