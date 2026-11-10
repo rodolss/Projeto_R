@@ -15,6 +15,9 @@ test('resposta inválida lança erro', async () => {
   await assert.rejects(buscarSerieIpca({ fetch: criarFetch([{ status: 200, json: { erro: 'x' } }]).fetch, desde: '2026-07' }));
   await assert.rejects(buscarSerieIpca({ fetch: criarFetch([{ status: 500, json: [] }]).fetch, desde: '2026-07' }));
 });
+test('período ainda sem IPCA divulgado (404) devolve série vazia', async () => {
+  assert.deepEqual(await buscarSerieIpca({ fetch: criarFetch([{ status: 404, json: {} }]).fetch, desde: '2026-10' }), {});
+});
 test('precisaAtualizarIpca', () => {
   assert.equal(precisaAtualizarIpca({ atualizadoEm: null }, new Date()), true);
   assert.equal(precisaAtualizarIpca({ atualizadoEm: new Date().toISOString() }, new Date()), false);
