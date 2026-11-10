@@ -10,6 +10,8 @@ Um único usuário, trabalhador CLT e leigo em investimentos, quer se aposentar 
 
 O app não prevê o mercado. Ele aplica **regras transparentes** (rebalanceamento por aportes + trajetória planejada) que fazem "comprar mais na baixa" sozinhas, e é honesto quando a meta não é alcançável.
 
+**Estratégia escolhida pelo usuário: viver de renda.** Desde o primeiro aporte, a carteira é montada só com investimentos que pagam proventos (juros, dividendos, aluguéis de FII). Até a aposentadoria, todos os proventos são reinvestidos. Na aposentadoria, o usuário para de reinvestir e passa a viver deles, **sem precisar vender nada**. O indicador de progresso mais intuitivo passa a ser "quanto a carteira já me paga por mês" comparado com o custo de vida.
+
 ## 2. Objetivos, não-objetivos e anti-objetivos
 
 ### Objetivos (v1)
@@ -74,7 +76,7 @@ Entradas do mês: `R` (valor líquido recebido) e, opcionalmente, os proventos. 
 
 1. **Custo de vida primeiro.** Se `R ≤ Cm`, não há aporte. A mensagem é: "Este mês não invista nada, o seu dia a dia vem primeiro."
 2. **Meses com valor a mais.** Se `R > S × 1,10`, o app pergunta "o que veio a mais?", com opções rápidas: 13º, Férias, PLR/bônus e Outro. *Decisão do designer, para proteger o estilo de vida no CLT:* em **Férias**, só o 1/3 constitucional conta como extra. O restante é o adiantamento do salário do mês seguinte (que virá menor), então fica guardado na conta, e o app soma esse valor ao `R` do mês seguinte. Os demais tipos são extra integral: `E = R − S`.
-3. **Despesas anuais.** O extra cobre primeiro o que falta das despesas anuais do ano-calendário. O app mantém um contador por ano de quanto já foi separado e mostra na resposta: "Separe R$ X para as despesas anuais (deixe na conta ou no Tesouro Selic)". Esse valor não é um investimento e não conta para as metas. Se os extras esperados no ano (13º ≈ `S` + 1/3 de férias ≈ `S/3`) não cobrirem `A`, o app desconta todo mês uma provisão `p = max(0, (A − extras esperados) / 12)`.
+3. **Despesas anuais.** O extra cobre primeiro o que falta das despesas anuais do **ciclo anual**. *Decisão do designer:* o ciclo vai de **novembro a outubro**, alinhado ao 13º, que paga as despesas do começo do ano (IPVA, IPTU). No primeiro uso, o assistente pergunta quanto já está separado para o ciclo atual, para não guardar o mesmo dinheiro duas vezes. O app mantém um contador por ciclo de quanto já foi separado e mostra na resposta: "Separe R$ X para as despesas anuais (deixe na conta ou no Tesouro Selic)". Esse valor não é um investimento e não conta para as metas. Se os extras esperados no ano (13º ≈ `S` + 1/3 de férias ≈ `S/3`) não cobrirem `A`, o app desconta todo mês uma provisão `p = max(0, (A − extras esperados) / 12)`.
 4. **Excedente do mês** `T = min(R, S) − Cm − p` mais o extra que sobrou depois do passo 3. Se `T ≤ 0`, não há aporte.
 5. **Reserva de emergência.** Alvo: `6 × C`. Enquanto o saldo da reserva estiver abaixo do alvo, **todo** o excedente vai para ela. Se a reserva for usada numa emergência, volta a ter prioridade até se recompor.
 
@@ -85,31 +87,35 @@ Entradas do mês: `R` (valor líquido recebido) e, opcionalmente, os proventos. 
   *Decisão do designer:* quando `M1` ou as premissas mudam (por uma edição do orçamento, por exemplo), a trajetória é **recalculada desde o início do plano**, mantendo `P0` e o mês de início. Assim, "quanto o plano previa para hoje" reflete sempre a meta atual.
 - **Aporte necessário** a partir do mês `t`, com patrimônio `P(t)`:
   `PMTnec(t) = (M1 − P(t)·(1+i)^(120−t)) · i / ((1+i)^(120−t) − 1)`. Se a meta já foi atingida, o valor é 0. Depois do mês 120, a meta passa a ser "o quanto antes" e todo o excedente é investido.
-- **Regra do mês** (com a reserva completa):
-  - Se `PMTnec ≥ T`, **tudo** vai para a carteira: aporte = `T`.
-  - Se `PMTnec < T` (o usuário está adiantado), a carteira recebe `max(PMTnec, 0)` e a diferença vai para a **caixa de oportunidade**, até a caixa atingir o teto de **6 × o excedente médio**. O que passar do teto vai para a carteira.
-  - Se `P(t) < Pplan(t)` e houver saldo na caixa, o app sugere transferir `min(caixa, Pplan(t) − P(t))` da caixa para a carteira, além do aporte do mês. É assim que a caixa é usada nos meses de queda.
+- **Mês de queda** (*decisão do designer*): o app mantém um **índice de desempenho** da carteira, sem a caixa. É uma rentabilidade real ponderada no tempo, calculada **só com os meses em que os saldos foram realmente atualizados**, então aportes e saldos estimados não o movem. Há queda quando o índice está **10% ou mais abaixo do pico**.
+- **Regra do mês** (com a reserva completa), na ordem:
+  1. **Em mês de queda:** nada vai para a caixa e **todo** o excedente `T` vai para a carteira. Além disso, o app sugere transferir **1/3 do saldo que a caixa tinha no início da queda** para a carteira, todo mês enquanto a queda durar (ou até a caixa zerar). Como o gatilho vem do mercado e não da comparação com a trajetória, a sugestão não se repete à toa, e a caixa nunca é enchida e esvaziada no mesmo mês.
+  2. **Fora de queda, com `PMTnec ≥ T`:** **tudo** vai para a carteira; aporte = `T`.
+  3. **Fora de queda, com `PMTnec < T`** (adiantado): a carteira recebe `max(PMTnec, 0)` e a diferença vai para a **caixa de oportunidade**, até a caixa atingir o teto de **6 × o excedente médio**. O que passar do teto vai para a carteira.
 - Os **proventos** informados no mês são somados ao valor a distribuir na carteira, ou seja, são reinvestidos.
 
 ### 4.7 Divisão entre os ativos (rebalanceamento só com aportes)
-- **Carteira-alvo padrão**, editável. Cada classe aponta para um ativo padrão:
-  - **Fase de crescimento** (até o mês 84): renda fixa / Tesouro IPCA+ 40%, ações BR / BOVA11 30%, exterior / IVVB11 20%, FIIs / XFIX11 10%.
-  - **Fase de renda** (mês 120): Tesouro IPCA+ com Juros Semestrais 50%, FIIs 25%, ETF de dividendos (ex.: DIVO11) 15%, exterior / IVVB11 10%.
-  - Entre os meses 84 e 120, os pesos migram de forma **linear, mês a mês**.
+- **Carteira-alvo padrão: carteira de renda, igual do início ao fim**, sem fases nem transição, e editável. São 4 classes, cada uma com um ativo padrão:
+  - Renda fixa **40%**: Tesouro IPCA+ com Juros Semestrais.
+  - FIIs **25%**: XFIX11 (fundo que reúne vários FIIs).
+  - Ações BR **25%**: ETF de dividendos (ex.: DIVO11).
+  - Exterior **10%**: IVVB11. Não paga proventos (reinveste sozinho); fica na carteira como **proteção** contra concentração no Brasil e, na aposentadoria, funciona como reserva extra. O app explica isso ao usuário.
+  - Como a carteira já nasce gerando renda, **nunca é preciso vender** para "virar" uma carteira de renda. A regra de nunca vender vale sem exceções.
   - *Decisão do designer:* os percentuais e os ativos padrão acima são um ponto de partida, e o usuário pode editar tudo. Os tickers sugeridos são exemplos, não uma recomendação profissional, e o app deixa isso claro.
 - **Algoritmo:** com os valores atuais por classe `Vc`, o aporte `X` e `Tot = ΣVc + X`, o alvo de cada classe é `wc·Tot` e o déficit é `dc = max(0, wc·Tot − Vc)`. Se `Σdc ≥ X`, o aporte é dividido na proporção dos déficits. Caso contrário, os déficits são preenchidos e a sobra é dividida pelos pesos. Nunca há sugestão de venda.
 - **Apresentação:** valor em R$ por ativo, mais uma estimativa em cotas para ETFs e FIIs, usando o preço implícito (saldo / cotas) ou um preço informado. A sobra de arredondamento vai para a classe de renda fixa.
 - **"Por quê":** uma frase gerada a partir do maior déficit e da variação da classe em relação ao mês anterior. Exemplo: "A bolsa brasileira caiu este mês e ficou abaixo do alvo, então o BOVA11 recebe uma fatia maior."
 
 ### 4.8 Saldos desatualizados
-A divisão usa os últimos saldos informados mais os aportes registrados desde então, sem nenhuma variação de mercado. Se a atualização mais recente tiver mais de 35 dias, um aviso amarelo sugere atualizar. O aviso é opcional e nunca bloqueia a resposta.
+*Decisão do designer:* entre uma atualização e outra, o saldo **estimado** de cada investimento é o último saldo informado, **corrigido pela rentabilidade da premissa** desde então, mais os aportes registrados. Sem essa correção, o patrimônio pareceria ficar para trás da trajetória (que cresce 5% ao ano) só porque o usuário não atualizou os saldos. Valores estimados aparecem marcados como "estimado". Se a atualização mais recente tiver mais de 35 dias, um aviso amarelo sugere atualizar. O aviso é opcional e nunca bloqueia a resposta.
 
 ### 4.9 Projeções e status (painel)
 - **Ritmo:** média dos aportes **realizados** (carteira + caixa; a reserva não entra) nos últimos 6 meses, ou desde o início se houver menos de 6 meses.
+- **Sem histórico suficiente** (*decisão do designer*): enquanto houver menos de 3 meses de aportes na carteira, a projeção usa o **excedente esperado** (`S − Cm − p`), identificado como "baseada no seu excedente esperado (ainda sem histórico)". Se a reserva ainda estiver em formação, a projeção simula primeiro os meses que faltam para completá-la e só depois os aportes na carteira. Assim, o painel não fica vermelho só porque o usuário está, corretamente, formando a reserva.
 - **Projeção:** parte de `P(t)` com o ritmo atual, à taxa da premissa. Calcula a data de `M1` e de `M2` e a faixa (premissa ± 2 pp). A busca vai até 50 anos; acima disso, a meta é tratada como "não alcançada nesse ritmo". **O rendimento observado nunca entra na projeção**: ele aparece num cartão separado ("rendimento real desde o início"), cujo método de cálculo fica a critério do construtor.
 - **Status** (compara a data projetada de `M1` com a data-alvo): 🔵 adiantado (3 meses ou mais antes), 🟢 no caminho (dentro de ±3 meses), 🟡 até 12 meses de atraso, 🔴 mais de 12 meses ou não alcançável. *Os limites são decisão do designer.*
 - **Ação sugerida:** quando há atraso, mostra `PMTnec − ritmo` em R$ por mês a mais, ou "espere: uma alta da bolsa também fecha a diferença".
-- **"Sua carteira já te paga":** média mensal dos proventos registrados nos últimos 12 meses (ou desde o início).
+- **"Sua carteira já te paga"**: é o **indicador principal** do painel, logo abaixo do status. Mostra a média mensal dos proventos registrados nos últimos 12 meses (ou desde o início), comparada com o custo de vida `C` e com o salário, com uma barra de progresso. Exemplo: "R$ 410 de R$ 5.500 por mês". As metas em patrimônio (`M1`, `M2`) e a trajetória continuam guiando o cálculo do aporte. *Decisão do designer:* quando os proventos passarem de 4% ao ano do patrimônio, o app sugere, na aposentadoria, reinvestir o excedente para proteger a carteira da inflação. Isso é só informativo na v1.
 
 ### 4.10 Check-up da carteira (regras v1)
 - Uma classe abaixo do alvo por mais de 5 pp: os próximos aportes vão priorizá-la.
@@ -129,12 +135,12 @@ A divisão usa os últimos saldos informados mais os aportes registrados desde e
 
 1. **Primeiro uso** (assistente em passos):
    1. Conectar os dados: um passo a passo para criar o token e colar no app. Se já existirem dados no repositório (segundo aparelho), o app os carrega e pula o resto do assistente.
-   2. Dados básicos: salário líquido e se recebe 13º e férias (padrão: sim).
+   2. Dados básicos: salário líquido, se recebe 13º e férias (padrão: sim) e quanto já tem separado para as despesas anuais do ciclo atual.
    3. Orçamento (seção 4.11).
    4. Investimentos atuais: nome, papel, classe, saldo e cotas. Pode ficar vazio.
    5. Carteira-alvo: mostra a padrão, com edição opcional.
    6. Veredito: as duas metas, o aporte necessário comparado ao excedente e as datas projetadas, ditos com honestidade. Se `M1` não couber em 10 anos, o app diz em quanto tempo cabe e qual renda é alcançável no prazo.
-2. **Mês (tela inicial):** pergunta "Quanto caiu na sua conta este mês?" e mostra a resposta ao vivo, na mesma tela: valor a investir, valor para o dia a dia, lista "onde aplicar" (ativo + frase simples + R$), o "por quê", avisos e o botão **"Já apliquei"**. Esse botão registra o valor aplicado por ativo (editável, caso tenha sido diferente do sugerido) e atualiza os saldos estimados. Na mesma tela, há uma opção para atualizar os saldos e um campo opcional de proventos. Existe um lançamento por mês-calendário: abrir o app de novo no mesmo mês edita o lançamento existente. Esboço de referência: opção "A" da sessão de design.
+2. **Mês (tela inicial):** pergunta "Quanto caiu na sua conta este mês?" e mostra a resposta ao vivo, na mesma tela: valor a investir, valor para o dia a dia, lista "onde aplicar" (ativo + frase simples + R$), o "por quê", avisos e o botão **"Já apliquei"**. Esse botão registra o valor aplicado por ativo (editável, caso tenha sido diferente do sugerido) e atualiza os saldos estimados. Na mesma tela, há uma opção para atualizar os saldos e o campo **"proventos recebidos este mês"** (com a dica "veja no extrato da corretora"). O campo não é obrigatório, mas é parte central do lançamento, porque alimenta o indicador principal do painel. Existe um lançamento por mês-calendário: abrir o app de novo no mesmo mês edita o lançamento existente. Esboço de referência: opção "A" da sessão de design.
 3. **Painel:** status, números principais, gráfico "até a meta" (plano, real, projeção e faixa), gráfico de zoom dos últimos meses e check-up. Esboço de referência: o painel da sessão de design.
 4. **Orçamento:** edição das categorias com o impacto ao vivo.
 5. **Histórico:** lista mês a mês (recebido, sugerido, aplicado, patrimônio, proventos), com detalhe e correção de cada mês. Cada lançamento guarda uma **cópia da sugestão** feita na época.
@@ -147,12 +153,13 @@ A divisão usa os últimos saldos informados mais os aportes registrados desde e
   - `config`: salário, mês de início, prazo, SWR, rentabilidade, flags de 13º e férias.
   - `orcamento[]`: id, nome, tipo, valor e mês de referência.
   - `ativos[]`: id, nome, ticker, papel, classe e frase explicativa.
-  - `carteiraAlvo`: pesos da fase de crescimento, pesos da fase de renda e o ativo padrão de cada classe.
+  - `carteiraAlvo`: peso e ativo padrão de cada uma das 4 classes.
   - `meses[]`: mês, recebido, tipo do extra, proventos, saldos e cotas por ativo, sugestão (cópia), aplicado por ativo e valores pendentes (como o adiantamento de férias).
   - `contadoresAnuais`: valor já separado para as despesas anuais em cada ano.
   - `ipca`: série em cache.
 - **Leitura e gravação** pela Contents API (`GET`/`PUT /repos/{owner}/Projeto_R-dados/contents/dados.json`), usando o `sha` para detectar conflito. **Em caso de conflito, vale a última gravação**: o app recarrega o remoto, reaplica a alteração local e avisa o usuário.
-- **Offline:** cópia local no `localStorage`. O app funciona com ela e sincroniza quando a conexão voltar.
+- **Offline e instalação no celular** (*decisão do designer*): o app é um **PWA**, com manifest e service worker. Pode ser adicionado à tela inicial do celular e abre mesmo sem internet. Os dados ficam numa cópia local no `localStorage`; o app funciona com ela e sincroniza quando a conexão voltar. A estratégia de cache e atualização do service worker fica a critério do construtor, desde que uma nova versão publicada chegue ao usuário sem ele ter que limpar o cache.
+- **Segurança do token:** o token fica no `localStorage` da origem `<usuário>.github.io`, que é compartilhada por todos os sites do GitHub Pages da mesma conta. Em 2026-11-09, a conta **não tinha nenhum outro site** no Pages, então todo código nessa origem é do próprio usuário. O token só alcança o repositório de dados. Se algum dia um site com código de terceiros for publicado na mesma conta, o caminho é mover o app para um domínio próprio.
 - O repositório `Projeto_R-dados` é criado na implementação (via `gh`), já como privado, com um `README` que explica que contém dados pessoais.
 
 ## 7. Qualidade e testes
@@ -167,6 +174,14 @@ A divisão usa os últimos saldos informados mais os aportes registrados desde e
 
 Organização de pastas e módulos; nomes do esquema de dados; como desenhar os gráficos em SVG; o método do "rendimento real desde o início"; o texto exato das mensagens (desde que seja simples, honesto e em pt-BR); o tratamento de meses sem lançamento nas médias; os detalhes visuais dentro do estilo limpo dos esboços.
 
-## 9. Questões em aberto
+## 9. Questões resolvidas na revisão do construtor
 
-(Preenchidas depois da revisão do construtor.)
+- **Migração para renda na reta final versus nunca vender:** resolvida pela escolha do usuário de montar uma **carteira de renda desde o início** (seções 1 e 4.7). Não há fases, transição nem vendas.
+- **Caixa de oportunidade em queda:** gatilho baseado no índice de desempenho, com regras em ordem de precedência (seção 4.6).
+- **Saldos desatualizados:** corrigidos pela premissa (seção 4.8).
+- **Projeção sem histórico ou com a reserva em formação:** usa o excedente esperado (seção 4.9).
+- **Despesas anuais no primeiro ciclo:** ciclo de novembro a outubro, com o valor já separado informado no assistente (seção 4.5).
+- **Offline:** PWA (seção 6).
+- **Token na origem compartilhada do GitHub Pages:** risco aceito e documentado (seção 6).
+
+Não há questões em aberto.
