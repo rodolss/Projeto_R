@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCG FIRE // Terminal de Aporte Inteligente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="terminal-shell">
+        <header class="terminal-header">
+            <div class="brand">
+                <span class="status-indicator live"></span>
+                <span class="brand-code">TCG::FIRE_TERMINAL</span>
+                <span class="system-tag">v2.4_STABLE</span>
+            </div>
+            <div class="system-telemetry">
+                <div class="telemetry-item">
+                    <span class="telemetry-label">MOTOR:</span>
+                    <span class="telemetry-val">PMT &amp; NPER DUAL ENGINE</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">REGRA:</span>
+                    <span class="telemetry-val">4% SWR (300&times;)</span>
+                </div>
+                <div class="telemetry-item">
+                    <span class="telemetry-label">RELÓGIO:</span>
+                    <span id="liveClock" class="telemetry-val mono">--:--:--</span>
+                </div>
+            </div>
+        </header>
+        <main class="terminal-grid">
+            <!-- COLUNA ESQUERDA: PARÂMETROS E ATUALIZAÇÃO -->
+            <section class="panel-column inputs-column">
+                <!-- MÓDULO 1: CONFIGURAÇÃO INICIAL (SETUP) -->
+                <div class="terminal-panel setup-panel">
+                    <div class="panel-heading">
+                        <div class="heading-title">
+                            <span class="panel-id">M01</span>
+                            <h2>CONFIGURAÇÃO INICIAL // SETUP</h2>
+                        </div>
+                        <span class="panel-badge">PARÂMETROS BASE</span>
+                    </div>
+
+                    <div class="panel-body">
+                        <!-- Salário Mensal Atual -->
+                        <div class="form-group">
+                            <div class="label-row">
+                                <label for="inputSalario">Salário Mensal Atual</label>
+                                <span class="help-tag">Entrada Líquida</span>
+                            </div>
+                            <div class="input-currency-wrapper">
+                                <span class="currency-prefix">R$</span>
+                                <input type="text" id="inputSalario" class="terminal-input mono" inputmode="numeric" placeholder="10.000,00" value="12.000,00">
+                            </div>
+                            <div class="input-hint">Base para a Meta FIRE (Regra 4% = Salário &times; 12 &times; 25)</div>
+                        </div>
+
+                        <!-- Custo de Vida Inegociável -->
+                        <div class="form-group">
+                            <div class="label-row">
+                                <label for="inputCusto">Custo de Vida Inegociável</label>
+                                <span class="help-tag alert-tag">Trava de Segurança</span>
+                            </div>
+                            <div class="input-currency-wrapper">
+                                <span class="currency-prefix">R$</span>
+                                <input type="text" id="inputCusto" class="terminal-input mono" inputmode="numeric" placeholder="6.000,00" value="6.500,00">
+                            </div>
+                            <div class="input-hint">Despesas essenciais que garantem sua dignidade e sobrevivência</div>
+                        </div>
+
+                        <!-- Teto de Aporte Resultante -->
+                        <div class="sub-metric-banner">
+                            <div class="sub-metric-info">
+                                <span class="sub-metric-label">TETO DE APORTE MÁXIMO SEGURO:</span>
+                                <span class="sub-metric-subtext">Salário Atual − Custo de Vida</span>
+                            </div>
+                            <div class="sub-metric-value mono" id="displayTeto">R$ 5.500,00</div>
+                        </div>
+
+                        <!-- Data Alvo da Aposentadoria -->
+                        <div class="form-group">
+                            <div class="label-row">
+                                <label for="inputDataAlvo">Data Alvo da Aposentadoria</label>
+                                <span class="help-tag mono" id="displayMesesRestantesLabel">-- meses restantes</span>
+                            </div>
+                            <div class="input-date-wrapper">
+                                <input type="month" id="inputDataAlvo" class="terminal-input mono">
+                            </div>
+                            <div class="input-hint">Mês e ano limite planejado para aposentadoria FIRE</div>
+                        </div>
+
+                        <!-- Taxa de Rentabilidade Anual Esperada -->
+                        <div class="form-group">
+                            <div class="label-row">
+                                <label for="inputTaxaAnual">Rentabilidade Anual Esperada</label>
+                                <span class="help-tag mono" id="displayTaxaMensalLabel">i = +0,643% a.m.</span>
+                            </div>
+                            <div class="input-percent-wrapper">
+                                <input type="number" id="inputTaxaAnual" class="terminal-input mono" step="0.1" min="0" max="60" value="8.0">
+                                <span class="percent-suffix">% a.a.</span>
+                            </div>
+                            <div class="input-hint">Taxa real estimada de rendimento anual da carteira</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- MÓDULO 2: ATUALIZAÇÃO PATRIMONIAL -->
+                <div class="terminal-panel asset-panel">
+                    <div class="panel-heading">
+                        <div class="heading-title">
+                            <span class="panel-id">M02</span>
+                            <h2>ATUALIZAÇÃO DE MERCADO // PATRIMÔNIO</h2>
+                        </div>
+                        <span class="panel-badge dynamic-badge">DINÂMICO</span>
+                    </div>
+
+                    <div class="panel-body">
+                        <!-- Campo Solicitado: Atualizar Patrimônio Hoje -->
+                        <div class="form-group hero-input-group">
+                            <div class="label-row">
+                                <label for="inputPatrimonioHoje" class="highlight-label">Atualizar Patrimônio Hoje</label>
+                                <span class="help-tag live-tag">VP (Valor Presente)</span>
+                            </div>
+                            <div class="input-currency-wrapper large-currency">
+                                <span class="currency-prefix">R$</span>
+                                <input type="text" id="inputPatrimonioHoje" class="terminal-input mono hero-input" inputmode="numeric" placeholder="150.000,00" value="250.000,00">
+                            </div>
+                            <div class="input-hint">Atualize este valor mensalmente para recalcular o aporte dinâmico</div>
+                        </div>
+
+                        <!-- Simulação de Choques de Mercado -->
+                        <div class="stress-test-box">
+                            <div class="stress-header">
+                                <span class="stress-label">SIMULAR OSCILAÇÃO DE MERCADO NO VP:</span>
+                            </div>
+                            <div class="stress-buttons">
+                                <button type="button" class="btn-stress crash" data-delta="-0.20" title="Queda severa de 20%">-20% Crash</button>
+                                <button type="button" class="btn-stress down" data-delta="-0.10" title="Queda moderada de 10%">-10% Baixa</button>
+                                <button type="button" class="btn-stress up" data-delta="+0.05" title="Alta de 5%">+5% Alta</button>
+                                <button type="button" class="btn-stress bull" data-delta="+0.15" title="Bull market de 15%">+15% Bull</button>
+                                <button type="button" class="btn-stress reset" data-delta="0" title="Restaurar valor original">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- COLUNA DIREITA: RECOMENDAÇÃO E TARGETS -->
+            <section class="panel-column output-column">
+                <!-- MÓDULO 3: PAINEL DE RECOMENDAÇÃO (HERO) -->
+                <div class="terminal-panel recommendation-panel" id="recommendationPanel">
+                    <div class="panel-heading">
+                        <div class="heading-title">
+                            <span class="panel-id">M03</span>
+                            <h2>PAINEL DE RECOMENDAÇÃO // DECISÃO DE APORTE</h2>
+                        </div>
+                        <span class="panel-badge status-pill" id="statusPill">PROCESSANDO</span>
+                    </div>
+
+                    <div class="panel-body recommendation-body">
+                        <!-- Hero Card do Aporte Recomendado -->
+                        <div class="recommendation-hero-card">
+                            <div class="hero-metric-caption">APORTE RECOMENDADO PARA ESTE MÊS</div>
+                            
+                            <div class="hero-amount-wrapper">
+                                <span class="hero-symbol">R$</span>
+                                <span class="hero-amount mono" id="displayAporteRecomendado">0,00</span>
+                            </div>
+
+                            <!-- Banner de Mensagem Condicional de Segurança -->
+                            <div class="recommendation-banner" id="recommendationBanner">
+                                <div class="banner-icon-col">
+                                    <span class="banner-icon" id="bannerIcon">✓</span>
+                                </div>
+                                <div class="banner-text-col">
+                                    <div class="banner-title" id="bannerTitle">STATUS DA OPERAÇÃO</div>
+                                    <div class="banner-message" id="bannerMessage">Calculando aporte dinâmico...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Grid Comparativo: Exigido vs Teto vs Atraso -->
+                        <div class="kpi-subgrid">
+                            <div class="kpi-mini-card">
+                                <span class="kpi-mini-label">APORTE EXIGIDO MATEMÁTICO (PMT):</span>
+                                <span class="kpi-mini-value mono" id="displayAporteExigidoMatematico">R$ 0,00</span>
+                                <span class="kpi-mini-subtext">Necessário para manter data sem atraso</span>
+                            </div>
+
+                            <div class="kpi-mini-card">
+                                <span class="kpi-mini-label">TETO MÁXIMO SEGURO:</span>
+                                <span class="kpi-mini-value mono" id="displayTetoSeguroCard">R$ 0,00</span>
+                                <span class="kpi-mini-subtext">Limite que preserva o custo inegociável</span>
+                            </div>
+
+                            <div class="kpi-mini-card">
+                                <span class="kpi-mini-label">ATRASO ESTIMADO (NPER):</span>
+                                <span class="kpi-mini-value mono" id="displayAtrasoMeses">0 meses</span>
+                                <span class="kpi-mini-subtext" id="displayAtrasoSubtext">Dentro do cronograma</span>
+                            </div>
+
+                            <div class="kpi-mini-card">
+                                <span class="kpi-mini-label">DATA ALVO RECALCULADA:</span>
+                                <span class="kpi-mini-value mono" id="displayNovaDataAlvo">--/----</span>
+                                <span class="kpi-mini-subtext" id="displayDataOriginalRef">Planejada: --/----</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- PATRIMÔNIO ALVO: REGRA DOS 4% -->
+                <div class="terminal-panel fire-target-panel">
+                    <div class="panel-heading">
+                        <div class="heading-title">
+                            <span class="panel-id">FIRE</span>
+                            <h2>PATRIMÔNIO ALVO // REGRA DOS 4% (300&times;)</h2>
+                        </div>
+                        <span class="panel-badge">INDEPENDÊNCIA FINANCEIRA</span>
+                    </div>
+
+                    <div class="panel-body">
+                        <div class="fire-target-display">
+                            <div class="target-stat">
+                                <span class="target-stat-label">PATRIMÔNIO ALVO (VF):</span>
+                                <span class="target-stat-val mono" id="displayPatrimonioAlvo">R$ 0,00</span>
+                                <span class="target-stat-formula mono">Salário Atual &times; 12 &times; 25</span>
+                            </div>
+                            <div class="target-stat">
+                                <span class="target-stat-label">RENDA PASSIVA ESTIMADA (4% a.a.):</span>
+                                <span class="target-stat-val mono text-accent" id="displayRendaPassivaMensal">R$ 0,00 / mês</span>
+                                <span class="target-stat-formula mono">Substitui 100% do seu salário atual</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar em direção à Meta -->
+                        <div class="progress-section">
+                            <div class="progress-header">
+                                <span class="progress-label">CONQUISTA DA LIBERDADE FINANCEIRA</span>
+                                <span class="progress-percent mono" id="displayProgressoPercent">0,00%</span>
+                            </div>
+                            <div class="terminal-progress-track">
+                                <div class="terminal-progress-fill" id="progressFill" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <span class="mono" id="displayPatrimonioAtualBadge">Atual: R$ 0,00</span>
+                                <span class="mono" id="displayPatrimonioFaltaBadge">Falta: R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MEMORIAL DE CÁLCULO E LOG MATEMÁTICO -->
+                <div class="terminal-panel log-panel">
+                    <div class="panel-heading">
+                        <div class="heading-title">
+                            <span class="panel-id">MATH</span>
+                            <h2>MEMORIAL DE CÁLCULO // PMT &amp; NPER LIVE LOG</h2>
+                        </div>
+                        <button type="button" class="btn-toggle-log mono" id="btnToggleLog">DETALHAR EQUAÇÕES</button>
+                    </div>
+
+                    <div class="panel-body log-body" id="logBody">
+                        <div class="console-screen mono" id="consoleScreen">
+                            <div class="console-line"><span class="console-prompt">&gt;</span> Inicializando motor matemático financeiro...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="terminal-footer">
+            <div class="footer-left">
+                <span class="footer-dot"></span>
+                <span>TCG FIRE INTELLIGENCE &bull; SISTEMA DE APORTE DINÂMICO ANTI-CRISE</span>
+            </div>
+            <div class="footer-right mono">
+                <span>MATHEMATICS: PMT(i, n, VP, VF) &bull; NPER(i, Teto, VP, VF)</span>
+            </div>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
