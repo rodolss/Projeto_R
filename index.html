@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Projeto R</title>
+  <meta name="description" content="Planejador pessoal de aposentadoria: quanto investir e onde, todo mês.">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topo">
+    <a class="marca" href="#/mes">Projeto R</a>
+    <nav class="abas" id="abas" aria-label="Seções">
+      <a href="#/mes" data-rota="mes"><span aria-hidden="true">💰</span> Mês</a>
+      <a href="#/painel" data-rota="painel"><span aria-hidden="true">📈</span> Painel</a>
+      <a href="#/orcamento" data-rota="orcamento"><span aria-hidden="true">🧾</span> Orçamento</a>
+      <a href="#/historico" data-rota="historico"><span aria-hidden="true">🗓️</span> Histórico</a>
+      <a href="#/config" data-rota="config" aria-label="Configurações"><span aria-hidden="true">⚙️</span><span class="so-largo"> Ajustes</span></a>
+    </nav>
+  </header>
+  <div id="avisos" class="avisos" aria-live="polite"></div>
+  <main id="tela" class="tela"></main>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
