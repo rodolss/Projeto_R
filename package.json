@@ -1,0 +1,9 @@
+{
+  "name": "projeto-r",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "servir": "node scripts/servidor.mjs"
+  }
+}
