@@ -1,7 +1,7 @@
 # Projeto R — Redesenho v2: "quanto falta" (design)
 
 - **Data:** 2026-11-10
-- **Status:** entendimento confirmado em entrevista; aguardando aprovação deste documento.
+- **Status:** aprovado pelo usuário em 2026-11-10.
 - **Base:** a v1 descrita em `2026-11-09-planejador-aposentadoria-design.md`. Tudo o que este documento não muda continua valendo como lá.
 - **Protótipo de referência:** ramo `prototipo/redesenho-v2`, arquivo `prototipos/redesenho-v2.html` (abrir no navegador; `#d-inicio` é o Início aprovado e `#d-simular` o Simulador aprovado). As variantes A, B e C ficam lá só como registro. Todos os números do protótipo são inventados.
 - **Aviso:** este repositório é público. Nenhum dado pessoal do usuário entra no código, nos testes ou nos documentos.
