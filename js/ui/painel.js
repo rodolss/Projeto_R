@@ -4,6 +4,7 @@ import { graficoTrajetoria, graficoZoom } from './grafico.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { formatarMes, diffMeses } from '../core/meses.js';
 import { calcularPainel } from '../core/motor.js';
+import { precisaRevisarOrcamento } from '../core/metas.js';
 
 const STATUS = {
   adiantado: '🔵 Adiantado',
@@ -90,6 +91,8 @@ function graficos(p) {
 export function render(container, ctx) {
   const p = calcularPainel({ estado: ctx.estado, hoje: ctx.hoje });
   container.replaceChildren(...[
+    precisaRevisarOrcamento(ctx.estado.config.ultimaRevisaoOrcamento, ctx.hoje.slice(0, 7))
+      && aviso('atencao', 'Já faz 6 meses desde a última revisão do orçamento. ', h('a', { href: '#/orcamento' }, 'Revisar agora')),
     blocoStatus(p),
     blocoRenda(p),
     numeros(p),
