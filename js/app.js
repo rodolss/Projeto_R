@@ -115,6 +115,7 @@ async function iniciar() {
   });
   await renderizar();
   atualizarIpca();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch((erro) => console.warn('Sem modo offline', erro));
 }
 
 iniciar();
