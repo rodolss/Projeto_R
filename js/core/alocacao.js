@@ -53,10 +53,13 @@ export function sugestaoPorAtivo({ distribuicao, carteiraAlvo, precos }) {
 export function explicarPorque({ valores, valoresMesAnterior, pesos, distribuicao, carteiraAlvo }) {
   const total = soma(valores);
   if (total <= 0) return 'Dividindo conforme a sua carteira-alvo.';
-  const c = CLASSES.reduce((melhor, x) => ((distribuicao[x] ?? 0) > (distribuicao[melhor] ?? 0) ? x : melhor), CLASSES[0]);
+  // A classe mais favorecida é a que recebe mais em relação à sua fatia normal (peso), não a que recebe mais reais.
+  const aporte = soma(distribuicao);
+  const favorecimento = (x) => (pesos[x] > 0 && aporte > 0 ? (distribuicao[x] ?? 0) / (pesos[x] * aporte) : 0);
+  const c = CLASSES.reduce((melhor, x) => (favorecimento(x) > favorecimento(melhor) ? x : melhor), CLASSES[0]);
   const { ticker } = carteiraAlvo[c];
   if (valoresMesAnterior && valores[c] < valoresMesAnterior[c]) {
     return `${NOMES_CLASSE[c]} caiu este mês e ficou abaixo do alvo, então o ${ticker} recebe uma fatia maior.`;
   }
-  return `${NOMES_CLASSE[c]} está abaixo do alvo (${formatarPct(valores[c] / total)} de ${formatarPct(pesos[c])}), então o ${ticker} recebe a maior parte.`;
+  return `${NOMES_CLASSE[c]} está abaixo do alvo (${formatarPct(valores[c] / total)} de ${formatarPct(pesos[c])}), então o ${ticker} recebe uma fatia maior.`;
 }

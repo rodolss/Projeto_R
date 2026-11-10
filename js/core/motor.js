@@ -180,6 +180,11 @@ function contexto(estado, hoje, atualizados = null) {
   };
 }
 
+// Saldo estimado de cada ativo hoje, em reais de hoje: { [ativoId]: { valor, estimado, data } }.
+export function saldosAtuais(estado, hoje) {
+  return contexto(estado, hoje).saldos;
+}
+
 // ---------- tela do mês ----------
 
 export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje }) {

@@ -51,6 +51,10 @@ test('por quê: queda', () => {
 });
 test('por quê: abaixo do alvo e carteira vazia', () => {
   const t = explicarPorque({ valores: v, valoresMesAnterior: v, pesos, distribuicao: { rendaFixa: 200, fiis: 125, acoes: 125, exterior: 550 }, carteiraAlvo: CARTEIRA_PADRAO });
-  assert.equal(t, 'A parte no exterior está abaixo do alvo (5,3% de 10,0%), então o IVVB11 recebe a maior parte.');
+  assert.equal(t, 'A parte no exterior está abaixo do alvo (5,3% de 10,0%), então o IVVB11 recebe uma fatia maior.');
+});
+test('por quê explica a classe mais favorecida, não a que recebe mais reais', () => {
+  const t = explicarPorque({ valores: v, valoresMesAnterior: null, pesos, distribuicao: { rendaFixa: 920, fiis: 575, acoes: 575, exterior: 730 }, carteiraAlvo: CARTEIRA_PADRAO });
+  assert.equal(t, 'A parte no exterior está abaixo do alvo (5,3% de 10,0%), então o IVVB11 recebe uma fatia maior.');
   assert.equal(explicarPorque({ valores: zeros, valoresMesAnterior: null, pesos, distribuicao: { rendaFixa: 400, fiis: 250, acoes: 250, exterior: 100 }, carteiraAlvo: CARTEIRA_PADRAO }), 'Dividindo conforme a sua carteira-alvo.');
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { perto } from '../ajuda.js';
 import { criarEstadoInicial, migrar } from '../../js/core/esquema.js';
-import { calcularMes, registrarAplicacao, calcularPainel } from '../../js/core/motor.js';
+import { calcularMes, registrarAplicacao, calcularPainel, saldosAtuais } from '../../js/core/motor.js';
 import { classificarStatus } from '../../js/core/projecao.js';
 
 function estadoBase() {
@@ -95,3 +95,9 @@ test('começar do zero não quebra', () => {
   assert.ok(!JSON.stringify(p).includes('NaN'));
 });
 test('migrar rejeita versão futura', () => assert.throws(() => migrar({ schemaVersion: 99 }), /versao-desconhecida/));
+test('saldosAtuais expõe o saldo estimado de cada ativo', () => {
+  const s = saldosAtuais(estadoBase(), '2026-11-10');
+  assert.equal(s.rf.valor, 4000);
+  assert.equal(s.rf.estimado, false);
+  assert.equal(saldosAtuais(estadoBase(), '2026-12-10').rf.estimado, true);
+});
