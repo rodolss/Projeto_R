@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatarBRL, parseBRL, formatarPct } from '../../js/core/formato.js';
+import { formatarBRL, parseBRL, formatarPct, formatarDuracao } from '../../js/core/formato.js';
 
 test('formatarBRL', () => {
   assert.equal(formatarBRL(1234.56), 'R$ 1.234,56');
@@ -21,4 +21,12 @@ test('parseBRL rejeita entradas inválidas', () => {
 test('formatarPct', () => {
   assert.equal(formatarPct(0.0643), '6,4%');
   assert.equal(formatarPct(0.25, 0), '25%');
+});
+test('formatarDuracao', () => {
+  assert.equal(formatarDuracao(null), 'mais de 50 anos');
+  assert.equal(formatarDuracao(0), 'menos de 1 mês');
+  assert.equal(formatarDuracao(1), '1 mês');
+  assert.equal(formatarDuracao(12), '1 ano');
+  assert.equal(formatarDuracao(13), '1 ano e 1 mês');
+  assert.equal(formatarDuracao(255), '21 anos e 3 meses');
 });

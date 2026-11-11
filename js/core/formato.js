@@ -37,3 +37,15 @@ export function parseBRL(texto) {
   const valor = Number(normal);
   return Number.isFinite(valor) ? valor : null;
 }
+
+// "21 anos e 3 meses", "1 ano", "8 meses". null = além do horizonte de 50 anos da projeção.
+export function formatarDuracao(meses) {
+  if (meses === null || meses === undefined) return 'mais de 50 anos';
+  if (meses <= 0) return 'menos de 1 mês';
+  const anos = Math.floor(meses / 12);
+  const resto = meses % 12;
+  const partes = [];
+  if (anos) partes.push(`${anos} ${anos === 1 ? 'ano' : 'anos'}`);
+  if (resto) partes.push(`${resto} ${resto === 1 ? 'mês' : 'meses'}`);
+  return partes.join(' e ');
+}

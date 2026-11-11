@@ -1,105 +1,109 @@
-// Painel: estou no caminho? Status, renda que a carteira já paga, projeções, gráficos e check-up.
-import { h, cartao, aviso, barra } from './dom.js';
-import { graficoTrajetoria, graficoZoom } from './grafico.js';
-import { formatarBRL, formatarPct } from '../core/formato.js';
+// Início: quanto falta para a renda plena, o que os investimentos já pagam e os marcos do caminho (spec v2 §5.2).
+import { h, aviso } from './dom.js';
+import { anel, abreviar } from './grafico.js';
+import { formatarBRL, formatarDuracao } from '../core/formato.js';
 import { formatarMes, diffMeses } from '../core/meses.js';
 import { calcularPainel } from '../core/motor.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
+import { contar } from './movimento.js';
+import { renderDetalhes } from './detalhes.js';
 
-const STATUS = {
-  adiantado: '🔵 Adiantado',
-  'no-caminho': '🟢 No caminho',
-  atencao: '🟡 Um pouco abaixo do plano',
-  atrasado: '🔴 Abaixo do plano',
-};
+const abreviado = (v) => `R$ ${abreviar(v)}`;
+const semCentavos = (v) => formatarBRL(Math.round(v)).replace(/,00$/, '');
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
-const quando = (projecao) => (projecao.mes ? formatarMes(projecao.mes) : 'não alcançada nesse ritmo');
-
-function svg(marcacao) {
-  const el = h('div', { class: 'grafico' });
-  el.innerHTML = marcacao; // gerado por grafico.js, sem texto do usuário
-  return el;
-}
-
-function blocoStatus(p) {
-  const igual = Math.abs(p.diferenca) < 1;
-  const frases = [
-    h('p', {}, 'Hoje você tem ', h('b', {}, formatarBRL(p.patrimonio)), '. O plano previa ', h('b', {}, formatarBRL(p.planejadoHoje)),
-      ' para esta data', igual ? ': você está exatamente no plano.' : [`: ${p.diferenca > 0 ? 'sobram' : 'faltam'} `, h('b', {}, formatarBRL(Math.abs(p.diferenca))), '.']),
+function centroDoAnel(p) {
+  if (p.marcos.rendaPlena.atingido) {
+    return [h('span', { class: 'rotulo' }, 'Renda plena'), h('span', { class: 'anel-grande' }, 'Você chegou'), h('span', { class: 'anel-medio' }, '🏆')];
+  }
+  if (p.faltam === null) {
+    return [h('span', { class: 'rotulo' }, 'Faltam'), h('span', { class: 'anel-medio' }, 'mais de'), h('span', { class: 'anel-grande' }, '50 anos'),
+      h('small', {}, h('a', { href: '#/simular' }, 'Veja no simulador'))];
+  }
+  if (p.faltam === 0) {
+    return [h('span', { class: 'anel-grande' }, 'Quase lá'), h('small', {}, 'Atualize seus saldos para confirmar')];
+  }
+  const anos = Math.floor(p.faltam / 12);
+  const meses = p.faltam % 12;
+  return [
+    h('span', { class: 'rotulo' }, 'Faltam'),
+    h('span', { class: 'anel-grande' }, anos ? plural(anos, 'ano', 'anos') : plural(meses, 'mês', 'meses')),
+    anos && meses ? h('span', { class: 'anel-medio' }, `e ${plural(meses, 'mês', 'meses')}`) : null,
+    h('small', {}, 'no seu ritmo de hoje'),
   ];
-  if (p.projecaoM1.mes) {
-    const d = diffMeses(p.mesAlvo, p.projecaoM1.mes);
-    const relacao = d === 0 ? 'exatamente no alvo' : `${Math.abs(d)} ${Math.abs(d) === 1 ? 'mês' : 'meses'} ${d > 0 ? 'depois' : 'antes'} do alvo (${formatarMes(p.mesAlvo)})`;
-    frases.push(h('p', {}, `No seu ritmo, a Independência chega em `, h('b', {}, formatarMes(p.projecaoM1.mes)), `, ${relacao}.`));
-  } else {
-    frases.push(h('p', {}, 'No ritmo atual, a Independência ', h('b', {}, 'não é alcançada'), '. Cada real a mais por mês muda isso.'));
-  }
-  const atrasado = p.status === 'atencao' || p.status === 'atrasado';
-  let acao = null;
-  if (atrasado && p.acao) {
-    acao = aviso('atencao', 'Para voltar ao alvo, aporte cerca de ', h('b', {}, `${formatarBRL(p.acao.aporteExtra)} a mais por mês`), ', ou espere: uma alta da bolsa também fecha parte da diferença.');
-  } else if (atrasado) {
-    acao = aviso('atencao', 'Espere: uma alta da bolsa também fecha a diferença.');
-  }
-  return h('section', { class: `cartao status ${p.status}` }, h('h2', {}, STATUS[p.status]), ...frases, acao);
 }
 
-function blocoRenda(p) {
-  const fracao = p.custoTotal > 0 ? p.proventosMedios / p.custoTotal : 0;
-  const rendaAnual = p.proventosMedios * 12;
-  return cartao(
-    h('div', { class: 'rotulo' }, 'Sua carteira já te paga'),
-    h('div', { class: 'valor-grande' }, `${formatarBRL(p.proventosMedios)}/mês`),
-    h('div', { class: 'suave' }, `de ${formatarBRL(p.custoTotal)} por mês do seu custo de vida (${formatarPct(fracao)}) · seu salário: ${formatarBRL(p.salario)}`),
-    barra(fracao),
-    p.proventosMedios === 0 && h('p', { class: 'suave pequeno' }, 'Informe os proventos na tela do mês para acompanhar sua renda passiva crescer.'),
-    p.patrimonio > 0 && rendaAnual > p.patrimonio * 0.04
-      && aviso('info', 'Na aposentadoria, reinvista o que passar de 4% ao ano para proteger a carteira da inflação.'));
+function chipSetinha(s) {
+  if (!s) return null;
+  if (s.delta === 0) return h('span', { class: 'chip-setinha' }, s.imediato ? 'igual ao mês passado' : `igual a ${formatarMes(s.mesComparado)}`);
+  const menos = s.delta < 0;
+  const quando = s.imediato ? 'no mês passado' : `em ${formatarMes(s.mesComparado)}`;
+  return h('span', { class: `chip-setinha ${menos ? 'melhor' : 'pior'}` },
+    `${menos ? '▼' : '▲'} ${formatarDuracao(Math.abs(s.delta))} a ${menos ? 'menos' : 'mais'} que ${quando}`);
 }
 
-function numeros(p) {
-  const card = (rotulo, valor, sub) => cartao(h('div', { class: 'rotulo' }, rotulo), h('div', { class: 'valor' }, valor), sub && h('div', { class: 'suave pequeno' }, sub));
-  const pctRenda = p.custoTotal > 0 ? p.rendaNoPrazo / p.custoTotal : 0;
-  return h('div', { class: 'grade' },
-    card('🥇 Independência (custo de vida)', quando(p.projecaoM1),
-      `Alvo: ${formatarMes(p.mesAlvo)} · faixa provável: ${quando(p.faixa.otimista)} a ${quando(p.faixa.pessimista)}`),
-    card(`Renda que você teria em ${formatarMes(p.mesAlvo)}`, `${formatarBRL(p.rendaNoPrazo)}/mês`,
-      `de ${formatarBRL(p.custoTotal)} desejados (${formatarPct(pctRenda, 0)})`),
-    card('🏆 Renda plena (salário)', quando(p.projecaoM2), `Patrimônio de ${formatarBRL(p.metas.rendaPlena)}`),
-    card('Seu ritmo de aportes', `${formatarBRL(p.ritmo.valor)}/mês`,
-      `${p.ritmo.fonte === 'esperado' ? 'baseada no seu excedente esperado (ainda sem histórico)' : 'média dos últimos 6 meses'}${Number.isFinite(p.pmtNec) ? ` · necessário: ${formatarBRL(p.pmtNec)}` : ''}`),
-    card('Rendimento real desde o início', p.rendimentoReal == null ? '—' : `${formatarPct(p.rendimentoReal)} a.a.`,
-      p.rendimentoReal == null ? 'Aparece depois de duas atualizações de saldo.' : 'Acima da inflação · premissa do plano: 5% a.a.'));
+function cartaoRenda(p) {
+  const valor = h('span', {}, formatarBRL(p.proventosMedios));
+  const fracao = p.salario > 0 ? Math.min(1, p.proventosMedios / p.salario) : 0;
+  const posCusto = p.salario > 0 ? Math.min(1, p.custoTotal / p.salario) : 0;
+  const custoAbaixo = posCusto > 0.62; // perto do fim, o rótulo do custo desce para não encostar no do salário
+  const cartao = h('section', { class: 'cartao renda' },
+    h('p', { class: 'rotulo' }, 'Seus investimentos já te pagam'),
+    h('p', { class: 'renda-valor' }, valor, h('small', {}, ' por mês')),
+    h('div', { class: `renda-barra${custoAbaixo ? ' com-abaixo' : ''}`, role: 'img', 'aria-label': `${formatarBRL(p.proventosMedios)} de ${formatarBRL(p.salario)} por mês` },
+      h('i', { style: `width:${(fracao * 100).toFixed(1)}%` }),
+      h('span', { class: `renda-marca${custoAbaixo ? ' abaixo' : ''}`, style: `left:${(posCusto * 100).toFixed(1)}%` }, `🥇 ${semCentavos(p.custoTotal)}`),
+      h('span', { class: 'renda-marca fim' }, `🏆 ${semCentavos(p.salario)}`)),
+    h('p', { class: 'suave pequeno' }, p.proventosMedios > 0
+      ? 'Em 🥇 eles pagam o seu custo de vida. Em 🏆, o seu salário inteiro.'
+      : 'Quando seus investimentos pagarem proventos, informe na tela do Mês e eles aparecem aqui.'));
+  return { cartao, valor };
 }
 
-function graficos(p) {
-  const blocos = [cartao(
-    h('h3', {}, 'Até a meta'),
-    h('div', { class: 'legenda' }, h('span', { class: 'l-plano' }, 'Plano'), h('span', { class: 'l-real' }, 'Real'),
-      h('span', { class: 'l-projecao' }, 'Projeção no seu ritmo'), h('span', { class: 'l-faixa' }, 'Faixa provável (3% a 7% a.a.)')),
-    svg(graficoTrajetoria({ ...p.grafico, meta: p.metas.independencia, mesAlvo: p.mesAlvo })),
-    h('p', { class: 'suave pequeno' }, 'A projeção usa o seu ritmo real de aportes e a rentabilidade da premissa (5% a.a. acima da inflação). A faixa mostra onde você chegaria se o mercado render entre 3% e 7% ao ano.'))];
-  if (p.grafico.real.length >= 2) {
-    blocos.push(cartao(
-      h('h3', {}, 'Últimos meses: real × plano'),
-      h('div', { class: 'legenda' }, h('span', { class: 'l-plano' }, 'Plano'), h('span', { class: 'l-real' }, 'Real')),
-      svg(graficoZoom({ plano: p.grafico.plano, real: p.grafico.real }))));
-  }
-  return blocos;
+function fileiraDeMarcos(p) {
+  const m = p.marcos;
+  const item = (classe, icone, titulo, sub) => h('div', { class: `marco ${classe}` },
+    h('span', { class: 'marco-bola', 'aria-hidden': 'true' }, icone), h('b', {}, titulo), h('span', {}, sub));
+  const situacao = (x, senao) => (x.atingido ? 'conquistada' : x.quaseLa ? 'quase lá: atualize seus saldos' : senao);
+  return h('section', { class: 'cartao marcos', 'aria-label': 'Marcos do caminho' },
+    item(m.reserva.atingido ? 'feito' : '', m.reserva.atingido ? '✓' : '🛡️', 'Reserva de emergência',
+      m.reserva.atingido ? 'conquistada' : `faltam ${semCentavos(m.reserva.falta)}`),
+    item(m.independencia.atingido ? 'feito' : '', '🥇', 'Independência', situacao(m.independencia, `em ${formatarDuracao(p.projecaoM1.meses)}`)),
+    item(m.rendaPlena.atingido ? 'meta feito' : 'meta', '🏆', 'Renda plena',
+      situacao(m.rendaPlena, p.projecaoM2.mes ? formatarMes(p.projecaoM2.mes) : 'mais de 50 anos')));
+}
+
+function fraseDoAlvo(p) {
+  if (!p.projecaoM2.mes || p.marcos.rendaPlena.atingido) return null;
+  const d = diffMeses(p.mesAlvo, p.projecaoM2.mes);
+  const quando = d === 0 ? 'chega bem no alvo' : `chega ${formatarDuracao(Math.abs(d))} ${d > 0 ? 'depois' : 'antes do alvo'}`;
+  return h('p', { class: 'nota' }, `Seu alvo é ${formatarMes(p.mesAlvo)}. No seu ritmo, a renda plena ${quando}. `,
+    h('a', { href: '#/simular' }, 'Veja o que muda no simulador'));
 }
 
 export function render(container, ctx) {
-  const p = calcularPainel({ estado: ctx.estado, hoje: ctx.hoje });
+  const { estado, hoje } = ctx;
+  const p = calcularPainel({ estado, hoje });
+  const fracao = p.marcos.rendaPlena.atingido ? 1 : (p.metas.rendaPlena > 0 ? p.patrimonio / p.metas.rendaPlena : 0);
+  const renda = cartaoRenda(p);
+
   container.replaceChildren(...[
-    precisaRevisarOrcamento(ctx.estado.config.ultimaRevisaoOrcamento, ctx.hoje.slice(0, 7))
+    h('section', { class: 'inicio-topo' },
+      h('p', { class: 'rotulo' }, 'Sua renda plena'),
+      h('div', { class: 'anel', html: anel({ fracao }) }, h('div', { class: 'anel-centro' }, ...centroDoAnel(p))),
+      chipSetinha(p.setinha),
+      h('p', { class: 'juntou' }, 'Você já juntou ', h('b', {}, abreviado(p.patrimonio)), ` de ${abreviado(p.metas.rendaPlena)}.`)),
+    renda.cartao,
+    fileiraDeMarcos(p),
+    fraseDoAlvo(p),
+    h('section', { class: 'cartao acao' },
+      h('div', {}, h('h3', {}, 'Dia de pagamento?'), h('p', { class: 'suave' }, 'Veja quanto investir este mês e onde.')),
+      h('a', { class: 'botao', href: '#/mes' }, 'Abrir')),
+    precisaRevisarOrcamento(estado.config.ultimaRevisaoOrcamento, hoje.slice(0, 7))
       && aviso('atencao', 'Já faz 6 meses desde a última revisão do orçamento. ', h('a', { href: '#/orcamento' }, 'Revisar agora')),
-    blocoStatus(p),
-    blocoRenda(p),
-    numeros(p),
-    ...graficos(p),
-    cartao(h('h3', {}, 'Check-up da carteira'), ...p.checkup.map((item) => h('div', { class: 'linha' },
-      h('div', { class: 'nome' }, h('span', {}, `${item.nivel === 'ok' ? '✅' : '🟡'} ${item.texto}`))))),
     p.avisos.includes('ipca-indisponivel') && aviso('info', 'Ainda não tenho a inflação mais recente; as metas usam a última disponível.'),
-    p.estimado && h('p', { class: 'suave pequeno' }, 'Alguns saldos são estimados a partir da última atualização.'),
+    p.estimado && h('p', { class: 'nota' }, 'Alguns saldos são estimados a partir da última atualização.'),
+    h('details', { class: 'cartao detalhes' }, h('summary', {}, 'Ver detalhes'), renderDetalhes(p, estado)),
   ].filter(Boolean));
+  contar(renda.valor, p.proventosMedios, formatarBRL);
 }
