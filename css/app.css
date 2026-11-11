@@ -231,6 +231,36 @@ details.detalhes[open] > summary::after { content: "−"; }
 .detalhes-conteudo { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 20px; }
 .detalhes-conteudo h3 { margin-bottom: 4px; }
 
+/* ---------- Simular (spec v2 §5.3) ---------- */
+.alvo { display: flex; flex-direction: column; gap: 6px; }
+.alvo .rotulo { margin: 0; }
+.alvo-titulo { font-family: var(--fonte-titulo); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 0; }
+.alvo.antes .alvo-titulo { color: var(--ok); }
+.alvo.nao-fecha .alvo-titulo { color: var(--alerta); }
+.alvo p { margin: 0; font-size: 14.5px; text-wrap: pretty; }
+.alvo .alvo-prazos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--suave); }
+.alvo-prazos span { font-weight: 600; color: var(--texto); padding: 5px 10px; border-radius: 10px; background: var(--cartao-2); font-variant-numeric: tabular-nums; }
+.controles { display: flex; flex-direction: column; gap: 16px; }
+.controle { display: flex; flex-direction: column; gap: 6px; }
+.controle-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14.5px; }
+.controle-topo output { font-weight: 600; font-variant-numeric: tabular-nums; }
+.controle input[type="range"] { width: 100%; accent-color: var(--destaque); height: 28px; margin: 0; }
+.dica { font-size: 13.5px; color: var(--suave); margin: 0; }
+.dica.alerta { color: var(--alerta); }
+.controles > .botao { align-self: flex-start; }
+.cenarios { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cenario { background: var(--cartao); border: 1px solid var(--borda); border-top: 5px solid var(--cor); border-radius: var(--raio);
+  padding: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cenario.destaque { box-shadow: inset 0 0 0 2px var(--cor); }
+.cenario header { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14.5px; flex-wrap: wrap; }
+.cenario header small { flex-basis: 100%; font-weight: 500; color: var(--suave); font-size: 12px; }
+.cenario-tempo { font-family: var(--fonte-titulo); font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.cenario-tempo span { display: block; font-size: 15px; font-weight: 600; }
+.cenario p { margin: 0; font-size: 13px; color: var(--suave); }
+.diferenca { font-size: 12.5px; font-weight: 600; }
+.diferenca.melhor { color: var(--ok); }
+.diferenca.pior { color: var(--alerta); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -1,7 +1,7 @@
 // "Ver detalhes" do Início: os números, gráficos e o check-up que eram do Painel, em palavras simples (spec v2 §5.2).
 import { h, linha } from './dom.js';
 import { graficoTrajetoria, graficoZoom } from './grafico.js';
-import { formatarBRL, formatarPct } from '../core/formato.js';
+import { formatarBRL, formatarPct, formatarPctCurto } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
 
 function svg(marcacao) {
@@ -9,8 +9,6 @@ function svg(marcacao) {
   el.innerHTML = marcacao; // gerado por grafico.js, sem texto do usuário
   return el;
 }
-
-const pctAno = (taxa) => formatarPct(taxa, Number.isInteger(Math.round(taxa * 1000) / 10) ? 0 : 1);
 
 export function renderDetalhes(p, estado) {
   const premissa = estado.config.rentabilidadeReal;
@@ -37,8 +35,8 @@ export function renderDetalhes(p, estado) {
       h('div', { class: 'legenda' }, h('span', { class: 'l-plano' }, 'Plano'), h('span', { class: 'l-real' }, 'Real'),
         h('span', { class: 'l-projecao' }, 'Projeção no seu ritmo'), h('span', { class: 'l-faixa' }, 'Faixa: do cenário ruim ao bom')),
       svg(graficoTrajetoria({ ...p.grafico, meta: p.metas.rendaPlena, mesAlvo: p.mesAlvo })),
-      h('p', { class: 'suave pequeno' }, `A projeção usa o seu ritmo e ${pctAno(premissa)} ao ano acima da inflação (o cenário normal). `
-        + `A faixa vai do cenário ruim (${pctAno(premissa - 0.02)}) ao bom (${pctAno(premissa + 0.02)}).`)),
+      h('p', { class: 'suave pequeno' }, `A projeção usa o seu ritmo e ${formatarPctCurto(premissa)} ao ano acima da inflação (o cenário normal). `
+        + `A faixa vai do cenário ruim (${formatarPctCurto(premissa - 0.02)}) ao bom (${formatarPctCurto(premissa + 0.02)}).`)),
   ];
   if (p.grafico.real.length >= 2) {
     blocos.push(h('div', { class: 'detalhes-grafico' },

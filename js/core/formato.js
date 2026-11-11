@@ -49,3 +49,9 @@ export function formatarDuracao(meses) {
   if (resto) partes.push(`${resto} ${resto === 1 ? 'mês' : 'meses'}`);
   return partes.join(' e ');
 }
+
+// "5%", "3,5%": sem casas decimais quando o percentual é inteiro.
+export function formatarPctCurto(fracao) {
+  const inteiro = Number.isInteger(Math.round(fracao * 1000) / 10);
+  return formatarPct(fracao, inteiro ? 0 : 1);
+}

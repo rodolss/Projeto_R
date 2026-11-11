@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatarBRL, parseBRL, formatarPct, formatarDuracao } from '../../js/core/formato.js';
+import { formatarBRL, parseBRL, formatarPct, formatarDuracao, formatarPctCurto } from '../../js/core/formato.js';
 
 test('formatarBRL', () => {
   assert.equal(formatarBRL(1234.56), 'R$ 1.234,56');
@@ -29,4 +29,10 @@ test('formatarDuracao', () => {
   assert.equal(formatarDuracao(12), '1 ano');
   assert.equal(formatarDuracao(13), '1 ano e 1 mês');
   assert.equal(formatarDuracao(255), '21 anos e 3 meses');
+});
+test('formatarPctCurto: sem casas quando é inteiro', () => {
+  assert.equal(formatarPctCurto(0.05), '5%');
+  assert.equal(formatarPctCurto(0.03), '3%');
+  assert.equal(formatarPctCurto(0.07), '7%');
+  assert.equal(formatarPctCurto(0.035), '3,5%');
 });
