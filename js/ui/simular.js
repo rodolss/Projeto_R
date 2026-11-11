@@ -3,7 +3,7 @@ import { h } from './dom.js';
 import { formatarBRL, formatarDuracao, formatarPctCurto } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
 import { calcularPainel } from '../core/motor.js';
-import { simular, moverAlavanca } from '../core/simulador.js';
+import { simular, moverAlavanca, numerosReais } from '../core/simulador.js';
 
 const CONTROLES = [
   { campo: 'aporte', rotulo: 'Quanto invisto por mês', passo: 50, padrao: 15000 },
@@ -53,8 +53,9 @@ function diferenca(simulado, real) {
 
 export function render(container, ctx) {
   const p = calcularPainel({ estado: ctx.estado, hoje: ctx.hoje });
-  const meus = { salario: Math.round(p.baseSimulador.salario), custo: Math.round(p.baseSimulador.custoTotal), aporte: Math.round(p.baseSimulador.ritmo) };
-  const base = { ...p.baseSimulador, salario: meus.salario, custoTotal: meus.custo };
+  // Números reais sem arredondar: o cenário normal bate com o "Faltam" do Início. Só a posição dos controles é inteira.
+  const base = p.baseSimulador;
+  const meus = numerosReais(base);
   const real = simular({ base, sim: meus });
   let sim = { ...meus };
 
@@ -66,7 +67,7 @@ export function render(container, ctx) {
 
   function sincronizar() {
     for (const { campo } of CONTROLES) {
-      entradas[campo].value = String(sim[campo]);
+      entradas[campo].value = String(Math.round(sim[campo]));
       saidas[campo].textContent = reais(sim[campo]);
     }
   }
@@ -89,8 +90,8 @@ export function render(container, ctx) {
   const controles = CONTROLES.map(({ campo, rotulo, passo, padrao }) => {
     const max = Math.max(padrao, Math.ceil((meus[campo] * 2) / passo) * passo);
     entradas[campo] = h('input', {
-      type: 'range', id: `sim-${campo}`, min: '0', max: String(max), step: String(passo), value: String(meus[campo]),
-      oninput: (e) => { sim = moverAlavanca(sim, campo, Number(e.target.value)); sincronizar(); atualizar(); },
+      type: 'range', id: `sim-${campo}`, min: '0', max: String(max), step: String(passo), value: String(Math.round(meus[campo])),
+      oninput: (e) => { sim = moverAlavanca(sim, campo, Number(e.target.value), meus); sincronizar(); atualizar(); },
     });
     saidas[campo] = h('output', { for: `sim-${campo}` }, reais(meus[campo]));
     return h('label', { class: 'controle', for: `sim-${campo}` }, h('span', { class: 'controle-topo' }, h('span', {}, rotulo), saidas[campo]), entradas[campo]);

@@ -17,6 +17,7 @@ import {
 } from './projecao.js';
 import { checkup } from './checkup.js';
 import { avaliarMarcos } from './marcos.js';
+import { aporteNecessario } from './simulador.js';
 import { novoId } from './esquema.js';
 
 const DIAS_SALDOS = 35;
@@ -442,6 +443,8 @@ export function calcularPainel({ estado, hoje }) {
     estimado: grupo.estimado,
     avisos: cx.ipcaIndisponivel ? ['ipca-indisponivel'] : [],
     faltam: projecaoM2.meses,
+    // O mesmo "quanto seria preciso para chegar no alvo" do simulador: conta a reserva que falta formar.
+    necessarioAlvo: aporteNecessario({ patrimonio: grupo.patrimonio, meta: metas.rendaPlena, i, mesAtual: mes, mesLimite: mesAlvo, reservaFaltando }),
     setinha: setinha({ meses: estado.meses, mesAtual: mes, faltamAgora: projecaoM2.meses }),
     reserva: grupo.reserva,
     alvoReserva: reservaAlvo,

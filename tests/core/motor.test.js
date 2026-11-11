@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { perto } from '../ajuda.js';
 import { criarEstadoInicial, migrar } from '../../js/core/esquema.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../../js/core/motor.js';
+import { simular, numerosReais } from '../../js/core/simulador.js';
 
 function estadoBase() {
   const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
@@ -224,4 +225,31 @@ test('renda plena atingida: faltam 0 e marco atingido (Review Focus 5)', () => {
   const p = calcularPainel({ estado: e, hoje: '2026-11-10' });
   assert.equal(p.faltam, 0);
   assert.equal(p.marcos.rendaPlena.atingido, true);
+});
+test('simulador com os números reais bate com o "Faltam" do Início (revisão final)', () => {
+  const e = criarEstadoInicial({ salario: 3473, mesInicio: '2026-11' });
+  e.orcamento = [
+    { id: 'o1', nome: 'Gastos', tipo: 'mensal', valor: 1789.58, mes: '2026-11' },
+    { id: 'o2', nome: 'Anuais', tipo: 'anual', valor: 4721.37, mes: '2026-11' },
+  ];
+  e.ativos = [
+    { id: 'res', nome: 'Reserva', ticker: 'Tesouro Selic', papel: 'reserva', classe: null, tipoForaDoPlano: null },
+    { id: 'rf', nome: 'RF', ticker: 'Tesouro IPCA+ com Juros Semestrais', papel: 'carteira', classe: 'rendaFixa', tipoForaDoPlano: null },
+  ];
+  e.saldos = [
+    { ativoId: 'res', data: '2026-11-10', valor: 6 * (1789.58 + 4721.37 / 12), cotas: null },
+    { ativoId: 'rf', data: '2026-11-10', valor: 770.98, cotas: null },
+  ];
+  e.ipca.serie = { '2026-11': 0.0039, '2026-12': 0.0039 };
+  const p = calcularPainel({ estado: e, hoje: '2027-01-10' });
+  const r = simular({ base: p.baseSimulador, sim: numerosReais(p.baseSimulador) });
+  assert.equal(r.cenarios.find((c) => c.id === 'normal').meses, p.faltam);
+});
+test('"quanto seria preciso para o alvo" é o mesmo no painel e no simulador, contando a reserva (revisão final)', () => {
+  const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
+  e.orcamento = [{ id: 'o1', nome: 'Gastos', tipo: 'mensal', valor: 5000, mes: '2026-11' }];
+  const p = calcularPainel({ estado: e, hoje: '2026-11-10' });
+  const r = simular({ base: p.baseSimulador, sim: numerosReais(p.baseSimulador) });
+  perto(p.necessarioAlvo, r.alvo.necessario, 0.5);
+  assert.ok(p.necessarioAlvo > p.pmtNec);
 });

@@ -8,11 +8,23 @@ import { somarMeses, diffMeses } from './meses.js';
 const TOLERANCIA = 0.5;
 
 // Salário e custo de vida movem o aporte junto: + R$ X de salário = + R$ X investidos; + R$ X de custo = − R$ X.
-export function moverAlavanca(sim, campo, valor) {
+// O aporte é sempre derivado dos números reais (`meus`): aporte = meus.aporte + Δsalário − Δcusto + ajuste, nunca
+// abaixo de 0. Arrastar o próprio aporte só muda o `ajuste`. Assim, levar um controle até a ponta e voltar
+// devolve o aporte de antes: o limite em 0 não "perde" o que foi descontado.
+export function moverAlavanca(sim, campo, valor, meus) {
   const v = Math.max(0, Math.round(Number(valor) || 0));
-  if (campo === 'salario') return { ...sim, salario: v, aporte: Math.max(0, Math.round(sim.aporte + (v - sim.salario))) };
-  if (campo === 'custo') return { ...sim, custo: v, aporte: Math.max(0, Math.round(sim.aporte - (v - sim.custo))) };
-  return { ...sim, aporte: v };
+  const proximo = { salario: sim.salario, custo: sim.custo, ajuste: sim.ajuste ?? 0 };
+  const semAjuste = (s) => meus.aporte + (s.salario - meus.salario) - (s.custo - meus.custo);
+  if (campo === 'salario') proximo.salario = v;
+  else if (campo === 'custo') proximo.custo = v;
+  else proximo.ajuste = v - semAjuste(proximo);
+  const aporte = Math.max(0, Math.round(semAjuste(proximo) + proximo.ajuste));
+  return { salario: proximo.salario, custo: proximo.custo, aporte, ajuste: proximo.ajuste };
+}
+
+// Os números reais de partida do simulador, sem arredondar: assim o cenário normal bate com o "Faltam" do Início.
+export function numerosReais(base) {
+  return { salario: base.salario, custo: base.custoTotal, aporte: base.ritmo, ajuste: 0 };
 }
 
 // Menor aporte mensal que alcança a meta até `mesLimite`, com a mesma regra de projetar() (reserva primeiro).

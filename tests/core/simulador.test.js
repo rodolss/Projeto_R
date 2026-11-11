@@ -41,10 +41,19 @@ test('alvo já passou: prazos contam de hoje', () => {
   assert.deepEqual(r.prazosMaiores.map((p) => p.mes), ['2031-11', '2036-11']);
 });
 test('alavancas ligadas', () => {
-  assert.deepEqual(moverAlavanca(REAIS, 'salario', 7000), { salario: 7000, custo: 3500, aporte: 3400 });
-  assert.deepEqual(moverAlavanca(REAIS, 'custo', 3800), { salario: 6000, custo: 3800, aporte: 2100 });
-  assert.deepEqual(moverAlavanca(REAIS, 'custo', 9000), { salario: 6000, custo: 9000, aporte: 0 });
-  assert.deepEqual(moverAlavanca(REAIS, 'aporte', 5000), { salario: 6000, custo: 3500, aporte: 5000 });
+  const sim = { ...REAIS, ajuste: 0 };
+  assert.deepEqual(moverAlavanca(sim, 'salario', 7000, REAIS), { salario: 7000, custo: 3500, aporte: 3400, ajuste: 0 });
+  assert.deepEqual(moverAlavanca(sim, 'custo', 3800, REAIS), { salario: 6000, custo: 3800, aporte: 2100, ajuste: 0 });
+  assert.deepEqual(moverAlavanca(sim, 'custo', 9000, REAIS), { salario: 6000, custo: 9000, aporte: 0, ajuste: 0 });
+  assert.deepEqual(moverAlavanca(sim, 'aporte', 5000, REAIS), { salario: 6000, custo: 3500, aporte: 5000, ajuste: 2600 });
+});
+test('alavancas: ir até a ponta e voltar devolve o aporte de antes (revisão final)', () => {
+  const ida = (sim, passos) => passos.reduce((s, [campo, valor]) => moverAlavanca(s, campo, valor, REAIS), sim);
+  const inicio = { ...REAIS, ajuste: 0 };
+  assert.equal(ida(inicio, [['custo', 9000], ['custo', 3500]]).aporte, 2400);
+  assert.equal(ida(inicio, [['salario', 0], ['salario', 6000]]).aporte, 2400);
+  assert.equal(ida(inicio, [['aporte', 3000], ['custo', 3800]]).aporte, 2700);
+  assert.equal(ida(inicio, [['aporte', 5000], ['custo', 9000], ['custo', 3500]]).aporte, 5000);
 });
 test('consegue acompanha as alavancas e avisa o excesso', () => {
   const r = simular({ base: BASE, sim: { salario: 7000, custo: 3800, aporte: 3000 } });

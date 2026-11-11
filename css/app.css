@@ -237,7 +237,7 @@ details.detalhes[open] > summary::after { content: "−"; }
 .alvo .rotulo { margin: 0; }
 .alvo-titulo { font-family: var(--fonte-titulo); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 0; }
 .alvo.antes .alvo-titulo { color: var(--ok); }
-.alvo.nao-fecha .alvo-titulo { color: var(--alerta); }
+/* "Não fecha" fica na cor normal do texto: o alvo nunca vira alarme vermelho (spec v2, anti-objetivo). */
 .alvo p { margin: 0; font-size: 14.5px; text-wrap: pretty; }
 .alvo .alvo-prazos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--suave); }
 .alvo-prazos span { font-weight: 600; color: var(--texto); padding: 5px 10px; border-radius: 10px; background: var(--cartao-2); font-variant-numeric: tabular-nums; }

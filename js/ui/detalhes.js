@@ -25,7 +25,7 @@ export function renderDetalhes(p, estado) {
     linha('Seus investimentos já pagam', `${formatarBRL(p.proventosMedios)}/mês`, 'Proventos, média de até 12 meses'),
     linha('Rendimento real desde o início', p.rendimentoReal == null ? '—' : `${formatarPct(p.rendimentoReal)} ao ano`,
       p.rendimentoReal == null ? 'Aparece depois de duas atualizações de saldo' : 'Acima da inflação'),
-    linha('Para chegar no alvo', Number.isFinite(p.pmtNec) ? `${formatarBRL(p.pmtNec)}/mês` : '—',
+    linha('Para chegar no alvo', Number.isFinite(p.necessarioAlvo) ? `${formatarBRL(p.necessarioAlvo)}/mês` : '—',
       `Até ${formatarMes(p.mesAlvo)}, no cenário normal`));
 
   const blocos = [
