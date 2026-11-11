@@ -12,8 +12,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * Lembretes do dia do pagamento (spec do app Android, §5). O site calcula as datas e manda a lista pela ponte;
@@ -32,36 +30,33 @@ object Lembretes {
 
     /** Troca a agenda inteira: cancela os lembretes antigos, guarda a lista nova e agenda os que ainda vão acontecer. */
     fun agendar(ctx: Context, json: String) {
-        val novos = JSONObject(json).optJSONArray("lembretes") ?: JSONArray()
+        val novos = LeitorLembretes.ler(json) // valida antes de mexer em qualquer coisa
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val antigos = JSONArray(prefs.getString(LISTA, "[]"))
-        for (i in 0 until antigos.length()) cancelar(ctx, antigos.getJSONObject(i).getInt("id"))
-        prefs.edit().putString(LISTA, novos.toString()).apply()
+        for (antigo in LeitorLembretes.ler(prefs.getString(LISTA, "[]") ?: "[]")) cancelar(ctx, antigo.id)
+        prefs.edit().putString(LISTA, LeitorLembretes.paraJson(novos)).apply()
         agendarLista(ctx, novos)
     }
 
     /** Depois de reiniciar o celular (ou atualizar o app), os alarmes somem: reagenda a última lista recebida. */
     fun reagendarSalvos(ctx: Context) {
-        agendarLista(ctx, JSONArray(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(LISTA, "[]")))
+        agendarLista(ctx, LeitorLembretes.ler(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(LISTA, "[]") ?: "[]"))
     }
 
-    private fun agendarLista(ctx: Context, lista: JSONArray) {
+    private fun agendarLista(ctx: Context, lista: List<ItemLembrete>) {
         val alarmes = ctx.getSystemService(AlarmManager::class.java)
         val agora = System.currentTimeMillis()
-        for (i in 0 until lista.length()) {
-            val l = lista.getJSONObject(i)
-            val quando = l.getLong("quando")
-            if (quando <= agora) continue
+        for (l in lista) {
+            if (l.quando <= agora) continue
             val intent = Intent(ctx, LembreteReceiver::class.java)
-                .putExtra("id", l.getInt("id"))
-                .putExtra("titulo", l.optString("titulo", "Projeto R"))
-                .putExtra("texto", l.optString("texto", TEXTO_PRINCIPAL))
-                .putExtra("rota", l.optString("rota", "#/mes"))
+                .putExtra("id", l.id)
+                .putExtra("titulo", l.titulo)
+                .putExtra("texto", l.texto)
+                .putExtra("rota", l.rota)
             val pendente = PendingIntent.getBroadcast(
-                ctx, l.getInt("id"), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ctx, l.id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             // Inexato de propósito: chega "por volta" do horário, sem a permissão de alarme exato.
-            alarmes.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quando, pendente)
+            alarmes.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, l.quando, pendente)
         }
     }
 

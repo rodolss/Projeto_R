@@ -40,6 +40,7 @@ class MainActivity : Activity() {
         private const val TAG = "ProjetoR"
         private const val PEDIDO_NOTIFICACAO = 1
         private const val ID_TESTE = 999
+        private const val ESTADO_URL = "url"
         private val ROTA_VALIDA = Regex("^#/[a-z-]+$")
 
         /** Só as páginas do Projeto R ficam dentro do app; o resto abre no navegador. */
@@ -60,7 +61,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.tentarDeNovo).setOnClickListener {
             semInternet.visibility = View.GONE
             web.visibility = View.VISIBLE
-            web.reload()
+            web.loadUrl(URL_INICIAL) // mais garantido que reload() depois de uma página de erro
         }
 
         web.settings.javaScriptEnabled = true
@@ -72,8 +73,10 @@ class MainActivity : Activity() {
         Lembretes.criarCanal(this)
         pedirPermissaoNaPrimeiraVez()
 
-        if (savedInstanceState != null) web.restoreState(savedInstanceState)
-        else web.loadUrl(URL_INICIAL + (rotaDe(intent) ?: ""))
+        // Ao recriar a tela (ex.: o celular trocou para o tema escuro), volta à mesma página. Guarda só o endereço:
+        // o histórico inteiro do WebView pode passar do limite de tamanho e fechar o app.
+        val salvo = savedInstanceState?.getString(ESTADO_URL)?.takeIf { ehDoApp(Uri.parse(it)) }
+        web.loadUrl(salvo ?: (URL_INICIAL + (rotaDe(intent) ?: "")))
     }
 
     /** Tocar numa notificação com o app já aberto leva à rota pedida (ex.: #/mes) sem recarregar. */
@@ -101,21 +104,20 @@ class MainActivity : Activity() {
         WebViewCompat.addWebMessageListener(web, "ProjetoRAndroid", setOf(ORIGEM)) {
                 _: WebView, mensagem: WebMessageCompat, _: Uri, _: Boolean, resposta: JavaScriptReplyProxy ->
             val texto = mensagem.data ?: return@addWebMessageListener
-            val json = try {
-                JSONObject(texto)
-            } catch (erro: Exception) {
-                Log.w(TAG, "Mensagem do site não é JSON: $texto")
-                return@addWebMessageListener
-            }
-            when (json.optString("tipo")) {
-                "agendar" -> Lembretes.agendar(this, texto)
-                "testar" -> Lembretes.notificar(this, ID_TESTE, "Projeto R", Lembretes.TEXTO_PRINCIPAL, "#/mes")
-                "permissao?" -> responderPermissao(resposta)
-                "pedirPermissao" -> {
-                    ultimaResposta = resposta
-                    pedirPermissao()
+            // Nada que o site mande pode derrubar o app: o site é publicado separado do APK.
+            try {
+                when (JSONObject(texto).optString("tipo")) {
+                    "agendar" -> Lembretes.agendar(this, texto)
+                    "testar" -> Lembretes.notificar(this, ID_TESTE, "Projeto R", Lembretes.TEXTO_PRINCIPAL, "#/mes")
+                    "permissao?" -> responderPermissao(resposta)
+                    "pedirPermissao" -> {
+                        ultimaResposta = resposta
+                        pedirPermissao()
+                    }
+                    else -> Log.w(TAG, "Tipo de mensagem desconhecido: $texto")
                 }
-                else -> Log.w(TAG, "Tipo de mensagem desconhecido: $texto")
+            } catch (erro: Exception) {
+                Log.w(TAG, "Mensagem do site ignorada: $texto", erro)
             }
         }
     }
@@ -183,7 +185,7 @@ class MainActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        web.saveState(outState)
+        web.url?.let { outState.putString(ESTADO_URL, it) }
     }
 
     @Deprecated("Mantido para o botão voltar em todas as versões suportadas (Android 8 em diante)")
