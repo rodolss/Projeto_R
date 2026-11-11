@@ -29,8 +29,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Compilar a casca
-        run: gradle -p android assembleDebug --no-daemon
+      - name: Compilar, testar e checar o release
+        run: gradle -p android assembleDebug testDebugUnitTest lintVitalRelease --no-daemon
 
   publicar:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/android-v')
