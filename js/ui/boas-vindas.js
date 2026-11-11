@@ -1,7 +1,7 @@
 // Assistente de primeiro uso (spec §5.1): conexão, dados básicos, orçamento, investimentos, carteira-alvo e veredito.
 import { h, campoMoeda, cartao, botao, aviso, textoConexao, AVISO_EXEMPLOS } from './dom.js';
-import { formatarBRL } from '../core/formato.js';
-import { formatarMes as nomeMes, diffMeses } from '../core/meses.js';
+import { formatarBRL, formatarDuracao } from '../core/formato.js';
+import { formatarMes as nomeMes } from '../core/meses.js';
 import { CATEGORIAS_SUGERIDAS, custoDeVida } from '../core/metas.js';
 import { CLASSES, CARTEIRA_PADRAO } from '../core/alocacao.js';
 import { criarEstadoInicial, novoId } from '../core/esquema.js';
@@ -230,25 +230,18 @@ export function render(container, ctx) {
   function passoVeredito() {
     const estado = montarEstado();
     const p = calcularPainel({ estado, hoje: ctx.hoje });
-    const alvo = p.mesAlvo;
-    const anos = (mes) => (diffMeses(mesInicio, mes) / 12).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-    let conclusao;
-    if (p.projecaoM1.mes && diffMeses(p.projecaoM1.mes, alvo) >= 0) {
-      conclusao = aviso('ok', `No seu ritmo, a Independência chega em ${nomeMes(p.projecaoM1.mes)}, dentro do prazo. 🎉`);
-    } else if (p.projecaoM1.mes) {
-      conclusao = aviso('atencao', `Em 10 anos não fecha: no seu ritmo, a Independência chega em ${nomeMes(p.projecaoM1.mes)} (${anos(p.projecaoM1.mes)} anos). Em ${nomeMes(alvo)}, sua carteira pagaria cerca de ${formatarBRL(p.rendaNoPrazo)} por mês.`);
-    } else {
-      conclusao = aviso('alerta', 'Com o que sobra hoje, a meta não é alcançada. Vale revisar o orçamento: cada real economizado por mês aproxima a data.');
-    }
+    // A renda plena é a meta; o alvo é só referência, sem alarme (spec v2 §5.5).
+    const conclusao = aviso('info', p.faltam !== null
+      ? `No seu ritmo, faltam ${formatarDuracao(p.faltam)} para a renda plena (${nomeMes(p.projecaoM2.mes)}). Seu alvo é ${nomeMes(p.mesAlvo)}: no simulador você vê o que muda se investir mais.`
+      : 'No ritmo de hoje, a renda plena fica a mais de 50 anos. No simulador você vê quanto seria preciso investir.');
     const reservaFaltando = p.checkup.find((x) => x.chave === 'reserva')?.nivel === 'atencao';
     return moldura('Seu plano', 'Isto é o que a matemática diz hoje. O app acompanha mês a mês e ajusta a rota.', [
       h('div', { class: 'grade' },
-        cartao(h('div', { class: 'rotulo' }, '🥇 Independência (custo de vida)'), h('div', { class: 'valor' }, formatarBRL(p.metas.independencia)),
-          h('div', { class: 'suave pequeno' }, `Patrimônio que paga ${formatarBRL(p.custoTotal)}/mês. Alvo: ${nomeMes(alvo)}.`)),
-        cartao(h('div', { class: 'rotulo' }, '🏆 Renda plena (salário)'), h('div', { class: 'valor' }, formatarBRL(p.metas.rendaPlena)),
-          h('div', { class: 'suave pequeno' }, `Patrimônio que paga ${formatarBRL(p.salario)}/mês.`)),
-        cartao(h('div', { class: 'rotulo' }, 'Quanto sobra para investir'), h('div', { class: 'valor' }, `${formatarBRL(p.ritmo.valor)}/mês`),
-          h('div', { class: 'suave pequeno' }, Number.isFinite(p.pmtNec) ? `Para chegar no prazo seriam ${formatarBRL(p.pmtNec)}/mês.` : ''))),
+        cartao(h('div', { class: 'rotulo' }, '🏆 Renda plena (sua meta)'), h('div', { class: 'valor' }, formatarBRL(p.metas.rendaPlena)),
+          h('div', { class: 'suave pequeno' }, `Patrimônio que paga ${formatarBRL(p.salario)}/mês, o seu salário.`)),
+        cartao(h('div', { class: 'rotulo' }, '🥇 Independência (um marco no caminho)'), h('div', { class: 'valor' }, formatarBRL(p.metas.independencia)),
+          h('div', { class: 'suave pequeno' }, `Paga o seu custo de vida de ${formatarBRL(p.custoTotal)}/mês.`)),
+        cartao(h('div', { class: 'rotulo' }, 'Quanto sobra para investir'), h('div', { class: 'valor' }, `${formatarBRL(p.ritmo.valor)}/mês`))),
       conclusao,
       reservaFaltando && aviso('info', 'Primeiro vamos formar sua reserva de emergência (6 meses de custo de vida). Só depois o dinheiro vai para os investimentos.'),
       h('div', { class: 'botoes' }, botao('Começar', async () => {

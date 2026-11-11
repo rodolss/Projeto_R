@@ -1,6 +1,6 @@
 // Tela do mês (tela inicial): "Quanto caiu na sua conta?" → quanto separar e onde aplicar, na hora.
-import { h, campoMoeda, cartao, botao, aviso, linha, barra, AVISO_EXEMPLOS } from './dom.js';
-import { formatarBRL, formatarPct } from '../core/formato.js';
+import { h, campoMoeda, cartao, botao, aviso, linha, AVISO_EXEMPLOS } from './dom.js';
+import { formatarBRL, formatarDuracao } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
@@ -184,7 +184,6 @@ export function render(container, ctx) {
       h('div', { class: 'botoes' }, salvarSaldos));
   }
 
-  const progresso = painel.metas.independencia > 0 ? painel.patrimonio / painel.metas.independencia : 0;
   const campoRecebido = campoMoeda({
     rotulo: null, valor: est.recebido, grande: true, id: 'recebido',
     dica: 'O salário líquido que entrou, livre na mão.',
@@ -198,9 +197,9 @@ export function render(container, ctx) {
     cartao(
       h('h1', {}, 'Quanto caiu na sua conta este mês?'),
       campoRecebido,
-      h('div', { style: 'margin-top:12px' },
-        h('div', { class: 'suave pequeno' }, `Independência: ${formatarPct(progresso)} do caminho · alvo ${formatarMes(painel.mesAlvo)}`),
-        barra(progresso))),
+      h('p', { class: 'suave', style: 'margin-top:12px' }, painel.faltam !== null
+        ? `Faltam ${formatarDuracao(painel.faltam)} para a renda plena.`
+        : 'No ritmo de hoje, a renda plena fica a mais de 50 anos.')),
     h('details', { class: 'cartao', open: (existente?.proventos ?? 0) > 0 },
       h('summary', {}, 'Recebeu proventos este mês?'),
       h('div', { style: 'margin-top:8px' }, campoMoeda({

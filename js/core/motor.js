@@ -1,9 +1,9 @@
 // Motor: junta as regras do núcleo para a tela do mês e para o painel.
 // Tudo é calculado em "reais de hoje" (corrigido pelo IPCA) e em termos reais.
 import { somarMeses, diffMeses, diasEntre } from './meses.js';
-import { taxaMensal, pmtNecessario, patrimonioPlanejado, valorFuturo } from './financas.js';
+import { taxaMensal, pmtNecessario, patrimonioPlanejado } from './financas.js';
 import { paraReaisDeHoje, ultimoMes } from './ipca.js';
-import { custoDeVida, calcularMetas, provisaoMensal, rendaDoPatrimonio } from './metas.js';
+import { custoDeVida, calcularMetas, provisaoMensal } from './metas.js';
 import {
   calcularExcedente, perguntarExtra, anuaisFaltando, somarAoCiclo, alvoReserva,
 } from './protecao.js';
@@ -13,7 +13,7 @@ import {
   CLASSES, distribuirAporte, arredondarDistribuicao, sugestaoPorAtivo, explicarPorque,
 } from './alocacao.js';
 import {
-  ritmoDeAportes, projetar, faixaProjecao, classificarStatus, acaoSugerida, proventosMedios, setinha,
+  ritmoDeAportes, projetar, proventosMedios, setinha,
 } from './projecao.js';
 import { checkup } from './checkup.js';
 import { avaliarMarcos } from './marcos.js';
@@ -382,10 +382,6 @@ export function calcularPainel({ estado, hoje }) {
 
   const projecaoM1 = projetar({ ...base, i, meta: metas.independencia });
   const projecaoM2 = projetar({ ...base, i, meta: metas.rendaPlena });
-  const faixa = faixaProjecao({ ...base, rentabilidade: cfg.rentabilidadeReal, meta: metas.independencia });
-  const mesesAteAlvo = Math.max(0, cfg.prazoMeses - t);
-  // Aproximação: o que ainda falta da reserva deixa de ir para a carteira.
-  const noPrazo = Math.max(0, valorFuturo({ p: grupo.patrimonio, aporte: ritmo.valor, i, meses: mesesAteAlvo }) - reservaFaltando);
   const planejadoHoje = patrimonioPlanejado({ p0: cx.p0, meta: metas.rendaPlena, i, prazo: cfg.prazoMeses, t: Math.min(Math.max(t, 0), cfg.prazoMeses) });
 
   const indices = indiceDesempenho(pontosDesempenho(estado), cx.serie);
@@ -423,7 +419,6 @@ export function calcularPainel({ estado, hoje }) {
   const reservaAlvo = alvoReserva(custo.total);
 
   return {
-    status: classificarStatus({ mesProjetado: projecaoM1.mes, mesAlvo }),
     patrimonio: grupo.patrimonio,
     planejadoHoje,
     diferenca: grupo.patrimonio - planejadoHoje,
@@ -432,12 +427,9 @@ export function calcularPainel({ estado, hoje }) {
     salario,
     mesAlvo,
     projecaoM1,
-    faixa,
     projecaoM2,
-    rendaNoPrazo: rendaDoPatrimonio(noPrazo, cfg.swr),
     ritmo,
     pmtNec: cx.pmtNec,
-    acao: acaoSugerida({ pmtNec: cx.pmtNec, ritmo: ritmo.valor }),
     proventosMedios: proventosMedios({ historico, mesInicio: cfg.mesInicio }),
     rendimentoReal,
     checkup: itensCheckup,

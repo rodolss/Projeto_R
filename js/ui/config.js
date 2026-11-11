@@ -5,7 +5,7 @@ import { formatarMes, diffMeses } from '../core/meses.js';
 import { CLASSES } from '../core/alocacao.js';
 import { migrar, novoId } from '../core/esquema.js';
 import { ultimoMes } from '../core/ipca.js';
-import { PAPEIS, NOMES_CLASSE_CURTOS } from './inicio.js';
+import { PAPEIS, NOMES_CLASSE_CURTOS } from './boas-vindas.js';
 
 const campoNumero = (rotulo, valor, aoMudar, { sufixo = '', dica = null, passo = '0.1' } = {}) => h('label', { class: 'campo' },
   h('span', { class: 'campo-rotulo' }, rotulo),
@@ -39,7 +39,7 @@ export function render(container, ctx) {
   const prem = { swr: estado.config.swr * 100, rent: estado.config.rentabilidadeReal * 100, prazo: estado.config.prazoMeses / 12 };
   const cartaoPremissas = cartao(h('h2', {}, 'Premissas do plano'),
     campoNumero('Taxa de retirada', prem.swr, (v) => { prem.swr = v; }, { sufixo: '% ao ano', dica: 'Quanto você tira da carteira por ano na aposentadoria. 4% é o padrão; 3,5% é mais conservador.' }),
-    campoNumero('Rentabilidade real esperada', prem.rent, (v) => { prem.rent = v; }, { sufixo: '% ao ano', dica: 'Quanto a carteira rende acima da inflação, em média.' }),
+    campoNumero('Rentabilidade real esperada', prem.rent, (v) => { prem.rent = v; }, { sufixo: '% ao ano', dica: 'Quanto a carteira rende por ano acima da inflação. É o cenário normal do simulador; o ruim e o moderado ficam 2 e 1 pontos abaixo, e o bom 2 pontos acima.' }),
     campoNumero('Prazo', prem.prazo, (v) => { prem.prazo = v; }, { sufixo: 'anos', passo: '1', dica: `Contado a partir de ${formatarMes(estado.config.mesInicio)}.` }),
     h('div', { class: 'botoes' }, botao('Salvar premissas', () => {
       if (!(prem.swr > 0 && prem.swr < 20 && prem.rent > -5 && prem.rent < 30 && prem.prazo >= 1 && prem.prazo <= 50)) {

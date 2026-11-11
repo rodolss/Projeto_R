@@ -1,6 +1,6 @@
-// Ritmo, projeções, faixa de incerteza, status e impacto do orçamento (spec §4.9 e §4.11).
+// Ritmo, projeções, cenários, setinha e impacto do orçamento (spec §4.9 e §4.11; spec v2 §4.4 e §4.5).
 import { somarMeses, diffMeses } from './meses.js';
-import { taxaMensal, mesesAteMeta } from './financas.js';
+import { mesesAteMeta } from './financas.js';
 
 const LIMITE_MESES = 600;
 
@@ -34,25 +34,6 @@ export function projetar({ patrimonio, aporteMensal, i, meta, mesAtual, reservaF
     v = v * (1 + i) + aporteMensal - paraReserva;
   }
   return { meses: null, mes: null };
-}
-
-export function faixaProjecao({ patrimonio, aporteMensal, rentabilidade, meta, mesAtual, reservaFaltando = 0, delta = 0.02 }) {
-  const com = (r) => projetar({ patrimonio, aporteMensal, i: taxaMensal(r), meta, mesAtual, reservaFaltando });
-  return { otimista: com(rentabilidade + delta), central: com(rentabilidade), pessimista: com(rentabilidade - delta) };
-}
-
-export function classificarStatus({ mesProjetado, mesAlvo }) {
-  if (!mesProjetado) return 'atrasado';
-  const d = diffMeses(mesAlvo, mesProjetado);
-  if (d <= -3) return 'adiantado';
-  if (d <= 3) return 'no-caminho';
-  if (d <= 12) return 'atencao';
-  return 'atrasado';
-}
-
-export function acaoSugerida({ pmtNec, ritmo }) {
-  const extra = pmtNec - ritmo;
-  return Number.isFinite(extra) && extra > 0 ? { aporteExtra: extra } : null;
 }
 
 export function proventosMedios({ historico, mesInicio }) {

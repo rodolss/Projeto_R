@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { perto } from '../ajuda.js';
 import { criarEstadoInicial, migrar } from '../../js/core/esquema.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../../js/core/motor.js';
-import { classificarStatus } from '../../js/core/projecao.js';
 
 function estadoBase() {
   const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
@@ -74,7 +73,6 @@ test('painel sem histórico usa o excedente esperado', () => {
   assert.equal(p.metas.independencia, 1650000);
   assert.equal(p.mesAlvo, '2036-11');
   perto(p.planejadoHoje, 9500);
-  assert.equal(p.status, classificarStatus({ mesProjetado: p.projecaoM1.mes, mesAlvo: '2036-11' }));
 });
 test('metas acompanham a inflação', () => {
   const e = estadoBase();
