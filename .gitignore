@@ -1,2 +1,11 @@
 node_modules/
 .superpowers/
+
+# Android (casca do app)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.p12
+*.pem
+*.jks

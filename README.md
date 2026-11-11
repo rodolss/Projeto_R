@@ -8,6 +8,16 @@ Planejador pessoal de aposentadoria. Ao abrir, o app mostra **quanto falta para 
 - **Simulador "E se…?":** arraste quanto investe, o salário e o custo de vida e veja quanto falta em 4 cenários de mercado (ruim, moderado, normal e bom) e quanto seria preciso para chegar no alvo.
 - **Os investimentos sugeridos são exemplos, não uma recomendação profissional.**
 
+## App Android
+
+Além do site, há um app Android: uma casca pequena que abre o site publicado, funciona sem internet depois da primeira abertura e lembra do dia do pagamento (5º dia útil ou um dia fixo, ajustável em Mais › Ajustes › Lembretes).
+
+- **Baixar:** no celular, abra https://github.com/rodolss/Projeto_R/releases/latest e toque em `projeto-r.apk`.
+- **Instalar:** libere "instalar apps desconhecidos" para o navegador quando o Android pedir e, se aparecer o aviso do Play Protect, toque em "Instalar mesmo assim".
+- **Primeira abertura:** aceite as notificações quando o app pedir e cole a sua chave do GitHub (o app guarda as coisas separado do Chrome; crie uma chave nova "Projeto R (app Android)").
+- **Backup:** exportar e importar backup só pelo computador.
+- **Para quem mantém:** o APK é montado e assinado pelo GitHub Actions (`.github/workflows/android.yml`) a cada tag `android-vN`. A chave de assinatura fica nos segredos do repositório e numa cópia de segurança fora dele (`scripts/gerar-chave-android.sh`).
+
 ## Privacidade
 
 Este repositório contém **apenas o código**. Os dados de quem usa o app ficam num repositório **privado** separado, acessado por uma chave do GitHub restrita a ele, e numa cópia local no navegador.

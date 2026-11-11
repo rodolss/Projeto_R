@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Projeto R</string>
+    <string name="sem_internet">Conecte-se à internet para abrir o Projeto R pela primeira vez.</string>
+    <string name="tentar_de_novo">Tentar de novo</string>
+</resources>
