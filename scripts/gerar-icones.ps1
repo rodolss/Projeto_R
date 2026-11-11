@@ -1,10 +1,10 @@
-# Gera os ícones PNG do app (um "R" branco sobre o azul de destaque).
+# Gera os ícones PNG do app (um "R" branco sobre o azul-marinho de destaque).
 # Uso: powershell -ExecutionPolicy Bypass -File scripts/gerar-icones.ps1
 Add-Type -AssemblyName System.Drawing
 
 $pasta = Join-Path $PSScriptRoot '..\icones'
 New-Item -ItemType Directory -Force -Path $pasta | Out-Null
-$azul = [System.Drawing.Color]::FromArgb(255, 37, 99, 235)
+$azul = [System.Drawing.Color]::FromArgb(255, 28, 59, 114)
 
 function Gerar([int]$tamanho, [string]$nome, [double]$escalaLetra) {
   $bmp = New-Object System.Drawing.Bitmap $tamanho, $tamanho

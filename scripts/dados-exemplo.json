@@ -1,0 +1,42 @@
+{
+  "_aviso": "Números INVENTADOS, só para capturas de tela. As datas são ajustadas ao dia de hoje por scripts/capturar-telas.mjs.",
+  "schemaVersion": 2,
+  "config": {
+    "salario": 6000, "mesSalario": "2026-10", "recebe13": true, "recebeFerias": true, "mesInicio": "2026-10",
+    "prazoMeses": 120, "swr": 0.04, "rentabilidadeReal": 0.05, "ultimaRevisaoOrcamento": "2026-10"
+  },
+  "plano": { "p0": 255000, "mesP0": "2026-10" },
+  "orcamento": [
+    { "id": "ex-moradia", "nome": "Moradia", "tipo": "mensal", "valor": 1500, "mes": "2026-10" },
+    { "id": "ex-mercado", "nome": "Mercado", "tipo": "mensal", "valor": 900, "mes": "2026-10" },
+    { "id": "ex-transporte", "nome": "Transporte", "tipo": "mensal", "valor": 600, "mes": "2026-10" },
+    { "id": "ex-ipva", "nome": "IPVA", "tipo": "anual", "valor": 2400, "mes": "2026-10" },
+    { "id": "ex-viagem", "nome": "Viagem", "tipo": "anual", "valor": 3600, "mes": "2026-10" }
+  ],
+  "ativos": [
+    { "id": "ex-res", "nome": "Reserva (Tesouro Selic)", "ticker": "Tesouro Selic", "papel": "reserva", "classe": null, "tipoForaDoPlano": null },
+    { "id": "ex-rf", "nome": "Tesouro IPCA+ com Juros Semestrais", "ticker": "Tesouro IPCA+ com Juros Semestrais", "papel": "carteira", "classe": "rendaFixa", "tipoForaDoPlano": null },
+    { "id": "ex-fii", "nome": "XFIX11", "ticker": "XFIX11", "papel": "carteira", "classe": "fiis", "tipoForaDoPlano": null },
+    { "id": "ex-aco", "nome": "DIVO11", "ticker": "DIVO11", "papel": "carteira", "classe": "acoes", "tipoForaDoPlano": null },
+    { "id": "ex-ext", "nome": "IVVB11", "ticker": "IVVB11", "papel": "carteira", "classe": "exterior", "tipoForaDoPlano": null }
+  ],
+  "saldos": [
+    { "ativoId": "ex-res", "data": "2026-10-10", "valor": 21000, "cotas": null },
+    { "ativoId": "ex-rf", "data": "2026-10-10", "valor": 104000, "cotas": null },
+    { "ativoId": "ex-fii", "data": "2026-10-10", "valor": 65000, "cotas": 6800 },
+    { "ativoId": "ex-aco", "data": "2026-10-10", "valor": 65000, "cotas": 650 },
+    { "ativoId": "ex-ext", "data": "2026-10-10", "valor": 26000, "cotas": 70 }
+  ],
+  "meses": [
+    {
+      "mes": "2026-10", "data": "2026-10-10", "recebido": 6000, "tipoExtra": null, "proventos": 1080,
+      "sugestao": { "excedente": 2400, "paraDiaADia": 3600, "sugestoes": [], "porque": "" },
+      "aplicado": [], "guardarParaProximoMes": 0, "paraAnuais": 0, "provisao": 0,
+      "previsao": { "mesRendaPlena": "2048-03" }
+    }
+  ],
+  "contadoresAnuais": {},
+  "ipca": { "serie": {}, "atualizadoEm": null },
+  "ipcaManual": {},
+  "marcos": { "reserva": "2026-10-10" }
+}
