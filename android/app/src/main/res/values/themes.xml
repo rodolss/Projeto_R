@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sem AppCompat: tema da plataforma, com as cores do app (azul-marinho). -->
+    <style name="Tema" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#1c3b72</item>
+        <item name="android:navigationBarColor">#1c3b72</item>
+        <item name="android:windowBackground">#f2f4f8</item>
+    </style>
+</resources>
