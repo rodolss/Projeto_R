@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { somarMeses } from '../../js/core/meses.js';
-import { graficoTrajetoria, graficoZoom, abreviar } from '../../js/ui/grafico.js';
+import { graficoTrajetoria, graficoZoom, abreviar, anel } from '../../js/ui/grafico.js';
 
 const serie = (n, f) => Array.from({ length: n }, (_, k) => ({ mes: somarMeses('2026-11', k), valor: f(k) }));
 
@@ -34,4 +34,11 @@ test('abreviar valores dos eixos', () => {
   assert.equal(abreviar(1650000), '1,65 mi');
   assert.equal(abreviar(500000), '500 mil');
   assert.equal(abreviar(0), '0');
+});
+test('anel: sem NaN e limitado entre 0 e 1', () => {
+  for (const f of [NaN, -1, 0, 0.001, 0.25, 1, 3]) {
+    const s = anel({ fracao: f });
+    assert.ok(s.startsWith('<svg') && !s.includes('NaN'));
+  }
+  assert.match(anel({ fracao: 1 }), /stroke-dashoffset="0"/);
 });

@@ -130,3 +130,11 @@ test('carregarLocal devolve a cópia local sem esperar a rede (revisão I9)', ()
   const armazenamento = criarArmazenamento(local({ schemaVersion: 1, x: 5 }));
   assert.equal(criarArmazem({ armazenamento, cliente: criarCliente() }).carregarLocal().estado.x, 5);
 });
+test('remoto da v1 chega migrado para a v2', async () => {
+  const armazenamento = criarArmazenamento();
+  const a = criarArmazem({ armazenamento, cliente: criarCliente({ remoto: { schemaVersion: 1, x: 1 } }) });
+  const r = await a.carregar();
+  assert.equal(r.estado.schemaVersion, 2);
+  assert.deepEqual(r.estado.marcos, {});
+  assert.equal(r.estado.x, 1);
+});

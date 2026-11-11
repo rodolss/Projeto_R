@@ -4,11 +4,18 @@ import { criarClienteGitHub, donoPadrao } from './dados/github.js';
 import { buscarSerieIpca, precisaAtualizarIpca } from './dados/ipca-remoto.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao } from './ui/dom.js';
+import { resolverRota, abaDoMenu } from './ui/rotas.js';
+import { escalonar } from './ui/movimento.js';
 
-const TELAS = ['inicio', 'mes', 'painel', 'orcamento', 'historico', 'config'];
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
-const app = { estado: null, armazem: null, conexao: null };
+const app = { estado: null, armazem: null, conexao: null, sincronizado: false };
+// Quem precisa dos dados já sincronizados (a comemoração de marcos) espera aqui (spec v2 §4.7).
+const esperandoSincronizar = [];
+function quandoSincronizado(fn) {
+  if (app.sincronizado) fn(app.estado);
+  else esperandoSincronizar.push(fn);
+}
 const fetchGlobal = (...args) => globalThis.fetch(...args);
 
 function lerConexao() {
@@ -43,6 +50,8 @@ async function conectar({ token, dono }) {
   montarArmazem();
   const r = await app.armazem.carregar();
   if (r.estado) app.estado = r.estado;
+  app.sincronizado = true;
+  for (const fn of esperandoSincronizar.splice(0)) fn(app.estado);
   return r;
 }
 
@@ -67,21 +76,27 @@ function contexto() {
     fetch: fetchGlobal,
     donoSugerido: donoPadrao(location.hostname),
     rerender: () => renderizar(),
+    sincronizado: app.sincronizado,
+    quandoSincronizado,
   };
 }
 
 async function renderizar() {
-  const rota = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'mes';
-  if (!app.estado && rota !== 'inicio') { navegar('#/inicio'); return; }
-  const nome = TELAS.includes(rota) ? rota : 'mes';
-  document.body.classList.toggle('sem-abas', nome === 'inicio');
-  for (const a of document.querySelectorAll('#abas a')) a.classList.toggle('ativa', a.dataset.rota === nome);
+  const nome = resolverRota(location.hash, Boolean(app.estado));
+  if (location.hash.replace(/^#\/?/, '').split('?')[0] !== nome) { navegar(`#/${nome}`); return; }
+  document.body.classList.toggle('sem-abas', nome === 'boas-vindas');
+  const aba = abaDoMenu(nome);
+  for (const a of document.querySelectorAll('#menu a')) {
+    if (a.dataset.rota === aba) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
 
   const tela = document.getElementById('tela');
   try {
     const modulo = await import(`./ui/${nome}.js`);
     tela.replaceChildren();
     modulo.render(tela, contexto());
+    escalonar(tela);
     window.scrollTo(0, 0);
   } catch (erro) {
     console.error(erro);
@@ -114,6 +129,8 @@ async function sincronizarAoAbrir() {
   const r = await app.armazem.carregar();
   if (r.aviso) mostrarAviso(textoConexao(r.aviso), r.aviso === 'conflito-resolvido' ? 'info' : 'atencao');
   receberEstado(r.estado);
+  app.sincronizado = true;
+  for (const fn of esperandoSincronizar.splice(0)) fn(app.estado);
   await atualizarIpca();
 }
 
@@ -132,6 +149,7 @@ async function iniciar() {
     if (s.sincronizado) mostrarAviso('Conexão de volta: dados sincronizados.', 'ok', 4000);
     receberEstado(s.estado);
   });
+  app.sincronizado = !app.conexao;
   if (app.estado || !app.conexao) await renderizar();
   sincronizarAoAbrir().then(() => { if (!document.getElementById('tela').childElementCount) renderizar(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch((erro) => console.warn('Sem modo offline', erro));

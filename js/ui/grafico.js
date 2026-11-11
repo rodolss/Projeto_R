@@ -85,3 +85,17 @@ export function graficoZoom({ plano, real, largura = 640, altura = 160 }) {
   for (const p of reais) partes.push(`<circle class="ponto" cx="${num(x(p.mes))}" cy="${num(y(p.valor))}" r="3"/>`);
   return `<svg viewBox="0 0 ${largura} ${altura}" role="img" aria-label="Últimos meses: patrimônio real comparado ao plano">${partes.join('')}</svg>`;
 }
+
+// Anel de progresso do Início: começa no topo e enche no sentido horário (spec v2 §5.2).
+export function anel({ fracao }) {
+  const R = 104;
+  const C = 2 * Math.PI * R;
+  let f = Number.isFinite(fracao) ? Math.min(1, Math.max(0, fracao)) : 0;
+  if (f > 0 && f < 0.015) f = 0.015; // um tiquinho visível em vez de nada
+  const resto = Math.round(C * (1 - f) * 100) / 100;
+  return `<svg viewBox="0 0 260 260" aria-hidden="true">`
+    + `<circle class="anel-trilho" cx="130" cy="130" r="${R}" fill="none" stroke-width="18"/>`
+    + (f > 0 ? `<circle class="anel-arco" cx="130" cy="130" r="${R}" fill="none" stroke-width="18" stroke-linecap="round" `
+      + `stroke-dasharray="${num(C)}" stroke-dashoffset="${resto}" style="--anel-total:${num(C)}" transform="rotate(-90 130 130)"/>` : '')
+    + '</svg>';
+}

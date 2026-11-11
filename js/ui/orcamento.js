@@ -1,4 +1,4 @@
-// Orçamento: categorias mensais e anuais, com o impacto de cada mudança na data da Independência.
+// Orçamento: categorias mensais e anuais, com o impacto de cada mudança na data da renda plena.
 import { h, campoMoeda, cartao, botao, aviso } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
@@ -25,8 +25,7 @@ export function render(container, ctx) {
     patrimonio: painel.patrimonio,
     aporteMensal: painel.ritmo.valor,
     i: taxaMensal(estado.config.rentabilidadeReal),
-    custoTotal: painel.custoTotal,
-    swr: estado.config.swr,
+    metaRendaPlena: painel.metas.rendaPlena,
   };
   const original = new Map(estado.orcamento.map((c) => [c.id, c.valor]));
   const rascunho = estado.orcamento.map((c) => ({ ...c }));
@@ -104,7 +103,7 @@ export function render(container, ctx) {
 
   container.replaceChildren(
     h('h1', {}, 'Orçamento'),
-    h('p', { class: 'suave' }, `Ajuste quanto você gasta em cada categoria. Ao lado, o efeito na data da Independência. Última revisão: ${formatarMes(estado.config.ultimaRevisaoOrcamento)}.`),
+    h('p', { class: 'suave' }, `Ajuste quanto você gasta em cada categoria. Ao lado, o efeito na data da renda plena. Última revisão: ${formatarMes(estado.config.ultimaRevisaoOrcamento)}.`),
     topo,
     listas,
     h('div', { class: 'botoes' }, salvar),

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { perto } from '../ajuda.js';
 import { criarEstadoInicial, migrar } from '../../js/core/esquema.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../../js/core/motor.js';
-import { classificarStatus } from '../../js/core/projecao.js';
+import { simular, numerosReais } from '../../js/core/simulador.js';
 
 function estadoBase() {
   const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
@@ -74,7 +74,6 @@ test('painel sem histórico usa o excedente esperado', () => {
   assert.equal(p.metas.independencia, 1650000);
   assert.equal(p.mesAlvo, '2036-11');
   perto(p.planejadoHoje, 9500);
-  assert.equal(p.status, classificarStatus({ mesProjetado: p.projecaoM1.mes, mesAlvo: '2036-11' }));
 });
 test('metas acompanham a inflação', () => {
   const e = estadoBase();
@@ -172,4 +171,85 @@ test('saldosAtuais expõe o saldo estimado de cada ativo', () => {
   assert.equal(s.rf.valor, 4000);
   assert.equal(s.rf.estimado, false);
   assert.equal(saldosAtuais(estadoBase(), '2026-12-10').rf.estimado, true);
+});
+test('o plano mira a renda plena: perto da Independência, nada vai para a caixa', () => {
+  const e = estadoBase();
+  e.saldos = e.saldos.map((s) => (s.ativoId === 'rf' ? { ...s, valor: 1000000 } : s));
+  const r = calcularMes({ estado: e, recebido: 7800, hoje: '2026-11-10' });
+  assert.equal(r.paraCaixa, 0);
+  assert.equal(r.sugestoes.reduce((s, x) => s + x.valor, 0), 2800);
+});
+test('painel: faltam, setinha, marcos e base do simulador', () => {
+  const p = calcularPainel({ estado: estadoBase(), hoje: '2026-11-10' });
+  assert.equal(p.faltam, p.projecaoM2.meses);
+  assert.equal(p.setinha, null);
+  assert.equal(p.marcos.reserva.atingido, true);
+  assert.deepEqual(p.marcos.aComemorar, ['reserva']);
+  assert.deepEqual(p.baseSimulador, { patrimonio: 9500, reserva: 33000, salario: 7800, custoTotal: 5500, ritmo: 2800, consegue: 2800, premissa: 0.05, swr: 0.04, mesAtual: '2026-11', mesAlvo: '2036-11' });
+});
+test('registrar o mês guarda a previsão; no mês seguinte a setinha compara com ele', () => {
+  let e = estadoBase();
+  const r = calcularMes({ estado: e, recebido: 7800, hoje: '2026-11-10' });
+  e = registrarAplicacao(e, { mes: '2026-11', data: '2026-11-10', recebido: 7800, resposta: r, aplicado: r.sugestoes.map((s) => ({ destino: s.classe, valor: s.valor })) });
+  const m = e.meses.find((x) => x.mes === '2026-11');
+  assert.equal(m.previsao.mesRendaPlena, calcularPainel({ estado: e, hoje: '2026-11-10' }).projecaoM2.mes);
+  const p = calcularPainel({ estado: e, hoje: '2026-12-10' });
+  assert.equal(p.setinha.mesComparado, '2026-11');
+  assert.equal(p.setinha.imediato, true);
+});
+test('marco comemorado não volta para a fila', () => {
+  const e = estadoBase();
+  e.marcos = { reserva: '2026-11-10' };
+  assert.deepEqual(calcularPainel({ estado: e, hoje: '2026-11-10' }).marcos.aComemorar, []);
+});
+test('independência pela estimativa fica em "quase lá" sem saldos recentes', () => {
+  const e = estadoBase();
+  e.saldos = e.saldos.map((s) => (s.ativoId === 'rf' ? { ...s, valor: 2000000 } : s));
+  assert.equal(calcularPainel({ estado: e, hoje: '2026-11-10' }).marcos.independencia.atingido, true);
+  const depois = calcularPainel({ estado: e, hoje: '2027-01-20' }).marcos.independencia;
+  assert.deepEqual(depois, { atingido: false, quaseLa: true });
+});
+test('começar do zero: nada a comemorar, reserva com quanto falta, sem NaN (Review Focus 1)', () => {
+  const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
+  e.orcamento = [{ id: 'o1', nome: 'Gastos', tipo: 'mensal', valor: 5000, mes: '2026-11' }];
+  const p = calcularPainel({ estado: e, hoje: '2026-11-10' });
+  assert.equal(p.marcos.reserva.atingido, false);
+  assert.equal(p.marcos.reserva.falta, 30000);
+  assert.deepEqual(p.marcos.aComemorar, []);
+  assert.ok(p.faltam === null || Number.isInteger(p.faltam));
+  assert.ok(!JSON.stringify(p).includes('NaN'));
+});
+test('renda plena atingida: faltam 0 e marco atingido (Review Focus 5)', () => {
+  const e = estadoBase();
+  e.saldos = e.saldos.map((s) => (s.ativoId === 'rf' ? { ...s, valor: 2400000 } : s));
+  const p = calcularPainel({ estado: e, hoje: '2026-11-10' });
+  assert.equal(p.faltam, 0);
+  assert.equal(p.marcos.rendaPlena.atingido, true);
+});
+test('simulador com os números reais bate com o "Faltam" do Início (revisão final)', () => {
+  const e = criarEstadoInicial({ salario: 3473, mesInicio: '2026-11' });
+  e.orcamento = [
+    { id: 'o1', nome: 'Gastos', tipo: 'mensal', valor: 1789.58, mes: '2026-11' },
+    { id: 'o2', nome: 'Anuais', tipo: 'anual', valor: 4721.37, mes: '2026-11' },
+  ];
+  e.ativos = [
+    { id: 'res', nome: 'Reserva', ticker: 'Tesouro Selic', papel: 'reserva', classe: null, tipoForaDoPlano: null },
+    { id: 'rf', nome: 'RF', ticker: 'Tesouro IPCA+ com Juros Semestrais', papel: 'carteira', classe: 'rendaFixa', tipoForaDoPlano: null },
+  ];
+  e.saldos = [
+    { ativoId: 'res', data: '2026-11-10', valor: 6 * (1789.58 + 4721.37 / 12), cotas: null },
+    { ativoId: 'rf', data: '2026-11-10', valor: 770.98, cotas: null },
+  ];
+  e.ipca.serie = { '2026-11': 0.0039, '2026-12': 0.0039 };
+  const p = calcularPainel({ estado: e, hoje: '2027-01-10' });
+  const r = simular({ base: p.baseSimulador, sim: numerosReais(p.baseSimulador) });
+  assert.equal(r.cenarios.find((c) => c.id === 'normal').meses, p.faltam);
+});
+test('"quanto seria preciso para o alvo" é o mesmo no painel e no simulador, contando a reserva (revisão final)', () => {
+  const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
+  e.orcamento = [{ id: 'o1', nome: 'Gastos', tipo: 'mensal', valor: 5000, mes: '2026-11' }];
+  const p = calcularPainel({ estado: e, hoje: '2026-11-10' });
+  const r = simular({ base: p.baseSimulador, sim: numerosReais(p.baseSimulador) });
+  perto(p.necessarioAlvo, r.alvo.necessario, 0.5);
+  assert.ok(p.necessarioAlvo > p.pmtNec);
 });

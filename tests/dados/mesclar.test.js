@@ -57,3 +57,11 @@ test('sem base conhecida: une tudo e o local vence nos empates', () => {
   const r = mesclar({ base: null, local, remoto });
   assert.deepEqual(r.meses.map((m) => [m.mes, m.recebido]), [['2026-11', 1], ['2026-12', 3]]);
 });
+test('marcos: une as chaves e fica com a data mais antiga', () => {
+  const r = mesclar({
+    base: { marcos: {} },
+    local: { marcos: { reserva: '2027-03-02' } },
+    remoto: { marcos: { reserva: '2027-03-01', independencia: '2035-01-01' } },
+  });
+  assert.deepEqual(r.marcos, { reserva: '2027-03-01', independencia: '2035-01-01' });
+});
