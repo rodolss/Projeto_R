@@ -22,6 +22,7 @@
   --fonte-texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fonte-titulo: "Sora", "Segoe UI", system-ui, -apple-system, sans-serif;
   --raio: 18px; --sombra: 0 1px 2px rgba(16, 26, 46, 0.05);
+  --veu: rgba(6, 10, 22, 0.6);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -260,6 +261,24 @@ details.detalhes[open] > summary::after { content: "−"; }
 .diferenca { font-size: 12.5px; font-weight: 600; }
 .diferenca.melhor { color: var(--ok); }
 .diferenca.pior { color: var(--alerta); }
+
+/* ---------- Comemoração de marco (spec v2 §7) ---------- */
+.festa { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--veu);
+  padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  animation: festa-fundo 300ms ease both; }
+.festa canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.festa-cartao { position: relative; max-width: 340px; background: var(--cartao); color: var(--texto); border-radius: 24px; padding: 28px 22px 22px;
+  text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center;
+  animation: festa-pulo 650ms cubic-bezier(.2, 1.4, .4, 1) both; }
+.festa-cartao h2 { font-size: 22px; margin: 0; }
+.festa-cartao p { margin: 0; }
+.festa-cartao > p:not(.rotulo) { font-size: 15px; color: var(--suave); text-wrap: pretty; }
+.festa-cartao .botao { margin-top: 6px; min-width: 160px; }
+.festa-icone { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; font-size: 38px; background: var(--ouro-fundo);
+  animation: festa-giro 900ms 200ms cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes festa-fundo { from { opacity: 0; } }
+@keyframes festa-pulo { from { opacity: 0; transform: scale(0.7) translateY(30px); } }
+@keyframes festa-giro { from { transform: scale(0.2) rotate(-60deg); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

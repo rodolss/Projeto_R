@@ -1,7 +1,7 @@
 // Fotografa telas do app em tamanho de celular (412 × 915), no tema claro e no escuro, com o Edge headless.
 // Serve para conferir o visual sem dados reais: injeta scripts/dados-exemplo.json (números inventados).
 //
-// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir]
+// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir] [--espera 1500]
 // Pressupõe `npm run servir` rodando em http://localhost:8080. Sai com código 1 se a página tiver erros.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -13,11 +13,10 @@ import { CARTEIRA_PADRAO } from '../js/core/alocacao.js';
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const APP = 'http://localhost:8080/';
 const PORTA = 9333;
-const ESPERA_MS = 1500;
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2);
-const saida = args.find((a) => !a.startsWith('--'));
+const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera'].includes(args[k - 1]));
 if (!saida) {
   console.error('Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir]');
   process.exit(2);
@@ -25,6 +24,8 @@ if (!saida) {
 const opcao = (nome) => args.includes(`--${nome}`);
 const iRotas = args.indexOf('--rotas');
 const rotas = iRotas >= 0 ? args[iRotas + 1].split(',') : ['inicio', 'mes', 'simular', 'mais'];
+const iEspera = args.indexOf('--espera');
+const ESPERA_MS = iEspera >= 0 ? Number(args[iEspera + 1]) : 1500;
 
 // ---------- amostra com datas de hoje ----------
 const doisDigitos = (n) => String(n).padStart(2, '0');

@@ -7,6 +7,10 @@ import { calcularPainel } from '../core/motor.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { contar } from './movimento.js';
 import { renderDetalhes } from './detalhes.js';
+import { comemorar } from './festa.js';
+import { registrarComemoracao } from '../core/marcos.js';
+
+let comemorando = false; // vale entre renders: impede duas comemorações ao mesmo tempo
 
 const abreviado = (v) => `R$ ${abreviar(v)}`;
 const semCentavos = (v) => formatarBRL(Math.round(v)).replace(/,00$/, '');
@@ -86,13 +90,14 @@ export function render(container, ctx) {
   const p = calcularPainel({ estado, hoje });
   const fracao = p.marcos.rendaPlena.atingido ? 1 : (p.metas.rendaPlena > 0 ? p.patrimonio / p.metas.rendaPlena : 0);
   const renda = cartaoRenda(p);
-
-  container.replaceChildren(...[
-    h('section', { class: 'inicio-topo' },
+  const topo = h('section', { class: 'inicio-topo' },
       h('p', { class: 'rotulo' }, 'Sua renda plena'),
       h('div', { class: 'anel', html: anel({ fracao }) }, h('div', { class: 'anel-centro' }, ...centroDoAnel(p))),
       chipSetinha(p.setinha),
-      h('p', { class: 'juntou' }, 'Você já juntou ', h('b', {}, abreviado(p.patrimonio)), ` de ${abreviado(p.metas.rendaPlena)}.`)),
+      h('p', { class: 'juntou' }, 'Você já juntou ', h('b', {}, abreviado(p.patrimonio)), ` de ${abreviado(p.metas.rendaPlena)}.`));
+
+  container.replaceChildren(...[
+    topo,
     renda.cartao,
     fileiraDeMarcos(p),
     fraseDoAlvo(p),
@@ -106,4 +111,17 @@ export function render(container, ctx) {
     h('details', { class: 'cartao detalhes' }, h('summary', {}, 'Ver detalhes'), renderDetalhes(p, estado)),
   ].filter(Boolean));
   contar(renda.valor, p.proventosMedios, formatarBRL);
+
+  // Comemora só depois da sincronização, com os dados mais novos: assim um marco já comemorado no outro aparelho
+  // não é comemorado de novo. A data é gravada antes de o cartão aparecer.
+  if (p.marcos.aComemorar.length) {
+    ctx.quandoSincronizado((estadoAtual) => {
+      if (comemorando || !topo.isConnected) return;
+      const ids = calcularPainel({ estado: estadoAtual, hoje }).marcos.aComemorar;
+      if (!ids.length) return;
+      comemorando = true;
+      ctx.salvar((e) => registrarComemoracao(e, ids, hoje)).catch((erro) => console.warn('Não gravei a comemoração', erro));
+      comemorar(ids).then(() => { comemorando = false; });
+    });
+  }
 }
