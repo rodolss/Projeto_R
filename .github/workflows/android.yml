@@ -90,7 +90,8 @@ jobs:
           1. Toque em **projeto-r.apk** para baixar.
           2. Abra o arquivo baixado. Se o Android pedir, libere "instalar apps desconhecidos" para o navegador.
           3. Se aparecer o aviso do Play Protect ("app não reconhecido"), toque em "Instalar mesmo assim".
-          4. Ao abrir pela primeira vez, cole a sua chave do GitHub (crie uma nova chamada "Projeto R (app Android)").
+          4. Ao abrir pela primeira vez, aceite as notificações e cole a sua chave do GitHub (crie uma nova chamada "Projeto R (app Android)").
+          5. Os lembretes do dia do pagamento ficam em Mais › Ajustes › Lembretes.
 
           Para atualizar, é só instalar o APK novo por cima: os dados continuam no GitHub.
           NOTAS
