@@ -1,7 +1,7 @@
 # Projeto R — App Android (design)
 
 - **Data:** 2026-11-10
-- **Status:** entendimento confirmado em entrevista; aguardando aprovação deste documento.
+- **Status:** aprovado pelo usuário em 2026-11-10.
 - **Base:** o app web atual (v2), descrito em `2026-11-09-planejador-aposentadoria-design.md` e `2026-11-10-redesenho-v2-design.md`. O app web continua sendo o produto; este documento acrescenta uma casca Android em volta dele.
 - **Aviso:** o repositório é público. Nenhum dado pessoal, chave de assinatura ou senha entra no repositório.
 
