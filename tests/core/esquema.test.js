@@ -24,3 +24,17 @@ test('migrar', () => {
   assert.throws(() => migrar({ schemaVersion: 99 }), /versao-desconhecida/);
 });
 test('novoId gera ids diferentes', () => assert.notEqual(novoId(), novoId()));
+test('estado inicial v2 traz marcos vazio', () => {
+  const e = criarEstadoInicial({ salario: 7800, mesInicio: '2026-11' });
+  assert.equal(e.schemaVersion, 2);
+  assert.deepEqual(e.marcos, {});
+});
+test('migrar v1 → v2 acrescenta marcos e preserva o resto', () => {
+  const v1 = { ...criarEstadoInicial({ salario: 1, mesInicio: '2026-11' }), schemaVersion: 1 };
+  delete v1.marcos;
+  const v2 = migrar(v1);
+  assert.equal(v2.schemaVersion, 2);
+  assert.deepEqual(v2.marcos, {});
+  assert.deepEqual(v2.config, v1.config);
+});
+test('migrar rejeita versão 3', () => assert.throws(() => migrar({ schemaVersion: 3 }), /versao-desconhecida/));

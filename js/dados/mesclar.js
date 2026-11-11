@@ -28,6 +28,15 @@ function mesclarContadores(base = {}, local = {}, remoto = {}) {
   return Object.fromEntries([...ciclos].map((c) => [c, (remoto[c] ?? 0) + ((local[c] ?? 0) - (base[c] ?? 0))]));
 }
 
+// Cada marco é comemorado uma vez: une as chaves e, se os dois lados comemoraram, vale a data mais antiga.
+function mesclarMarcos(local = {}, remoto = {}) {
+  const resultado = { ...remoto };
+  for (const [k, data] of Object.entries(local)) {
+    if (!resultado[k] || data < resultado[k]) resultado[k] = data;
+  }
+  return resultado;
+}
+
 export function mesclar({ base, local, remoto }) {
   const b = base ?? {};
   const resultado = {};
@@ -35,6 +44,7 @@ export function mesclar({ base, local, remoto }) {
     if (CHAVES[k]) resultado[k] = mesclarLista(b[k], local[k], remoto[k], CHAVES[k]);
     else if (k === 'contadoresAnuais') resultado[k] = mesclarContadores(b[k], local[k], remoto[k]);
     else if (k === 'ipca') resultado[k] = (local.ipca?.atualizadoEm ?? '') > (remoto.ipca?.atualizadoEm ?? '') ? local.ipca : remoto.ipca;
+    else if (k === 'marcos') resultado[k] = mesclarMarcos(local.marcos, remoto.marcos);
     else if (k === 'ipcaManual') resultado[k] = { ...(remoto.ipcaManual ?? {}), ...(local.ipcaManual ?? {}) };
     else resultado[k] = igual(local[k], b[k]) ? remoto[k] : local[k];
   }

@@ -2,7 +2,7 @@
 import { CARTEIRA_PADRAO } from './alocacao.js';
 import { cicloAnual } from './meses.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function criarEstadoInicial({ salario, mesInicio, recebe13 = true, recebeFerias = true, anuaisJaSeparados = 0 }) {
   return {
@@ -27,13 +27,14 @@ export function criarEstadoInicial({ salario, mesInicio, recebe13 = true, recebe
     contadoresAnuais: anuaisJaSeparados > 0 ? { [cicloAnual(mesInicio)]: anuaisJaSeparados } : {},
     ipca: { serie: {}, atualizadoEm: null },
     ipcaManual: {},
+    marcos: {},
   };
 }
 
+// v1 → v2: acrescenta `marcos` (data em que cada marco foi comemorado).
 export function migrar(estado) {
-  if (!estado || typeof estado.schemaVersion !== 'number' || estado.schemaVersion > SCHEMA_VERSION) {
-    throw new Error('versao-desconhecida');
-  }
+  if (estado?.schemaVersion === 1) return { ...estado, schemaVersion: 2, marcos: estado.marcos ?? {} };
+  if (estado?.schemaVersion !== SCHEMA_VERSION) throw new Error('versao-desconhecida');
   return estado;
 }
 
