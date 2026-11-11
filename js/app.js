@@ -6,6 +6,7 @@ import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao } from './ui/dom.js';
 import { resolverRota, abaDoMenu } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
+import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
@@ -37,9 +38,20 @@ export function mostrarAviso(texto, nivel = 'info', duracao = 7000) {
   if (duracao) setTimeout(() => el.remove(), duracao);
 }
 
+// No app Android, a agenda dos lembretes acompanha os dados: registrar o mês tira os lembretes dele.
+function reagendarLembretes() {
+  if (!noApp() || !app.estado) return;
+  try {
+    reagendar({ estado: app.estado, config: lerConfig(), agora: agoraLocal(), enviar: enviarAoApp() });
+  } catch (erro) {
+    console.warn('Não reagendei os lembretes', erro);
+  }
+}
+
 async function salvar(mutacao) {
   const r = await app.armazem.salvar(mutacao);
   app.estado = r.estado;
+  reagendarLembretes();
   if (r.aviso) mostrarAviso(textoConexao(r.aviso), r.aviso === 'conflito-resolvido' ? 'info' : 'atencao');
   return r;
 }
@@ -131,6 +143,7 @@ async function sincronizarAoAbrir() {
   receberEstado(r.estado);
   app.sincronizado = true;
   for (const fn of esperandoSincronizar.splice(0)) fn(app.estado);
+  reagendarLembretes(); // inclui meses registrados em outro aparelho
   await atualizarIpca();
 }
 

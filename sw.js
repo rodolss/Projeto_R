@@ -12,7 +12,7 @@ const CASCA = [
   './js/core/protecao.js', './js/core/simulador.js',
   './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/mesclar.js',
   './js/ui/boas-vindas.js', './js/ui/config.js', './js/ui/detalhes.js', './js/ui/dom.js', './js/ui/festa.js', './js/ui/grafico.js', './js/ui/historico.js',
-  './js/ui/inicio.js', './js/ui/mais.js', './js/ui/mes.js', './js/ui/movimento.js', './js/ui/orcamento.js', './js/ui/rotas.js', './js/ui/simular.js',
+  './js/ui/inicio.js', './js/ui/mais.js', './js/ui/mes.js', './js/ui/movimento.js', './js/ui/nativo.js', './js/ui/orcamento.js', './js/ui/rotas.js', './js/ui/simular.js',
 ];
 
 self.addEventListener('install', (evento) => {

@@ -1,4 +1,4 @@
-// Ajustes: renda, premissas, carteira-alvo, investimentos, conexão, IPCA manual e backup.
+// Ajustes: renda, premissas, carteira-alvo, investimentos, lembretes (só no app Android), conexão, IPCA manual e backup.
 import { h, campoMoeda, cartao, botao, aviso, textoConexao, AVISO_EXEMPLOS } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { formatarMes, diffMeses } from '../core/meses.js';
@@ -6,6 +6,10 @@ import { CLASSES } from '../core/alocacao.js';
 import { migrar, novoId } from '../core/esquema.js';
 import { ultimoMes } from '../core/ipca.js';
 import { PAPEIS, NOMES_CLASSE_CURTOS } from './boas-vindas.js';
+import { montarLembretes, descreverProximo } from '../core/lembretes.js';
+import {
+  noApp, lerConfig, salvarConfig, reagendar, agoraLocal, enviarAoApp, perguntarPermissao, pedirPermissao, testar, aoReceber,
+} from './nativo.js';
 
 const campoNumero = (rotulo, valor, aoMudar, { sufixo = '', dica = null, passo = '0.1' } = {}) => h('label', { class: 'campo' },
   h('span', { class: 'campo-rotulo' }, rotulo),
@@ -13,6 +17,63 @@ const campoNumero = (rotulo, valor, aoMudar, { sufixo = '', dica = null, passo =
     h('input', { class: 'entrada', type: 'number', step: passo, min: '0', value: String(valor), style: 'max-width:140px', oninput: (e) => aoMudar(Number(e.target.value)) }),
     sufixo),
   dica && h('span', { class: 'campo-dica' }, dica));
+
+// Lembretes do dia do pagamento (spec do app Android, §6). Só existe dentro do app Android.
+function cartaoLembretes(ctx) {
+  const enviar = enviarAoApp();
+  const cfg = lerConfig();
+  const meses = () => ctx.estado.meses.map((m) => m.mes);
+  const proximo = h('p', { class: 'suave' });
+  const dicaUtil = h('span', { class: 'campo-dica' }, 'Conta de segunda a sexta e pula os feriados nacionais, o Carnaval e o Corpus Christi.');
+  const permissao = h('div');
+  const campoDia = h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Dia do mês'),
+    h('input', {
+      class: 'entrada', type: 'number', min: '1', max: '31', step: '1', value: String(cfg.dia), style: 'max-width:120px',
+      oninput: (e) => { cfg.dia = Number(e.target.value) || 1; atualizar(); },
+    }),
+    h('span', { class: 'campo-dica' }, 'Se cair em fim de semana ou feriado, o lembrete vem no próximo dia útil.'));
+
+  function atualizar() {
+    campoDia.style.display = cfg.tipo === 'fixo' ? '' : 'none';
+    dicaUtil.style.display = cfg.tipo === 'util' ? '' : 'none';
+    const agora = agoraLocal();
+    const texto = descreverProximo(montarLembretes({ config: cfg, agora, mesesRegistrados: meses() }), agora);
+    proximo.textContent = !cfg.ligado ? 'Lembretes desligados.' : texto ? `Próximo lembrete: ${texto}` : 'Nenhum lembrete agendado.';
+  }
+
+  aoReceber((m) => {
+    if (m.tipo !== 'permissao') return;
+    permissao.replaceChildren(...(m.concedida ? [] : [aviso('atencao',
+      'As notificações estão bloqueadas. Libere em Configurações do Android › Apps › Projeto R › Notificações.',
+      h('div', { class: 'botoes', style: 'margin-top:8px' }, botao('Pedir permissão', () => pedirPermissao(enviar), { secundario: true })))]));
+  });
+  perguntarPermissao(enviar);
+
+  const cartaoPronto = cartao(h('h2', {}, 'Lembretes'),
+    h('p', { class: 'suave' }, 'O app avisa no dia do pagamento para você atualizar os saldos e registrar o mês.'),
+    h('label', { class: 'marcar' }, h('input', { type: 'checkbox', checked: cfg.ligado, onchange: (e) => { cfg.ligado = e.target.checked; atualizar(); } }),
+      'Lembrar no dia do pagamento'),
+    h('label', { class: 'campo', style: 'margin-top:8px' }, h('span', { class: 'campo-rotulo' }, 'Quando'),
+      h('select', { class: 'entrada', onchange: (e) => { cfg.tipo = e.target.value; atualizar(); } },
+        h('option', { value: 'util', selected: cfg.tipo === 'util' }, '5º dia útil'),
+        h('option', { value: 'fixo', selected: cfg.tipo === 'fixo' }, 'Dia fixo do mês')),
+      dicaUtil),
+    campoDia,
+    h('label', { class: 'campo', style: 'margin-top:8px' }, h('span', { class: 'campo-rotulo' }, 'Horário (aproximado)'),
+      h('input', { class: 'entrada', type: 'time', value: cfg.hora, style: 'max-width:140px', oninput: (e) => { if (e.target.value) { cfg.hora = e.target.value; atualizar(); } } })),
+    proximo,
+    permissao,
+    h('div', { class: 'botoes', style: 'margin-top:8px' },
+      botao('Salvar lembretes', () => {
+        salvarConfig(cfg);
+        reagendar({ estado: ctx.estado, config: cfg, agora: agoraLocal(), enviar });
+        atualizar();
+        ctx.aviso('Lembretes salvos.', 'ok', 3000);
+      }),
+      botao('Testar agora', () => { testar(enviar); ctx.aviso('Notificação de teste enviada.', 'info', 3000); }, { secundario: true })));
+  atualizar();
+  return cartaoPronto;
+}
 
 export function render(container, ctx) {
   const { estado, hoje } = ctx;
@@ -151,14 +212,15 @@ export function render(container, ctx) {
 
   // ---------- Backup ----------
   const msgBackup = h('div');
+  const naoNoApp = !noApp(); // no app Android, o backup é só pelo computador (decisão do usuário)
   const exportar = botao('Exportar backup', () => {
     const blob = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
     const a = h('a', { href: URL.createObjectURL(blob), download: `projeto-r-backup-${hoje}.json` });
     document.body.append(a);
     a.click();
     a.remove();
-  }, { secundario: true });
-  const arquivo = h('input', { type: 'file', accept: 'application/json,.json', class: 'entrada', 'aria-label': 'Arquivo de backup' });
+  }, { secundario: true, desabilitado: !naoNoApp });
+  const arquivo = h('input', { type: 'file', accept: 'application/json,.json', class: 'entrada', 'aria-label': 'Arquivo de backup', disabled: !naoNoApp });
   arquivo.addEventListener('change', async () => {
     const f = arquivo.files?.[0];
     if (!f) return;
@@ -178,6 +240,7 @@ export function render(container, ctx) {
   const msgRefazer = h('div');
   const cartaoBackup = cartao(h('h2', {}, 'Backup e recomeço'),
     h('p', { class: 'suave' }, 'Guarde uma cópia dos seus dados num arquivo, ou restaure uma cópia.'),
+    !naoNoApp && aviso('info', 'Faça o backup pelo computador.'),
     h('div', { class: 'botoes' }, exportar),
     h('label', { class: 'campo', style: 'margin-top:8px' }, h('span', { class: 'campo-rotulo' }, 'Importar backup'), arquivo),
     msgBackup,
@@ -189,6 +252,6 @@ export function render(container, ctx) {
   container.replaceChildren(...[
     h('h1', {}, 'Ajustes'),
     h('p', { class: 'suave' }, `Salário atual: ${formatarBRL(estado.config.salario)} · plano iniciado em ${formatarMes(estado.config.mesInicio)}.`),
-    cartaoRenda, cartaoPremissas, cartaoCarteira, cartaoAtivos, cartaoConexao, cartaoIpca, cartaoBackup,
+    cartaoRenda, cartaoPremissas, cartaoCarteira, cartaoAtivos, noApp() && cartaoLembretes(ctx), cartaoConexao, cartaoIpca, cartaoBackup,
   ].filter(Boolean));
 }
