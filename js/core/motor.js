@@ -13,9 +13,10 @@ import {
   CLASSES, distribuirAporte, arredondarDistribuicao, sugestaoPorAtivo, explicarPorque,
 } from './alocacao.js';
 import {
-  ritmoDeAportes, projetar, faixaProjecao, classificarStatus, acaoSugerida, proventosMedios,
+  ritmoDeAportes, projetar, faixaProjecao, classificarStatus, acaoSugerida, proventosMedios, setinha,
 } from './projecao.js';
 import { checkup } from './checkup.js';
+import { avaliarMarcos } from './marcos.js';
 import { novoId } from './esquema.js';
 
 const DIAS_SALDOS = 35;
@@ -168,11 +169,18 @@ function contexto(estado, hoje, atualizados = null, { excluirMes = null } = {}) 
     .filter(Boolean)
     .sort();
   const diasDesdeAtualizacao = datasCarteira.length ? diasEntre(datasCarteira.at(-1), hoje) : 0;
+  // Saldos confirmados: toda a carteira com saldo digitado de verdade nos últimos 35 dias (marcos, spec v2 §4.7).
+  const idsCarteira = estado.ativos.filter((a) => a.papel === 'carteira').map((a) => a.id);
+  const saldosConfirmados = idsCarteira.length > 0 && idsCarteira.every((id) => {
+    const ultimo = ultimoSaldoAte(estado, id, hoje);
+    return ultimo && diasEntre(ultimo.data, hoje) <= DIAS_SALDOS;
+  });
 
   const t = diffMeses(cfg.mesInicio, mes);
   const mesAlvo = somarMeses(cfg.mesInicio, cfg.prazoMeses);
   const p0 = real(estado.plano.p0, estado.plano.mesP0);
-  const pmtNec = pmtNecessario({ p: grupo.patrimonio, meta: metas.independencia, i, meses: cfg.prazoMeses - t });
+  // O plano persegue a renda plena (spec v2 §4.2).
+  const pmtNec = pmtNecessario({ p: grupo.patrimonio, meta: metas.rendaPlena, i, meses: cfg.prazoMeses - t });
 
   const queda = situacaoQueda(indiceDesempenho(pontosDesempenho(estado, { atualizados, hoje }), serie));
   let caixaNoInicioDaQueda = grupo.caixa;
@@ -194,7 +202,7 @@ function contexto(estado, hoje, atualizados = null, { excluirMes = null } = {}) 
   const ipcaIndisponivel = !ultimoIpca || diffMeses(ultimoIpca, mes) > 2;
 
   return {
-    mes, serie, cfg, i, real, custo, salario, metas, provisao, saldos, grupo, diasDesdeAtualizacao,
+    mes, serie, cfg, i, real, custo, salario, metas, provisao, saldos, grupo, diasDesdeAtualizacao, saldosConfirmados,
     t, mesAlvo, p0, pmtNec, queda, caixaNoInicioDaQueda, excedenteMedio, ipcaIndisponivel,
   };
 }
@@ -322,6 +330,8 @@ export function registrarAplicacao(estado, {
     guardarParaProximoMes: resposta.guardarParaProximoMes ?? 0, paraAnuais: resposta.paraAnuais ?? 0, provisao: resposta.provisao ?? 0,
   };
   novo.meses = [...novo.meses.filter((m) => m.mes !== mes), entrada].sort((a, b) => (a.mes < b.mes ? -1 : 1));
+  // Guarda a previsão da renda plena deste momento, para a setinha do mês seguinte (spec v2 §4.4).
+  entrada.previsao = { mesRendaPlena: calcularPainel({ estado: novo, hoje: data }).projecaoM2.mes };
   return novo;
 }
 
@@ -376,7 +386,7 @@ export function calcularPainel({ estado, hoje }) {
   const mesesAteAlvo = Math.max(0, cfg.prazoMeses - t);
   // Aproximação: o que ainda falta da reserva deixa de ir para a carteira.
   const noPrazo = Math.max(0, valorFuturo({ p: grupo.patrimonio, aporte: ritmo.valor, i, meses: mesesAteAlvo }) - reservaFaltando);
-  const planejadoHoje = patrimonioPlanejado({ p0: cx.p0, meta: metas.independencia, i, prazo: cfg.prazoMeses, t: Math.min(Math.max(t, 0), cfg.prazoMeses) });
+  const planejadoHoje = patrimonioPlanejado({ p0: cx.p0, meta: metas.rendaPlena, i, prazo: cfg.prazoMeses, t: Math.min(Math.max(t, 0), cfg.prazoMeses) });
 
   const indices = indiceDesempenho(pontosDesempenho(estado), cx.serie);
   let rendimentoReal = null;
@@ -400,7 +410,7 @@ export function calcularPainel({ estado, hoje }) {
 
   const plano = [];
   for (let k = 0; k <= cfg.prazoMeses; k++) {
-    plano.push({ mes: somarMeses(cfg.mesInicio, k), valor: patrimonioPlanejado({ p0: cx.p0, meta: metas.independencia, i, prazo: cfg.prazoMeses, t: k }) });
+    plano.push({ mes: somarMeses(cfg.mesInicio, k), valor: patrimonioPlanejado({ p0: cx.p0, meta: metas.rendaPlena, i, prazo: cfg.prazoMeses, t: k }) });
   }
   const realSerie = [];
   for (let k = 0; k <= Math.max(0, t); k++) {
@@ -409,7 +419,8 @@ export function calcularPainel({ estado, hoje }) {
     realSerie.push({ mes: m, valor: agrupar(estado, saldosEm(estado, { mes: m, dataLimite, serie: cx.serie, i })).patrimonio });
   }
   const ate = Math.max(0, diffMeses(mes, mesAlvo) + 24);
-  const caminho = (taxa) => trajetoria({ patrimonio: grupo.patrimonio, aporte: ritmo.valor, i: taxa, meta: metas.independencia, mesAtual: mes, ate, reservaFaltando });
+  const caminho = (taxa) => trajetoria({ patrimonio: grupo.patrimonio, aporte: ritmo.valor, i: taxa, meta: metas.rendaPlena, mesAtual: mes, ate, reservaFaltando });
+  const reservaAlvo = alvoReserva(custo.total);
 
   return {
     status: classificarStatus({ mesProjetado: projecaoM1.mes, mesAlvo }),
@@ -438,5 +449,17 @@ export function calcularPainel({ estado, hoje }) {
     },
     estimado: grupo.estimado,
     avisos: cx.ipcaIndisponivel ? ['ipca-indisponivel'] : [],
+    faltam: projecaoM2.meses,
+    setinha: setinha({ meses: estado.meses, mesAtual: mes, faltamAgora: projecaoM2.meses }),
+    reserva: grupo.reserva,
+    alvoReserva: reservaAlvo,
+    marcos: avaliarMarcos({
+      reserva: grupo.reserva, alvoReserva: reservaAlvo, patrimonio: grupo.patrimonio, metas,
+      saldosConfirmados: cx.saldosConfirmados, comemorados: estado.marcos ?? {},
+    }),
+    baseSimulador: {
+      patrimonio: grupo.patrimonio, reserva: grupo.reserva, salario, custoTotal: custo.total, ritmo: ritmo.valor,
+      consegue: Math.max(excedenteEsperado, ritmo.valor), premissa: cfg.rentabilidadeReal, swr: cfg.swr, mesAtual: mes, mesAlvo,
+    },
   };
 }
