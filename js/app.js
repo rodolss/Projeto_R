@@ -4,8 +4,9 @@ import { criarClienteGitHub, donoPadrao } from './dados/github.js';
 import { buscarSerieIpca, precisaAtualizarIpca } from './dados/ipca-remoto.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao } from './ui/dom.js';
+import { resolverRota, abaDoMenu } from './ui/rotas.js';
+import { escalonar } from './ui/movimento.js';
 
-const TELAS = ['inicio', 'mes', 'painel', 'orcamento', 'historico', 'config'];
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
 const app = { estado: null, armazem: null, conexao: null };
@@ -71,17 +72,21 @@ function contexto() {
 }
 
 async function renderizar() {
-  const rota = (location.hash.replace(/^#\/?/, '').split('?')[0]) || 'mes';
-  if (!app.estado && rota !== 'inicio') { navegar('#/inicio'); return; }
-  const nome = TELAS.includes(rota) ? rota : 'mes';
-  document.body.classList.toggle('sem-abas', nome === 'inicio');
-  for (const a of document.querySelectorAll('#abas a')) a.classList.toggle('ativa', a.dataset.rota === nome);
+  const nome = resolverRota(location.hash, Boolean(app.estado));
+  if (location.hash.replace(/^#\/?/, '').split('?')[0] !== nome) { navegar(`#/${nome}`); return; }
+  document.body.classList.toggle('sem-abas', nome === 'boas-vindas');
+  const aba = abaDoMenu(nome);
+  for (const a of document.querySelectorAll('#menu a')) {
+    if (a.dataset.rota === aba) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
 
   const tela = document.getElementById('tela');
   try {
     const modulo = await import(`./ui/${nome}.js`);
     tela.replaceChildren();
     modulo.render(tela, contexto());
+    escalonar(tela);
     window.scrollTo(0, 0);
   } catch (erro) {
     console.error(erro);

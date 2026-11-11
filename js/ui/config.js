@@ -183,7 +183,7 @@ export function render(container, ctx) {
     msgBackup,
     h('div', { class: 'botoes', style: 'margin-top:12px' }, botao('Refazer o assistente', () => msgRefazer.replaceChildren(aviso('atencao',
       'O assistente cria um plano novo e substitui todos os dados atuais. Exporte um backup antes. ',
-      h('div', { class: 'botoes', style: 'margin-top:8px' }, botao('Refazer mesmo assim', () => ctx.navegar('#/inicio'), { perigo: true })))), { secundario: true })),
+      h('div', { class: 'botoes', style: 'margin-top:8px' }, botao('Refazer mesmo assim', () => ctx.navegar('#/boas-vindas'), { perigo: true })))), { secundario: true })),
     msgRefazer);
 
   container.replaceChildren(...[

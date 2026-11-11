@@ -14,18 +14,16 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <header class="topo">
-    <a class="marca" href="#/mes">Projeto R</a>
-    <nav class="abas" id="abas" aria-label="Seções">
-      <a href="#/mes" data-rota="mes"><span aria-hidden="true">💰</span> Mês</a>
-      <a href="#/painel" data-rota="painel"><span aria-hidden="true">📈</span> Painel</a>
-      <a href="#/orcamento" data-rota="orcamento"><span aria-hidden="true">🧾</span> Orçamento</a>
-      <a href="#/historico" data-rota="historico"><span aria-hidden="true">🗓️</span> Histórico</a>
-      <a href="#/config" data-rota="config" aria-label="Configurações"><span aria-hidden="true">⚙️</span><span class="so-largo"> Ajustes</span></a>
-    </nav>
-  </header>
   <div id="avisos" class="avisos" aria-live="polite"></div>
   <main id="tela" class="tela"></main>
+  <nav class="menu" aria-label="Menu">
+    <div class="menu-dentro" id="menu">
+      <a href="#/inicio" data-rota="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Início</span></a>
+      <a href="#/mes" data-rota="mes"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M15.5 14.5h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Mês</span></a>
+      <a href="#/simular" data-rota="simular"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9M18 7h1M5 12h3M12 12h7M5 17h11M20 17h-1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span>Simular</span></a>
+      <a href="#/mais" data-rota="mais"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Mais</span></a>
+    </div>
+  </nav>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
