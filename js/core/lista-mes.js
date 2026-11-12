@@ -84,3 +84,7 @@ export function dataCurta(data) {
   const [, m, d] = data.split('-').map(Number);
   return `${d}/${MESES_CURTOS[m - 1]}`;
 }
+
+const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+export const nomeDoMes = (mes) => MESES_LONGOS[Number(mes.slice(5, 7)) - 1];

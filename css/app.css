@@ -305,6 +305,8 @@ details.detalhes[open] > summary::after { content: "−"; }
   overscroll-behavior: contain; background: var(--fundo); border-radius: 22px 22px 0 0; display: flex; flex-direction: column; gap: 12px;
   padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .folha h2 { margin: 0; }
+.botao-link { background: none; border: 0; color: var(--destaque); font: inherit; font-weight: 600; text-decoration: underline;
+  padding: 12px 4px; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) { .folha { animation: folha-sobe 180ms ease-out both; } }
 @keyframes folha-sobe { from { transform: translateY(24px); opacity: 0.6; } }
 

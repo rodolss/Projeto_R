@@ -82,7 +82,7 @@ export function mostrarFolha({ conteudo, aoFechar, rotulo }) {
     camada = h('div', { id: 'camada-folha' });
     document.body.append(camada);
   }
-  const painel = h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true', 'aria-label': rotulo }, ...conteudo);
+  const painel = h('div', { class: 'folha', role: 'dialog', 'aria-modal': 'true', 'aria-label': rotulo, tabindex: '-1' }, ...conteudo);
   painel.addEventListener('keydown', (e) => { if (e.key === 'Escape') aoFechar(); });
   camada.replaceChildren(h('div', { class: 'veu', onclick: aoFechar }), painel);
   return painel;

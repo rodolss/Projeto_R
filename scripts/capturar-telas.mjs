@@ -1,7 +1,7 @@
 // Fotografa telas do app em tamanho de celular (412 × 915), no tema claro e no escuro, com o Edge headless.
 // Serve para conferir o visual sem dados reais: injeta scripts/dados-exemplo.json (números inventados).
 //
-// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--estado arquivo.json] [--reduzir] [--espera 1500]
+// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--estado arquivo.json] [--local extras.json] [--reduzir] [--espera 1500]
 // --estado usa um estado pronto (por exemplo, o de scripts/gerar-historico-falso.mjs) no lugar da amostra.
 // Pressupõe `npm run servir` rodando em http://localhost:8080. Sai com código 1 se a página tiver erros.
 import { spawn } from 'node:child_process';
@@ -17,7 +17,7 @@ const PORTA = 9333;
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2);
-const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera', '--estado'].includes(args[k - 1]));
+const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera', '--estado', '--local'].includes(args[k - 1]));
 if (!saida) {
   console.error('Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir]');
   process.exit(2);
@@ -28,6 +28,8 @@ const rotas = iRotas >= 0 ? args[iRotas + 1].split(',') : ['inicio', 'mes', 'sim
 const iEspera = args.indexOf('--espera');
 const ESPERA_MS = iEspera >= 0 ? Number(args[iEspera + 1]) : 1500;
 const iEstado = args.indexOf('--estado');
+const iLocal = args.indexOf('--local'); // JSON { chave: valor } gravado no localStorage além do estado (ex.: rascunho do Mês)
+const extras = iLocal >= 0 ? JSON.parse(readFileSync(args[iLocal + 1], 'utf8')) : {};
 
 // ---------- amostra com datas de hoje ----------
 const doisDigitos = (n) => String(n).padStart(2, '0');
@@ -134,7 +136,7 @@ try {
     await cdp.enviar('Page.navigate', { url: APP });
     await pausa(800);
     await cdp.enviar('Runtime.evaluate', {
-      expression: `localStorage.clear(); ${estado ? `localStorage.setItem('projetoR.estado', ${JSON.stringify(JSON.stringify(estado))});` : ''}`,
+      expression: `localStorage.clear(); ${estado ? `localStorage.setItem('projetoR.estado', ${JSON.stringify(JSON.stringify(estado))});` : ''} ${Object.entries(extras).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(JSON.stringify(v))});`).join(' ')}`,
     });
     for (const rota of rotas) {
       await cdp.enviar('Page.navigate', { url: `${APP}?c=${Date.now()}#/${rota}` });

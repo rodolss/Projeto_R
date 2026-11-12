@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   rascunhoVazio, rascunhoDoRegistro, validarRascunho, situacao, ultimoRegistroAntes, saldoDigitadoNoMes,
-  totalAplicado, saldosParaGravar, dataCurta,
+  totalAplicado, saldosParaGravar, dataCurta, nomeDoMes,
 } from '../../js/core/lista-mes.js';
 
 const comFeito = (mudancas) => ({ ...rascunhoVazio('2026-11'), ...mudancas });
@@ -92,4 +92,9 @@ test('saldosParaGravar no dia do registro tira o aporte do mês (e as cotas)', (
 test('dataCurta', () => {
   assert.equal(dataCurta('2026-11-12'), '12/nov');
   assert.equal(dataCurta('2026-01-05'), '5/jan');
+});
+
+test('nomeDoMes', () => {
+  assert.equal(nomeDoMes('2026-11'), 'novembro');
+  assert.equal(nomeDoMes('2027-03'), 'março');
 });
