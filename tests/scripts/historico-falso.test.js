@@ -36,6 +36,12 @@ test('vida real: 13º, férias, PLR, proventos e aumentos', () => {
   assert.equal(estado.config.mesSalario, '2026-03');
 });
 
+test('as quedas da bolsa aparecem na explicação de algum mês', () => {
+  const porque = estado.meses.map((m) => m.sugestao.porque ?? '').join(' ');
+  assert.match(porque, /A bolsa brasileira caiu este mês/);
+  assert.match(porque, /A parte no exterior caiu este mês/);
+});
+
 test('reserva alcançada e ainda sem comemorar', () => {
   const p = calcularPainel({ estado, hoje: '2026-11-12' });
   assert.ok(p.marcos.reserva.atingido);

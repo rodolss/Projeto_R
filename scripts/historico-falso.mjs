@@ -22,7 +22,7 @@ const REVISOES_ORCAMENTO = ['2024-05', '2024-11', '2025-05', '2025-11', '2026-05
 const FERIAS = ['2024-07', '2025-07', '2026-07'];
 const PLR = { '2025-02': 6000 };
 const APLICOU_MENOS = { '2024-04': 0.7 }; // a pessoa aplicou só 70% do sugerido
-const SEM_ATUALIZAR_SALDOS = new Set(['2024-02', '2024-06', '2024-10', '2025-01', '2025-06', '2025-10', '2026-02']);
+const SEM_ATUALIZAR_SALDOS = new Set(['2024-02', '2024-06', '2024-10', '2025-06', '2025-10', '2026-02']); // nunca logo depois de uma queda
 
 // Mercado (retorno mensal nominal do preço). Quedas fixas, no mês em que acontecem.
 const SELIC = 0.009;
@@ -33,15 +33,18 @@ const MERCADO = {
   exterior: { media: 0.011, desvio: 0.04 },
 };
 const QUEDAS = {
-  '2024-11': { acoes: -0.05, fiis: -0.03 },
-  '2024-12': { acoes: -0.06, fiis: -0.05, rendaFixa: -0.03 },
-  '2025-03': { exterior: -0.07 },
-  '2025-04': { exterior: -0.05 },
+  '2024-11': { acoes: -0.07, fiis: -0.03 },
+  '2024-12': { acoes: -0.08, fiis: -0.05, rendaFixa: -0.03 },
+  '2025-03': { exterior: -0.09 },
+  '2025-04': { exterior: -0.06 },
+  // Com a carteira já maior, a queda vence o aporte novo e aparece como "caiu este mês" no registro seguinte.
+  '2025-11': { acoes: -0.10, fiis: -0.04 },
+  '2026-04': { exterior: -0.11 },
 };
 const CUPOM_SEMESTRAL = 0.0295; // Tesouro IPCA+ com juros semestrais: maio e novembro
 const PRECO_INICIAL = { fiis: 11, acoes: 95, exterior: 260 };
 
-// Gerador com semente (mulberry32) e ruído normal (Box-Muller): o mesmo arquivo a cada execução.
+// Gerador com semente (mulberry32) e ruído normal (Box-Muller): os mesmos números a cada execução (os ids mudam).
 function aleatorio(semente) {
   let s = semente >>> 0;
   const unif = () => {
