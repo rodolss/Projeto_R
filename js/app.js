@@ -8,6 +8,7 @@ import { resolverRota, abaDoMenu } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
+import { VERSAO } from './versao.js';
 
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
@@ -169,7 +170,7 @@ async function iniciar() {
 
   // Antes de qualquer await: a versão nova pode assumir logo que o app abre.
   if ('serviceWorker' in navigator) {
-    iniciarAtualizacao({ sw: navigator.serviceWorker, avisar: (texto) => mostrarAviso(texto, 'ok', 3000) });
+    iniciarAtualizacao({ sw: navigator.serviceWorker, versao: VERSAO, avisar: (texto) => mostrarAviso(texto, 'ok', 3000) });
   }
   window.addEventListener('hashchange', renderizar);
   window.addEventListener('online', async () => {
