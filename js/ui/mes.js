@@ -191,7 +191,7 @@ function desenhar(container, ctx) {
       terminar('so-saldos', ctx);
     });
     return [
-      h('h2', {}, 'Atualizar saldos'),
+      h('h2', { 'data-sem-recarregar': '' }, 'Atualizar saldos'), // valores digitados aqui não vão para o rascunho
       h('p', { class: 'suave' }, `Copie os valores como estão na corretora agora. O registro de ${nome} não muda.`),
       h('div', {}, ...camposSaldos(edicoes, () => {})),
       h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
@@ -278,12 +278,13 @@ function desenhar(container, ctx) {
       ctx.aviso(editando ? 'Registro atualizado.' : 'Mês registrado! 👏', 'ok', 4000);
       terminar('investir', ctx);
     });
-    confirmacao.replaceChildren(cartao(
+    // data-sem-recarregar: com valores ainda não confirmados, a atualização automática espera (js/ui/atualizacao.js).
+    confirmacao.replaceChildren(h('div', { 'data-sem-recarregar': '' }, cartao(
       h('h3', {}, temAlgo ? 'Quanto você aplicou de fato?' : 'Registrar o mês'),
       temAlgo && h('p', { class: 'suave pequeno' }, 'Se aplicou um valor diferente do sugerido, corrija aqui.'),
       ...aplicado.map((a) => h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: a.nome, valor: a.valor, aoMudar: (v) => { a.valor = v; } }))),
       transferencia.valor > 0 && h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: 'Transferido da caixa de oportunidade', valor: transferencia.valor, aoMudar: (v) => { transferencia.valor = v; } })),
-      h('div', { class: 'botoes', style: 'margin-top:12px' }, confirmar, botao('Cancelar', () => confirmacao.replaceChildren(), { secundario: true }))));
+      h('div', { class: 'botoes', style: 'margin-top:12px' }, confirmar, botao('Cancelar', () => confirmacao.replaceChildren(), { secundario: true })))));
     confirmacao.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
