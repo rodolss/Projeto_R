@@ -9,8 +9,28 @@ import { contar } from './movimento.js';
 import { renderDetalhes } from './detalhes.js';
 import { comemorar } from './festa.js';
 import { registrarComemoracao } from '../core/marcos.js';
+import { cartaoDoPagamento, dataCurta, nomeDoMes } from '../core/lista-mes.js';
+import { lerRascunho } from './mes-rascunho.js';
 
 let comemorando = false; // vale entre renders: impede duas comemorações ao mesmo tempo
+
+// Cartão do dia do pagamento: acompanha a aba Mês (registrado, pela metade ou para abrir).
+function cartaoPagamento(estado, hoje) {
+  const mes = hoje.slice(0, 7);
+  const c = cartaoDoPagamento({ entrada: estado.meses.find((m) => m.mes === mes), rascunho: lerRascunho(mes) });
+  if (c.tipo === 'registrado') {
+    const nome = nomeDoMes(mes);
+    return h('section', { class: 'cartao acao registrado' },
+      h('div', { class: 'titulo-check' }, h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'),
+        h('div', {}, h('h3', {}, `${nome[0].toUpperCase()}${nome.slice(1)} registrado`),
+          h('p', { class: 'suave' }, `${formatarBRL(c.total)} aplicados em ${dataCurta(c.data)}`))),
+      h('a', { class: 'botao secundario', href: '#/mes' }, 'Ver'));
+  }
+  return h('section', { class: 'cartao acao' },
+    h('div', {}, h('h3', {}, c.tipo === 'continuar' ? `Dia de pagamento? · ${c.quantas} de 4 feitos` : 'Dia de pagamento?'),
+      h('p', { class: 'suave' }, 'Veja quanto investir este mês e onde.')),
+    h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar' : 'Abrir'));
+}
 
 const abreviado = (v) => `R$ ${abreviar(v)}`;
 const semCentavos = (v) => formatarBRL(Math.round(v)).replace(/,00$/, '');
@@ -101,9 +121,7 @@ export function render(container, ctx) {
     renda.cartao,
     fileiraDeMarcos(p),
     fraseDoAlvo(p),
-    h('section', { class: 'cartao acao' },
-      h('div', {}, h('h3', {}, 'Dia de pagamento?'), h('p', { class: 'suave' }, 'Veja quanto investir este mês e onde.')),
-      h('a', { class: 'botao', href: '#/mes' }, 'Abrir')),
+    cartaoPagamento(estado, hoje),
     precisaRevisarOrcamento(estado.config.ultimaRevisaoOrcamento, hoje.slice(0, 7))
       && aviso('atencao', 'Já faz 6 meses desde a última revisão do orçamento. ', h('a', { href: '#/orcamento' }, 'Revisar agora')),
     p.avisos.includes('ipca-indisponivel') && aviso('info', 'Ainda não tenho a inflação mais recente; as metas usam a última disponível.'),

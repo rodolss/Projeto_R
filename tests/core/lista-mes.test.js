@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   rascunhoVazio, rascunhoDoRegistro, validarRascunho, situacao, ultimoRegistroAntes, saldoDigitadoNoMes,
-  totalAplicado, saldosParaGravar, dataCurta, nomeDoMes,
+  totalAplicado, saldosParaGravar, dataCurta, nomeDoMes, cartaoDoPagamento,
 } from '../../js/core/lista-mes.js';
 
 const comFeito = (mudancas) => ({ ...rascunhoVazio('2026-11'), ...mudancas });
@@ -97,4 +97,13 @@ test('dataCurta', () => {
 test('nomeDoMes', () => {
   assert.equal(nomeDoMes('2026-11'), 'novembro');
   assert.equal(nomeDoMes('2027-03'), 'março');
+});
+
+test('cartaoDoPagamento: registrado, pela metade ou para abrir', () => {
+  const entrada = { mes: '2026-11', data: '2026-11-12', aplicado: [{ valor: 4000 }, { valor: 596.01 }] };
+  assert.deepEqual(cartaoDoPagamento({ entrada, rascunho: null }), { tipo: 'registrado', total: 4596.01, data: '2026-11-12' });
+  assert.deepEqual(cartaoDoPagamento({ entrada, rascunho: { ...rascunhoVazio('2026-11'), editando: true } }).tipo, 'registrado');
+  assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: comFeito({ recebido: 9200, feito: { salario: true, proventos: false } }) }), { tipo: 'continuar', quantas: 1 });
+  assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: null }), { tipo: 'abrir' });
+  assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: rascunhoVazio('2026-11') }), { tipo: 'abrir' });
 });

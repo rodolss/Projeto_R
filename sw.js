@@ -1,6 +1,6 @@
 // Service worker: o app abre sem internet. Estratégia network-first: com conexão, sempre busca a
 // versão nova (e atualiza o cache); sem conexão, usa o cache. APIs externas nunca passam pelo cache.
-const VERSAO = 'projeto-r-v2';
+const VERSAO = 'projeto-r-v3';
 const CASCA = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png',

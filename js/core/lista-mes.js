@@ -88,3 +88,10 @@ export function dataCurta(data) {
 const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 export const nomeDoMes = (mes) => MESES_LONGOS[Number(mes.slice(5, 7)) - 1];
+
+// Cartão "Dia de pagamento?" do Início: mês registrado, pela metade (rascunho com 1 a 3 tarefas) ou para abrir.
+export function cartaoDoPagamento({ entrada, rascunho }) {
+  if (entrada) return { tipo: 'registrado', total: totalAplicado(entrada), data: entrada.data };
+  const { quantas } = situacao({ registrado: false, rascunho });
+  return quantas > 0 ? { tipo: 'continuar', quantas } : { tipo: 'abrir' };
+}
