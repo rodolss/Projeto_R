@@ -39,7 +39,7 @@ export function situacao({ registrado, rascunho }) {
   }
   const r = rascunho ?? rascunhoVazio(null);
   const feitas = {
-    salario: r.feito.salario,
+    salario: r.feito.salario && r.recebido != null, // campo apagado depois de salvo desmarca
     proventos: r.feito.proventos,
     saldos: r.editando || r.saldosModo !== null,
     investir: false,
@@ -94,4 +94,9 @@ export function cartaoDoPagamento({ entrada, rascunho }) {
   if (entrada) return { tipo: 'registrado', total: totalAplicado(entrada), data: entrada.data };
   const { quantas } = situacao({ registrado: false, rascunho });
   return quantas > 0 ? { tipo: 'continuar', quantas } : { tipo: 'abrir' };
+}
+
+// Tarefa 3: "Usar estes saldos" ou "Pular". Pular depois de copiar mantém os valores digitados (podem voltar a ser usados).
+export function escolherSaldos(rascunho, acao) {
+  return { ...rascunho, saldosModo: acao === 'usar' ? 'copiados' : 'pulados' };
 }

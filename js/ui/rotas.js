@@ -17,3 +17,10 @@ export function folhaAberta(hash) {
   const consulta = String(hash ?? '').split('?')[1] ?? '';
   return new URLSearchParams(consulta).get('folha') || null;
 }
+
+// Depois de um salvamento demorado (GitHub), a pessoa pode ter fechado a folha ou mudado de tela:
+// só fecha a folha se ela ainda está aberta; no Mês sem ela, redesenha; em outra tela, não mexe.
+export function depoisDeSalvar(hash, folha) {
+  if (folhaAberta(hash) === folha) return 'fechar';
+  return resolverRota(hash, true) === 'mes' ? 'redesenhar' : 'nada';
+}

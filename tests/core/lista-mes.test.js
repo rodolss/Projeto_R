@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   rascunhoVazio, rascunhoDoRegistro, validarRascunho, situacao, ultimoRegistroAntes, saldoDigitadoNoMes,
-  totalAplicado, saldosParaGravar, dataCurta, nomeDoMes, cartaoDoPagamento,
+  totalAplicado, saldosParaGravar, dataCurta, nomeDoMes, cartaoDoPagamento, escolherSaldos,
 } from '../../js/core/lista-mes.js';
 
 const comFeito = (mudancas) => ({ ...rascunhoVazio('2026-11'), ...mudancas });
@@ -34,7 +34,7 @@ test('situacao: mês registrado sem edição tem as 4 feitas', () => {
 });
 
 test('situacao: em edição os saldos contam como feitos e o investir precisa ser confirmado de novo', () => {
-  const s = situacao({ registrado: true, rascunho: { ...comFeito({ feito: { salario: true, proventos: true } }), editando: true } });
+  const s = situacao({ registrado: true, rascunho: { ...comFeito({ recebido: 9200, proventos: 0, feito: { salario: true, proventos: true } }), editando: true } });
   assert.equal(s.modo, 'editando');
   assert.equal(s.feitas.saldos, true);
   assert.equal(s.feitas.investir, false);
@@ -106,4 +106,18 @@ test('cartaoDoPagamento: registrado, pela metade ou para abrir', () => {
   assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: comFeito({ recebido: 9200, feito: { salario: true, proventos: false } }) }), { tipo: 'continuar', quantas: 1 });
   assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: null }), { tipo: 'abrir' });
   assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: rascunhoVazio('2026-11') }), { tipo: 'abrir' });
+});
+
+test('revisão: salário apagado depois de salvo desmarca a tarefa 1', () => {
+  const s = situacao({ registrado: false, rascunho: comFeito({ recebido: null, proventos: 0, saldosModo: 'pulados', feito: { salario: true, proventos: true } }) });
+  assert.equal(s.feitas.salario, false);
+  assert.equal(s.podeInvestir, false);
+});
+
+test('revisão: "Pular" depois de "Usar estes saldos" pula, sem apagar os valores', () => {
+  const copiado = escolherSaldos(comFeito({ saldos: { a: { valor: 10, cotas: null } } }), 'usar');
+  assert.equal(copiado.saldosModo, 'copiados');
+  const pulado = escolherSaldos(copiado, 'pular');
+  assert.equal(pulado.saldosModo, 'pulados');
+  assert.deepEqual(pulado.saldos, { a: { valor: 10, cotas: null } });
 });

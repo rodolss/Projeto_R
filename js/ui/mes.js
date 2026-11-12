@@ -11,10 +11,10 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
-  saldosParaGravar, dataCurta, nomeDoMes,
+  saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
 } from '../core/lista-mes.js';
 import { lerRascunho, salvarRascunho, apagarRascunho } from './mes-rascunho.js';
-import { folhaAberta } from './rotas.js';
+import { folhaAberta, depoisDeSalvar } from './rotas.js';
 
 const ROTULOS_EXTRA = { 'decimo-terceiro': '13º', ferias: 'Férias', plr: 'PLR/bônus', outro: 'Outro' };
 const TITULOS_FOLHA = {
@@ -35,6 +35,13 @@ function fechar() {
   } else {
     location.replace('#/mes');
   }
+}
+
+// Depois de salvar no GitHub (pode demorar): fecha a folha se ainda aberta; senão redesenha o Mês ou não mexe.
+function terminar(folha, ctx) {
+  const acao = depoisDeSalvar(location.hash, folha);
+  if (acao === 'fechar') fechar();
+  else if (acao === 'redesenhar') ctx.rerender();
 }
 
 export function render(container, ctx) {
@@ -167,8 +174,8 @@ function desenhar(container, ctx) {
       h('p', { class: 'suave' }, 'Copie antes de aplicar o dinheiro deste mês. Deixa a divisão mais precisa.'),
       h('div', {}, ...camposSaldos(r.saldos, guardar)),
       h('div', { class: 'botoes' },
-        listaSaldos.length > 0 && botao('Usar estes saldos', () => { r.saldosModo = 'copiados'; guardar(); fechar(); }),
-        botao('Pular', () => { if (r.saldosModo !== 'copiados') r.saldosModo = 'pulados'; guardar(); fechar(); }, { secundario: listaSaldos.length > 0 })),
+        listaSaldos.length > 0 && botao('Usar estes saldos', () => { salvarRascunho(escolherSaldos(r, 'usar')); fechar(); }),
+        botao('Pular', () => { salvarRascunho(escolherSaldos(r, 'pular')); fechar(); }, { secundario: listaSaldos.length > 0 })),
     ];
   }
 
@@ -181,7 +188,7 @@ function desenhar(container, ctx) {
       salvar.disabled = true;
       await ctx.salvar((e) => registrarSaldos(e, { data: hoje, saldos: saldosParaGravar({ estado: e, mes, hoje, saldos }) }));
       ctx.aviso('Saldos salvos.', 'ok', 3000);
-      fechar();
+      terminar('so-saldos', ctx);
     });
     return [
       h('h2', {}, 'Atualizar saldos'),
@@ -269,7 +276,7 @@ function desenhar(container, ctx) {
       }));
       apagarRascunho();
       ctx.aviso(editando ? 'Registro atualizado.' : 'Mês registrado! 👏', 'ok', 4000);
-      fechar();
+      terminar('investir', ctx);
     });
     confirmacao.replaceChildren(cartao(
       h('h3', {}, temAlgo ? 'Quanto você aplicou de fato?' : 'Registrar o mês'),
