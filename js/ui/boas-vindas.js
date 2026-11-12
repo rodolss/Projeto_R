@@ -253,7 +253,8 @@ export function render(container, ctx) {
 
   const PASSOS = [passoConectar, passoBasico, passoOrcamento, passoInvestimentos, passoCarteira, passoVeredito];
   function desenhar() {
-    container.replaceChildren(...PASSOS[passo]().filter(Boolean));
+    // O assistente guarda as respostas só na memória: a atualização automática espera (js/ui/atualizacao.js).
+    container.replaceChildren(h('span', { 'data-sem-recarregar': '', hidden: true }), ...PASSOS[passo]().filter(Boolean));
   }
   desenhar();
 }
