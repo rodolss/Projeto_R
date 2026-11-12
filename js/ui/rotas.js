@@ -10,3 +10,10 @@ export function resolverRota(hash, temEstado) {
 }
 
 export const abaDoMenu = (rota) => ABAS[rota] ?? null;
+
+// Folha por baixo aberta na tela: #/mes?folha=salario → 'salario'. Abrir cria uma entrada no histórico,
+// então o botão voltar (no app Android, web.goBack) fecha a folha sem trocar de tela.
+export function folhaAberta(hash) {
+  const consulta = String(hash ?? '').split('?')[1] ?? '';
+  return new URLSearchParams(consulta).get('folha') || null;
+}

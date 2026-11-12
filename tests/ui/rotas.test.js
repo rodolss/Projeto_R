@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolverRota, abaDoMenu, TELAS } from '../../js/ui/rotas.js';
+import { resolverRota, abaDoMenu, TELAS, folhaAberta } from '../../js/ui/rotas.js';
 
 test('telas conhecidas', () => {
   assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config']);
@@ -21,4 +21,11 @@ test('aba do menu', () => {
   assert.equal(abaDoMenu('mes'), 'mes');
   assert.equal(abaDoMenu('inicio'), 'inicio');
   assert.equal(abaDoMenu('boas-vindas'), null);
+});
+test('folha aberta vem do hash; a rota continua sendo a tela', () => {
+  assert.equal(folhaAberta('#/mes?folha=salario'), 'salario');
+  assert.equal(folhaAberta('#/mes'), null);
+  assert.equal(folhaAberta('#/mes?folha='), null);
+  assert.equal(folhaAberta(''), null);
+  assert.equal(resolverRota('#/mes?folha=investir', true), 'mes');
 });

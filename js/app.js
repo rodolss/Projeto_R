@@ -3,7 +3,7 @@ import { criarArmazem } from './dados/armazem.js';
 import { criarClienteGitHub, donoPadrao } from './dados/github.js';
 import { buscarSerieIpca, precisaAtualizarIpca } from './dados/ipca-remoto.js';
 import { dataISO, somarMeses } from './core/meses.js';
-import { h, cartao, aviso, textoConexao } from './ui/dom.js';
+import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
 import { resolverRota, abaDoMenu } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
@@ -74,6 +74,7 @@ function desconectar() {
 }
 
 const navegar = (hash) => { location.hash = hash; };
+let telaDesenhada = null; // a última tela desenhada por inteiro
 
 function contexto() {
   return {
@@ -106,10 +107,19 @@ async function renderizar() {
   const tela = document.getElementById('tela');
   try {
     const modulo = await import(`./ui/${nome}.js`);
+    // Mesma tela (abrir ou fechar uma folha, dados de outro aparelho): só atualiza, sem animar nem rolar para o topo.
+    if (nome === telaDesenhada && modulo.atualizar) {
+      tela.classList.add('sem-entrada');
+      modulo.atualizar(tela, contexto());
+      return;
+    }
+    esconderFolha();
+    tela.classList.remove('sem-entrada');
     tela.replaceChildren();
     modulo.render(tela, contexto());
     escalonar(tela);
     window.scrollTo(0, 0);
+    telaDesenhada = nome;
   } catch (erro) {
     console.error(erro);
     tela.replaceChildren(cartao(h('p', {}, 'Esta tela ainda não está pronta.')));

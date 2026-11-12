@@ -146,7 +146,7 @@ try {
       await pausa(300);
       const { data } = await cdp.enviar('Page.captureScreenshot', { format: 'png' });
       await cdp.enviar('Emulation.setDeviceMetricsOverride', { width: 412, height: 915, deviceScaleFactor: 2, mobile: true });
-      const arquivo = join(saida, `${rota}-${tema}${opcao('reduzir') ? '-reduzido' : ''}.png`);
+      const arquivo = join(saida, `${rota.replace(/[?=/&]/g, "-")}-${tema}${opcao("reduzir") ? "-reduzido" : ""}.png`);
       writeFileSync(arquivo, Buffer.from(data, 'base64'));
       console.log(`ok  ${arquivo}`);
     }
