@@ -1,7 +1,8 @@
 // Fotografa telas do app em tamanho de celular (412 × 915), no tema claro e no escuro, com o Edge headless.
 // Serve para conferir o visual sem dados reais: injeta scripts/dados-exemplo.json (números inventados).
 //
-// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir] [--espera 1500]
+// Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--estado arquivo.json] [--reduzir] [--espera 1500]
+// --estado usa um estado pronto (por exemplo, o de scripts/gerar-historico-falso.mjs) no lugar da amostra.
 // Pressupõe `npm run servir` rodando em http://localhost:8080. Sai com código 1 se a página tiver erros.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -16,7 +17,7 @@ const PORTA = 9333;
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2);
-const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera'].includes(args[k - 1]));
+const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera', '--estado'].includes(args[k - 1]));
 if (!saida) {
   console.error('Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir]');
   process.exit(2);
@@ -26,6 +27,7 @@ const iRotas = args.indexOf('--rotas');
 const rotas = iRotas >= 0 ? args[iRotas + 1].split(',') : ['inicio', 'mes', 'simular', 'mais'];
 const iEspera = args.indexOf('--espera');
 const ESPERA_MS = iEspera >= 0 ? Number(args[iEspera + 1]) : 1500;
+const iEstado = args.indexOf('--estado');
 
 // ---------- amostra com datas de hoje ----------
 const doisDigitos = (n) => String(n).padStart(2, '0');
@@ -121,7 +123,7 @@ try {
   await cdp.enviar('Log.enable');
   await cdp.enviar('Emulation.setDeviceMetricsOverride', { width: 412, height: 915, deviceScaleFactor: 2, mobile: true });
 
-  const estado = opcao('sem-dados') ? null : amostraDeHoje();
+  const estado = opcao('sem-dados') ? null : iEstado >= 0 ? JSON.parse(readFileSync(args[iEstado + 1], 'utf8')) : amostraDeHoje();
   for (const tema of ['claro', 'escuro']) {
     await cdp.enviar('Emulation.setEmulatedMedia', {
       features: [
