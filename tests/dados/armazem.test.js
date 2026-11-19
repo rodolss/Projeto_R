@@ -138,3 +138,38 @@ test('remoto da v1 chega migrado para a v2', async () => {
   assert.deepEqual(r.estado.marcos, {});
   assert.equal(r.estado.x, 1);
 });
+
+// Contas da casa: o mesmo armazém, com outro prefixo, outra migração e outra mescla.
+const casaVazia = (extra = {}) => ({ schemaVersion: 1, pessoas: [], contas: [], meses: [], ...extra });
+const migrarCasaTeste = (e) => { if (e?.schemaVersion !== 1) throw new Error('versao-desconhecida'); return e; };
+
+test('casa: prefixo próprio grava em projetoR.casa.* sem tocar nos dados da aposentadoria', async () => {
+  const armazenamento = criarArmazenamento(local({ schemaVersion: 2, aposentadoria: true }));
+  const cliente = criarCliente({ remoto: casaVazia() });
+  const a = criarArmazem({ armazenamento, cliente, prefixo: 'projetoR.casa', migrar: migrarCasaTeste });
+  await a.salvar((e) => ({ ...e, contas: [{ id: 'c1' }] }));
+  assert.deepEqual(JSON.parse(armazenamento.mem['projetoR.casa.estado']).contas, [{ id: 'c1' }]);
+  assert.ok(armazenamento.mem['projetoR.casa.sha']);
+  assert.ok(armazenamento.mem['projetoR.casa.base']);
+  assert.equal(JSON.parse(armazenamento.mem['projetoR.estado']).aposentadoria, true);
+  assert.equal(armazenamento.mem['projetoR.sha'], undefined);
+});
+
+test('casa: conflito usa a mescla passada', async () => {
+  const armazenamento = criarArmazenamento({ 'projetoR.casa.estado': JSON.stringify(casaVazia()) });
+  const cliente = criarCliente({ remoto: casaVazia({ remotoMudou: true }), falhasGravar: ['conflito'] });
+  let chamou = null;
+  const mesclar = ({ local: l, remoto: r }) => { chamou = true; return { ...r, ...l, mesclado: true }; };
+  const r = await criarArmazem({ armazenamento, cliente, prefixo: 'projetoR.casa', migrar: migrarCasaTeste, mesclar })
+    .salvar((e) => ({ ...e, x: 1 }));
+  assert.equal(chamou, true);
+  assert.equal(r.estado.mesclado, true);
+  assert.equal(cliente.estadoRemoto.atual.mesclado, true);
+});
+
+test('casa: dados locais corrompidos vão para projetoR.casa.estado.corrompido', async () => {
+  const armazenamento = criarArmazenamento({ 'projetoR.casa.estado': '{quebrado' });
+  const r = await criarArmazem({ armazenamento, cliente: null, prefixo: 'projetoR.casa', migrar: migrarCasaTeste }).carregar();
+  assert.equal(r.estado, null);
+  assert.equal(armazenamento.mem['projetoR.casa.estado.corrompido'], '{quebrado');
+});

@@ -2,18 +2,20 @@
 // - A pendência é marcada ANTES de enviar: se o app fechar no meio, a próxima abertura reenvia.
 // - Salvamentos e carregamentos rodam em fila, um de cada vez.
 // - Se o remoto mudou em outro aparelho, mescla em 3 vias (nada se perde) e avisa.
-import { migrar } from '../core/esquema.js';
-import { mesclar, mudou } from './mesclar.js';
-
-const CHAVES = {
-  estado: 'projetoR.estado', sha: 'projetoR.sha', pendente: 'projetoR.pendente',
-  base: 'projetoR.base', corrompido: 'projetoR.estado.corrompido',
-};
+// - O prefixo separa os arquivos: a aposentadoria usa `projetoR` (dados.json) e a casa `projetoR.casa` (casa.json).
+import { migrar as migrarAposentadoria } from '../core/esquema.js';
+import { mesclar as mesclarAposentadoria, mudou } from './mesclar.js';
 
 const avisoDe = (erro) => (erro?.codigo === 'rede' ? 'offline' : (erro?.codigo ?? 'desconhecido'));
 const comAviso = (obj, aviso) => (aviso ? { ...obj, aviso } : obj);
 
-export function criarArmazem({ armazenamento, cliente }) {
+export function criarArmazem({
+  armazenamento, cliente, prefixo = 'projetoR', migrar = migrarAposentadoria, mesclar = mesclarAposentadoria,
+}) {
+  const CHAVES = {
+    estado: `${prefixo}.estado`, sha: `${prefixo}.sha`, pendente: `${prefixo}.pendente`,
+    base: `${prefixo}.base`, corrompido: `${prefixo}.estado.corrompido`,
+  };
   let fila = Promise.resolve();
   const enfileirar = (operacao) => {
     const p = fila.then(operacao, operacao);
