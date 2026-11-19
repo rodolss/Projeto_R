@@ -81,6 +81,10 @@ export function render(container, ctx) {
         h('label', { class: 'campo', style: 'margin-top:12px' }, h('span', { class: 'campo-rotulo' }, 'Seu usuário do GitHub'), dono),
         h('div', { class: 'botoes', style: 'margin-top:12px' }, testar, botao('Continuar sem sincronizar', () => ir(1), { secundario: true })),
         msg),
+      cartao(
+        h('h2', {}, 'Só quer as contas da casa?'),
+        h('p', { class: 'suave' }, 'Anote as contas da casa e veja quanto cada um paga, sem o planejador de aposentadoria.'),
+        h('div', { class: 'botoes', style: 'margin-top:8px' }, botao('Abrir as contas da casa', () => ctx.navegar('#/casa'), { secundario: true }))),
     ], { voltar: false });
   }
 

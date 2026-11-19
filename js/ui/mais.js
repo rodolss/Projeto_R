@@ -2,6 +2,7 @@
 import { h } from './dom.js';
 
 const ITENS = [
+  { href: '#/casa', titulo: 'Contas da casa', frase: 'Quanto cada um paga das contas' },
   { href: '#/orcamento', titulo: 'Orçamento', frase: 'Seu custo de vida' },
   { href: '#/historico', titulo: 'Histórico', frase: 'Mês a mês' },
   { href: '#/config', titulo: 'Ajustes', frase: 'Premissas, conexão e backup' },

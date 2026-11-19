@@ -6,7 +6,8 @@ import { resolverRota } from './rotas.js';
 
 const CHAVE = 'projetoR.atualizado';
 // Orçamento, Ajustes, Histórico e o assistente guardam edições só na memória até "Salvar": não são seguras.
-const TELAS_SEGURAS = ['inicio', 'mes', 'simular', 'mais'];
+// Na casa, o Mês e o Ano são seguros (as folhas com campo marcam data-sem-recarregar); os Ajustes não.
+const TELAS_SEGURAS = ['inicio', 'mes', 'simular', 'mais', 'casa', 'casa-ano'];
 
 export function podeRecarregar({ hash, documento }) {
   return TELAS_SEGURAS.includes(resolverRota(hash, true))

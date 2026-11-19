@@ -1,9 +1,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar } from '../../js/ui/rotas.js';
+import {
+  resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
+} from '../../js/ui/rotas.js';
+
+test('contas da casa: rotas próprias, que funcionam sem plano de aposentadoria', () => {
+  assert.equal(resolverRota('#/casa-ano', false), 'casa-ano');
+  assert.equal(resolverRota('#/casa?mes=2026-10', false), 'casa');
+  assert.equal(resolverRota('#/casa-ajustes', true), 'casa-ajustes');
+  assert.equal(resolverRota('#/inicio', false, 'casa'), 'boas-vindas');
+});
+test('contas da casa: sem rota, abre no último espaço usado', () => {
+  assert.equal(resolverRota('', false, 'casa'), 'casa');
+  assert.equal(resolverRota('', true, 'casa'), 'casa');
+  assert.equal(resolverRota('#/xyz', true, 'casa'), 'casa');
+  assert.equal(resolverRota('', true, 'aposentadoria'), 'inicio');
+  assert.equal(resolverRota('', true), 'inicio');
+  assert.equal(resolverRota('', false), 'boas-vindas');
+});
+test('contas da casa: menu, espaço e parâmetros do hash', () => {
+  assert.equal(abaDoMenu('casa'), 'casa');
+  assert.equal(abaDoMenu('casa-ano'), 'casa-ano');
+  assert.equal(abaDoMenu('casa-ajustes'), 'casa-ajustes');
+  assert.equal(ehDaCasa('casa-ano'), true);
+  assert.equal(ehDaCasa('mes'), false);
+  assert.equal(parametroDoHash('#/casa?mes=2026-10&folha=x', 'mes'), '2026-10');
+  assert.equal(parametroDoHash('#/casa?mes=2026-10&folha=x', 'folha'), 'x');
+  assert.equal(parametroDoHash('#/casa', 'mes'), null);
+  assert.equal(folhaAberta('#/casa?mes=2026-10&folha=conta-c1'), 'conta-c1');
+});
+test('contas da casa: depois de salvar numa folha da casa', () => {
+  assert.equal(depoisDeSalvar('#/casa?folha=conta-c1', 'conta-c1', 'casa'), 'fechar');
+  assert.equal(depoisDeSalvar('#/casa?mes=2026-10', 'conta-c1', 'casa'), 'redesenhar');
+  assert.equal(depoisDeSalvar('#/casa-ano', 'conta-c1', 'casa'), 'nada');
+});
 
 test('telas conhecidas', () => {
-  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config']);
+  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-ano', 'casa-ajustes']);
 });
 test('rotas', () => {
   assert.equal(resolverRota('', true), 'inicio');
@@ -35,4 +68,10 @@ test('revisão: depois de salvar, fecha a folha só se ela ainda está aberta', 
   assert.equal(depoisDeSalvar('#/mes', 'investir'), 'redesenhar');
   assert.equal(depoisDeSalvar('#/mes?folha=salario', 'investir'), 'redesenhar');
   assert.equal(depoisDeSalvar('#/inicio', 'investir'), 'nada');
+});
+
+test('revisão: dados de outro aparelho só redesenham sem campo em foco e sem folha aberta', () => {
+  assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11', false), true);
+  assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11&folha=cartao-c4', false), false);
+  assert.equal(podeAtualizarSozinho('#/casa', true), false);
 });

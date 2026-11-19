@@ -116,3 +116,15 @@ test('armazenamento de sessão bloqueado não impede a atualização', async () 
   assert.equal(r.recargas, 1);
   assert.deepEqual(r.avisos, []);
 });
+
+test('contas da casa: o Mês e o Ano são telas seguras; os Ajustes da casa não', async () => {
+  const mes = cenario({ hash: '#/casa?mes=2026-10' });
+  await mes.novaVersao();
+  assert.equal(mes.recargas, 1);
+  const ano = cenario({ hash: '#/casa-ano' });
+  await ano.novaVersao();
+  assert.equal(ano.recargas, 1);
+  const ajustes = cenario({ hash: '#/casa-ajustes' });
+  await ajustes.novaVersao();
+  assert.equal(ajustes.recargas, 0);
+});
