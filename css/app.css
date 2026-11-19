@@ -353,6 +353,15 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-apagar:active { background: var(--cartao-2); }
 .casa-passo { display: flex; align-items: center; gap: 12px; }
 .casa-vezes { min-width: 82px; text-align: center; font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+/* Ano: listas com barra (uma série, uma cor; o valor fica sempre em texto). */
+.barra-item { display: block; padding: 11px 16px 13px; border-top: 1px solid var(--borda); color: var(--texto); text-decoration: none; }
+a.barra-item:active { background: var(--cartao-2); }
+.barra-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.barra-topo b { font-weight: 600; }
+.barra-topo .quanto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.barra-item small { display: block; color: var(--suave); font-size: 12.5px; }
+.barra-trilho { height: 8px; border-radius: 4px; background: var(--cartao-2); margin-top: 7px; overflow: hidden; }
+.barra-trilho > i { display: block; height: 100%; border-radius: 4px; background: var(--destaque); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
