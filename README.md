@@ -8,6 +8,16 @@ Planejador pessoal de aposentadoria. Ao abrir, o app mostra **quanto falta para 
 - **Simulador "E se…?":** arraste quanto investe, o salário e o custo de vida e veja quanto falta em 4 cenários de mercado (ruim, moderado, normal e bom) e quanto seria preciso para chegar no alvo.
 - **Os investimentos sugeridos são exemplos, não uma recomendação profissional.**
 
+## Contas da casa
+
+Um espaço separado da aposentadoria (**Mais › Contas da casa**) para dividir as contas da casa entre duas pessoas **em proporção à renda**: quem ganha mais paga mais, e cada um paga a mesma fatia do que ganha.
+
+- **Mês:** o total das contas, quanto cada um paga e quanto sobra. Tocar num valor abre um campo só. Um mês novo já vem previsto com os últimos valores ("a confirmar") até alguém digitar o valor certo.
+- **Cartão compra por compra:** anote as compras da fatura, inclusive parceladas (as parcelas aparecem sozinhas nos meses seguintes).
+- **Ano:** quanto foi para as contas, quanto cada um pagou, mês a mês e para onde foi o dinheiro.
+- **Dois celulares:** os dados ficam em `casa.json` no mesmo repositório privado. O app lembra o espaço usado em cada aparelho, então o celular de quem só usa as contas da casa abre direto nelas (e não recebe os lembretes da aposentadoria).
+- **Vindo de uma planilha:** `node scripts/importar-planilha.mjs <planilha.xlsx> <saida.json>` converte a planilha antiga (uma aba por ano) num `casa.json`. A saída tem dados pessoais: grave-a fora deste repositório e envie só para o repositório privado.
+
 ## App Android
 
 Além do site, há um app Android: uma casca pequena que abre o site publicado, funciona sem internet depois da primeira abertura e lembra do dia do pagamento (5º dia útil ou um dia fixo, ajustável em Mais › Ajustes › Lembretes).
@@ -30,12 +40,13 @@ Requer o [Node.js](https://nodejs.org/) LTS apenas para os testes e para o servi
 npm test          # roda os testes
 npm run servir    # abre em http://localhost:8080
 node scripts/capturar-telas.mjs <pasta>   # fotografa as telas no tamanho de celular (claro e escuro), com dados de exemplo
+node scripts/gerar-casa-exemplo.mjs casa.json && node scripts/capturar-telas.mjs <pasta> --rotas casa,casa-ano,casa-ajustes --local casa.json
 ```
 
 ## Estrutura
 
 - `js/core/`: regras e matemática financeira (módulos puros, testados).
 - `js/dados/`: sincronização com o GitHub, cópia local e IPCA do Banco Central.
-- `js/ui/`: telas (início, mês, simular, mais, orçamento, histórico, ajustes e assistente de boas-vindas).
+- `js/ui/`: telas (início, mês, simular, mais, orçamento, histórico, ajustes e assistente de boas-vindas; `casa*.js` são as contas da casa).
 - `fontes/`: Inter e Sora (licença OFL), guardadas no app para funcionar sem internet.
 - `docs/superpowers/`: design e plano de implementação.
