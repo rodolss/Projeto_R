@@ -353,6 +353,11 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-apagar:active { background: var(--cartao-2); }
 .casa-passo { display: flex; align-items: center; gap: 12px; }
 .casa-vezes { min-width: 82px; text-align: center; font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.casa-ajuste { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--borda); }
+.casa-ajuste-linha { display: flex; align-items: center; gap: 8px; }
+.casa-ajuste-linha .entrada { flex: 1; min-width: 0; }
+.casa-ajuste-linha .marcar { flex: 1; min-width: 0; font-size: 14.5px; }
+.casa-ajuste-linha .seta-mes { width: 42px; height: 42px; font-size: 18px; padding: 0; }
 /* Ano: listas com barra (uma série, uma cor; o valor fica sempre em texto). */
 .barra-item { display: block; padding: 11px 16px 13px; border-top: 1px solid var(--borda); color: var(--texto); text-decoration: none; }
 a.barra-item:active { background: var(--cartao-2); }
