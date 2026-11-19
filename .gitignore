@@ -9,3 +9,6 @@ android/local.properties
 *.p12
 *.pem
 *.jks
+
+# Planilha pessoal de finanças (dados privados; nunca publicar)
+Controle Financeiro.xlsx
