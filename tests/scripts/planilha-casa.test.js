@@ -124,3 +124,10 @@ test('meses em ordem e dentro do formato da casa', () => {
   assert.equal(casa.schemaVersion, 1);
   assert.ok(casa.meses.every((m) => m.salarios && m.valores && Array.isArray(m.compras)));
 });
+
+test('revisão: nos meses reais, toda conta ausente da aba entra como zero (também as que não usa mais)', () => {
+  const { casa } = importar();
+  assert.equal(mes(casa, '2026-03').valores[idDe(casa, 'Reserva')], 0);
+  assert.equal(mes(casa, '2026-03').valores[idDe(casa, 'Apartamento')], 0);
+  assert.equal(mes(casa, '2026-12').valores[idDe(casa, 'Reserva')], undefined); // mês previsto: sem zeros
+});

@@ -7,7 +7,7 @@ import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
-import { resolverRota, abaDoMenu, ehDaCasa } from './ui/rotas.js';
+import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
@@ -19,8 +19,10 @@ const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'aposentadoria': o app abre 
 const CHAVE_USOU_APOSENTADORIA = 'projetoR.usouAposentadoria';
 const app = {
   estado: null, armazem: null, conexao: null, sincronizado: false,
-  casa: null, armazemCasa: null, casaSincronizada: false,
+  casa: null, armazemCasa: null, casaSincronizada: false, erroCasa: null,
 };
+// Leitura do casa.json que deu certo (ou juntou com outro aparelho). Qualquer outro aviso é falha de leitura.
+const leituraOk = (aviso) => !aviso || aviso === 'conflito-resolvido';
 // Quem precisa dos dados já sincronizados (a comemoração de marcos) espera aqui (spec v2 §4.7).
 const esperandoSincronizar = [];
 function quandoSincronizado(fn) {
@@ -94,7 +96,8 @@ async function conectar({ token, dono }) {
   if (r.estado) app.estado = r.estado;
   if (rCasa.estado) app.casa = rCasa.estado;
   app.sincronizado = true;
-  app.casaSincronizada = !rCasa.aviso;
+  app.erroCasa = leituraOk(rCasa.aviso) ? null : rCasa.aviso;
+  app.casaSincronizada = !app.erroCasa;
   for (const fn of esperandoSincronizar.splice(0)) fn(app.estado);
   return { ...r, casa: rCasa };
 }
@@ -126,6 +129,8 @@ function contexto() {
     casa: app.casa,
     salvarCasa,
     casaSincronizada: app.casaSincronizada,
+    erroCasa: app.erroCasa,
+    tentarCasaDeNovo: async () => { await sincronizarCasaAoAbrir(); renderizar(); },
   };
 }
 
@@ -186,6 +191,7 @@ function receberEstado(novo) {
   if (!novo || JSON.stringify(novo) === JSON.stringify(app.estado)) return;
   const tinha = Boolean(app.estado);
   app.estado = novo;
+  if (naCasa()) return; // as telas da casa não usam os dados da aposentadoria: nada a redesenhar
   if (!tinha || !digitando()) renderizar();
   else mostrarAviso('Chegaram dados de outro aparelho. Saia do campo e abra a tela de novo para ver.', 'info');
 }
@@ -195,8 +201,9 @@ function receberCasa(novo) {
   const tinha = Boolean(app.casa);
   app.casa = novo;
   if (!naCasa()) return;
-  if (!tinha || !digitando()) renderizar();
-  else mostrarAviso('Chegaram dados de outro aparelho. Saia do campo e abra a tela de novo para ver.', 'info');
+  // Com folha aberta ou campo em foco, o que foi digitado (só na memória) não pode sumir.
+  if (!tinha || podeAtualizarSozinho(location.hash, digitando())) renderizar();
+  else mostrarAviso('Chegaram dados de outro aparelho. Feche e abra de novo para ver.', 'info');
 }
 
 // Abre na hora com a cópia local; a sincronização com o GitHub acontece em segundo plano.
@@ -214,10 +221,16 @@ async function sincronizarCasaAoAbrir() {
   const r = await app.armazemCasa.carregar();
   // Os avisos de conexão já vêm da aposentadoria; aqui só o que é da casa (ou se o aparelho só usa a casa).
   if (r.aviso && (r.aviso === 'conflito-resolvido' || !app.estado)) avisoDeConexao(r.aviso);
-  const antes = app.casaSincronizada;
-  app.casaSincronizada = true;
+  const antes = `${app.casaSincronizada}|${app.erroCasa}`;
+  // Só uma leitura que deu certo libera "Começar" num aparelho sem casa (senão duplicaria as contas).
+  if (leituraOk(r.aviso)) {
+    app.casaSincronizada = true;
+    app.erroCasa = null;
+  } else {
+    app.erroCasa = r.aviso;
+  }
   if (r.estado) receberCasa(r.estado);
-  else if (!antes && naCasa()) renderizar(); // sem casa no GitHub: troca "Carregando" pelo começo
+  if (!app.casa && naCasa() && antes !== `${app.casaSincronizada}|${app.erroCasa}`) renderizar(); // troca "Carregando" pelo começo ou pelo erro
 }
 
 async function iniciar() {

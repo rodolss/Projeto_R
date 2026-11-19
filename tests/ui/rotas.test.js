@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash,
+  resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
 } from '../../js/ui/rotas.js';
 
 test('contas da casa: rotas próprias, que funcionam sem plano de aposentadoria', () => {
@@ -68,4 +68,10 @@ test('revisão: depois de salvar, fecha a folha só se ela ainda está aberta', 
   assert.equal(depoisDeSalvar('#/mes', 'investir'), 'redesenhar');
   assert.equal(depoisDeSalvar('#/mes?folha=salario', 'investir'), 'redesenhar');
   assert.equal(depoisDeSalvar('#/inicio', 'investir'), 'nada');
+});
+
+test('revisão: dados de outro aparelho só redesenham sem campo em foco e sem folha aberta', () => {
+  assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11', false), true);
+  assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11&folha=cartao-c4', false), false);
+  assert.equal(podeAtualizarSozinho('#/casa', true), false);
 });

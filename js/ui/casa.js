@@ -1,12 +1,12 @@
 // Contas da casa · Mês (desenho de 2026-11-19): total das contas, quanto cada um paga e quanto sobra,
 // a lista das contas e os salários. Tocar num valor abre uma folha com um campo só (#/casa?mes=…&folha=…);
 // o voltar do celular fecha a folha. Feita para quem tem receio de coisas complicadas: pouco texto, nada de jargão.
-import { h, campoMoeda, cartao, botao, aviso, mostrarFolha, esconderFolha } from './dom.js';
+import { h, campoMoeda, cartao, botao, aviso, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
   resumoDoMes, primeiroMes, valorDaConta, salarioNoMes, criarCasa, salvarValor, salvarSalario,
-  adicionarCompra, apagarCompra, conferirFatura,
+  adicionarCompra, apagarCompra, conferirFatura, parcelasSeguintes,
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
@@ -19,9 +19,12 @@ const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}
 const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde) : `${nomeDoMes(deOnde)} de ${deOnde.slice(0, 4)}`);
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
-export function estadoDaTela({ casa, conectado, casaSincronizada }) {
+// Aparelho conectado que ainda não conseguiu ler o casa.json nunca vê "Começar": criar uma casa nova ali
+// duplicaria as contas ao juntar com a do GitHub. Se a leitura falhou, mostra o erro e "Tentar de novo".
+export function estadoDaTela({ casa, conectado, casaSincronizada, erroCasa = null }) {
   if (casa) return 'mes';
-  return conectado && !casaSincronizada ? 'carregando' : 'comecar';
+  if (!conectado || casaSincronizada) return 'comecar';
+  return erroCasa ? 'erro' : 'carregando';
 }
 
 export function mesDaTela(hash, hoje) {
@@ -43,15 +46,36 @@ export function atualizar(container, ctx) {
 }
 
 function desenhar(container, ctx) {
-  const tela = estadoDaTela({ casa: ctx.casa, conectado: Boolean(ctx.conexao), casaSincronizada: ctx.casaSincronizada });
+  const tela = estadoDaTela({
+    casa: ctx.casa, conectado: Boolean(ctx.conexao), casaSincronizada: ctx.casaSincronizada, erroCasa: ctx.erroCasa,
+  });
   if (tela !== 'mes') {
     esconderFolha();
-    container.replaceChildren(...(tela === 'carregando'
-      ? [cartao(h('p', { class: 'suave' }, 'Carregando as contas da casa…'))]
-      : telaDeComeco(ctx)));
+    const conteudo = {
+      carregando: () => [cartao(h('p', { class: 'suave' }, 'Carregando as contas da casa…'))],
+      erro: () => telaDeErro(ctx),
+      comecar: () => telaDeComeco(ctx),
+    };
+    container.replaceChildren(...conteudo[tela]());
     return;
   }
   desenharMes(container, ctx);
+}
+
+// ---------- não consegui ler as contas do GitHub ----------
+function telaDeErro(ctx) {
+  const tentar = botao('Tentar de novo', async () => {
+    tentar.disabled = true;
+    await ctx.tentarCasaDeNovo();
+  });
+  const chaveRuim = ['token-invalido', 'sem-permissao', 'repo-nao-encontrado'].includes(ctx.erroCasa);
+  return [
+    cartao(
+      h('h1', {}, 'Contas da casa'),
+      aviso('atencao', `Não consegui abrir as contas da casa. ${textoConexao(ctx.erroCasa)}`),
+      h('div', { class: 'botoes', style: 'margin-top:12px' }, tentar)),
+    chaveRuim && cartaoConectar(ctx, { titulo: 'Trocar a chave deste celular', texto: 'Cole uma chave nova do GitHub para este celular.' }),
+  ].filter(Boolean);
 }
 
 // ---------- primeiro uso ----------
@@ -108,7 +132,7 @@ function desenharMes(container, ctx) {
   const terminar = (folha) => {
     const acao = depoisDeSalvar(location.hash, folha, 'casa');
     if (acao === 'fechar') fechar();
-    else if (acao === 'redesenhar') ctx.rerender();
+    else if (acao === 'redesenhar' && !folhaAberta(location.hash)) ctx.rerender(); // outra folha aberta: não apaga o que se digita nela
   };
   const irPara = (m) => location.replace(`#/casa?mes=${m}`);
 
@@ -257,10 +281,27 @@ function desenharMes(container, ctx) {
       h('span', { class: 'quanto' }, formatarBRL(c.valor)),
       h('button', {
         type: 'button', class: 'casa-apagar', 'aria-label': `Apagar ${c.nome}`,
-        onclick: async () => {
+        // Dois toques: o primeiro só pergunta (um toque sem querer não apaga nada).
+        onclick: async (e) => {
+          const botaoApagar = e.currentTarget;
+          if (!botaoApagar.classList.contains('confirmar')) {
+            botaoApagar.classList.add('confirmar');
+            botaoApagar.textContent = 'Apagar';
+            botaoApagar.setAttribute('aria-label', `Confirmar: apagar ${c.nome}`);
+            setTimeout(() => {
+              if (!botaoApagar.isConnected) return;
+              botaoApagar.classList.remove('confirmar');
+              botaoApagar.textContent = '×';
+              botaoApagar.setAttribute('aria-label', `Apagar ${c.nome}`);
+            }, 4000);
+            return;
+          }
+          botaoApagar.disabled = true;
+          const seguintes = parcelasSeguintes(casa, { mes, compraId: c.id });
           await ctx.salvarCasa((x) => apagarCompra(x, { mes, compraId: c.id }));
-          const seguintes = c.parcela && c.parcela.n < c.parcela.de;
-          ctx.aviso(seguintes ? 'Compra apagada, junto com as próximas parcelas.' : 'Compra apagada.', 'ok', 3000);
+          ctx.aviso(seguintes
+            ? `Compra apagada, junto com ${plural(seguintes, 'lançamento dos meses seguintes', 'lançamentos dos meses seguintes')}.`
+            : 'Compra apagada.', 'ok', 3500);
           ctx.rerender();
         },
       }, '×')));

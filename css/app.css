@@ -351,8 +351,10 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-compra .quanto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .casa-apagar { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: var(--suave); font-size: 22px; cursor: pointer; }
 .casa-apagar:active { background: var(--cartao-2); }
+.casa-apagar.confirmar { width: auto; border-radius: 99px; padding: 0 14px; font-size: 14px; font-weight: 600; background: var(--alerta-fundo); color: var(--alerta); }
 .casa-passo { display: flex; align-items: center; gap: 12px; }
 .casa-vezes { min-width: 82px; text-align: center; font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.casa-trocar-chave > .cartao { border: 0; padding: 8px 0 0; box-shadow: none; }
 .casa-ajuste { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--borda); }
 .casa-ajuste-linha { display: flex; align-items: center; gap: 8px; }
 .casa-ajuste-linha .entrada { flex: 1; min-width: 0; }

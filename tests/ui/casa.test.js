@@ -21,3 +21,10 @@ test('o mês da tela vem do hash; inválido ou ausente, é o mês de hoje', () =
   assert.equal(mesDaTela('#/casa?mes=xyz&folha=a', '2026-11-19'), '2026-11');
   assert.equal(mesDaTela('#/casa', '2026-11-19'), '2026-11');
 });
+
+test('revisão: conectado e a primeira leitura falhou: tela de erro (nunca o começo, que duplicaria a casa)', () => {
+  assert.equal(estadoDaTela({ casa: null, conectado: true, casaSincronizada: false, erroCasa: 'offline' }), 'erro');
+  assert.equal(estadoDaTela({ casa: null, conectado: true, casaSincronizada: false, erroCasa: 'token-invalido' }), 'erro');
+  assert.equal(estadoDaTela({ casa: null, conectado: true, casaSincronizada: false, erroCasa: null }), 'carregando');
+  assert.equal(estadoDaTela({ casa, conectado: true, casaSincronizada: false, erroCasa: 'offline' }), 'mes');
+});

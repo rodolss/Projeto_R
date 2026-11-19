@@ -35,3 +35,7 @@ export function depoisDeSalvar(hash, folha, tela = 'mes') {
   if (folhaAberta(hash) === folha) return 'fechar';
   return resolverRota(hash, true) === tela ? 'redesenhar' : 'nada';
 }
+
+// Dados de outro aparelho só redesenham a tela da casa se ninguém estiver digitando nem com uma folha aberta:
+// a folha guarda o que foi digitado só na memória até "Salvar".
+export const podeAtualizarSozinho = (hash, digitando) => !digitando && !folhaAberta(hash);

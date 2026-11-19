@@ -198,3 +198,37 @@ test('contas: adicionar, mover, renomear, arquivar e pessoas', () => {
   casa = renomearPessoa(casa, 'p2', 'Bea');
   assert.deepEqual(casa.pessoas.map((p) => p.nome), ['Ana', 'Bea']);
 });
+
+// ---------- revisão final ----------
+import { parcelasSeguintes } from '../../js/core/casa.js';
+
+test('revisão: subir/descer pula as contas que não usa mais (que ficam escondidas nos Ajustes)', () => {
+  let casa = editarConta(casaBase(), 'c2', { arquivada: true }); // [c1, c2(arq), c3, c4]
+  casa = moverConta(casa, 'c3', -1);
+  assert.deepEqual(casa.contas.filter((c) => !c.arquivada).map((c) => c.id), ['c3', 'c1', 'c4']);
+  casa = moverConta(casa, 'c1', 1);
+  assert.deepEqual(casa.contas.filter((c) => !c.arquivada).map((c) => c.id), ['c3', 'c4', 'c1']);
+  const antes = casa.contas.map((c) => c.id);
+  assert.deepEqual(moverConta(casa, 'c3', -1).contas.map((c) => c.id), antes); // já é a primeira visível
+});
+
+test('revisão: voltar a usar uma conta não inventa valores nos meses de antes', () => {
+  let casa = salvarValor(casaBase(), { mes: '2025-12', contaId: 'c2', valor: 50 });
+  casa = editarConta(casa, 'c2', { arquivada: true });
+  casa = editarConta(casa, 'c2', { arquivada: false, ativadaEm: '2026-11' });
+  assert.equal(valorDaConta(casa, '2026-02', 'c2').situacao, 'vazio');
+  assert.equal(valorDaConta(casa, '2025-12', 'c2').situacao, 'confirmado');
+  assert.deepEqual(valorDaConta(casa, '2026-11', 'c2'), { valor: 50, situacao: 'a-confirmar', compras: [], deOnde: '2025-12' });
+});
+
+test('revisão: quantas parcelas seguintes uma compra leva junto ao ser apagada', () => {
+  const novoId = ids();
+  let casa = adicionarCompra(casaBase(), { mes: '2026-11', contaId: 'c4', nome: 'Sofá', valor: 40, vezes: 3, novoId });
+  casa = adicionarCompra(casa, { mes: '2026-11', contaId: 'c4', nome: 'Pão', valor: 5, vezes: 1, novoId });
+  const sofa = casa.meses[0].compras.find((c) => c.nome === 'Sofá');
+  const pao = casa.meses[0].compras.find((c) => c.nome === 'Pão');
+  assert.equal(parcelasSeguintes(casa, { mes: '2026-11', compraId: sofa.id }), 2);
+  assert.equal(parcelasSeguintes(casa, { mes: '2026-11', compraId: pao.id }), 0);
+  const ultima = casa.meses.find((m) => m.mes === '2027-01').compras[0];
+  assert.equal(parcelasSeguintes(casa, { mes: '2027-01', compraId: ultima.id }), 0);
+});

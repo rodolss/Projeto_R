@@ -193,9 +193,10 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
         if (real) reg.valores[id] = centavos(valor ?? 0);
         else if (valor) reg.valores[id] = centavos(valor);
       }
-      // Conta ativa que não existia nesta aba: zero nos meses reais, para a previsão não inventar valor no passado.
+      // Conta que não existia nesta aba: zero nos meses reais, para a previsão não inventar valor no passado
+      // (nem agora, nem se uma conta que não usa mais voltar a ser usada).
       if (real) {
-        for (const k of ativas) {
+        for (const k of ordem) {
           if (!a.contas.some((c) => chave(c.nome) === k)) reg.valores[idDaConta.get(k)] = 0;
         }
       }

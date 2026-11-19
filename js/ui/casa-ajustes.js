@@ -80,15 +80,25 @@ function desenhar(container, ctx) {
       h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Continuam no histórico, mas não aparecem nos meses novos.'),
       ...arquivadas.map((conta) => h('div', { class: 'linha' },
         h('div', { class: 'nome' }, h('span', {}, conta.nome)),
-        h('button', { type: 'button', class: 'botao-link', style: 'padding:4px 0', onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: false }), `${conta.nome} voltou para a lista.`) }, 'Voltar a usar')))));
+        h('button', {
+          type: 'button', class: 'botao-link', style: 'padding:4px 0',
+          // A previsão volta só deste mês em diante: os meses em que a conta estava parada não ganham valor.
+          onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: false, ativadaEm: ctx.hoje.slice(0, 7) }), `${conta.nome} voltou para a lista.`),
+        }, 'Voltar a usar')))));
 
   // ---------- sincronização ----------
   const outra = casa.pessoas[1]?.nome ?? 'a outra pessoa';
   const sincronizacao = ctx.conexao
-    ? cartao(
-      h('h2', {}, 'Nos dois celulares'),
-      h('p', { class: 'suave' }, `Conectado ao repositório privado de ${ctx.conexao.dono}: as contas aparecem em todo celular conectado.`),
-      h('p', { class: 'suave pequeno' }, `Para usar no celular de ${outra}: instale o app, toque em "Abrir as contas da casa" e conecte com uma chave do GitHub só para aquele celular.`))
+    ? [
+      cartao(
+        h('h2', {}, 'Nos dois celulares'),
+        h('p', { class: 'suave' }, `Conectado ao repositório privado de ${ctx.conexao.dono}: as contas aparecem em todo celular conectado.`),
+        h('p', { class: 'suave pequeno' }, `Para usar no celular de ${outra}: instale o app, toque em "Abrir as contas da casa" e conecte com uma chave do GitHub só para aquele celular.`)),
+      // A chave vence (validade de 1 ano): dá para trocar aqui mesmo, sem passar pela aposentadoria.
+      h('details', { class: 'cartao casa-trocar-chave' },
+        h('summary', {}, 'Trocar a chave deste celular'),
+        cartaoConectar(ctx, { titulo: 'Chave nova', texto: 'Use quando o app avisar que a chave venceu ou ficou inválida.' })),
+    ]
     : cartaoConectar(ctx, { titulo: 'Usar nos dois celulares', texto: 'Hoje as contas estão só neste aparelho. Conecte com uma chave do GitHub para ver as mesmas contas em outro celular.' });
 
   const comoFunciona = cartao(
@@ -100,7 +110,7 @@ function desenhar(container, ctx) {
     h('h1', {}, 'Ajustes da casa'),
     pessoas,
     contas,
-    sincronizacao,
+    ...[sincronizacao].flat(),
     comoFunciona,
     h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
   );

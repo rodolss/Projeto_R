@@ -56,6 +56,8 @@ export function valorDaConta(casa, mes, contaId) {
   if (compras.length) return { valor: soma(compras), situacao: confirmado ? 'confirmado' : 'a-confirmar', compras, deOnde: null };
   if (confirmado) return { valor: reg.valores[contaId], situacao: 'confirmado', compras, deOnde: null };
   if (conta.arquivada) return VAZIO;
+  // Conta que voltou a ser usada não é prevista nos meses de antes da volta (não reescreve o passado).
+  if (conta.ativadaEm && mes < conta.ativadaEm) return VAZIO;
   const anteriores = ordenados(casa).filter((m) => m.mes < mes);
   for (let k = anteriores.length - 1; k >= 0; k--) {
     const valor = valorDefinido(anteriores[k], conta);
@@ -176,6 +178,13 @@ export function apagarCompra(casa, { mes, compraId }) {
   return resultado;
 }
 
+// Quantas parcelas de meses seguintes saem junto ao apagar esta compra (para avisar quem apagou).
+export function parcelasSeguintes(casa, { mes, compraId }) {
+  const alvo = registro(casa, mes)?.compras?.find((c) => c.id === compraId);
+  if (!alvo?.grupo) return 0;
+  return casa.meses.filter((m) => m.mes > mes).reduce((n, m) => n + (m.compras ?? []).filter((c) => c.grupo === alvo.grupo).length, 0);
+}
+
 export function conferirFatura(casa, { mes, contaId }) {
   return comMes(casa, mes, (reg) => { reg.valores[contaId] = soma(comprasDa(reg, contaId)); });
 }
@@ -184,16 +193,20 @@ export function adicionarConta(casa, { nome, compraPorCompra = false, novoId = i
   return { ...casa, contas: [...casa.contas, { id: novoId(), nome: nome.trim(), compraPorCompra, arquivada: false }] };
 }
 
-export function editarConta(casa, contaId, { nome, compraPorCompra, arquivada }) {
-  const mudanca = Object.fromEntries(Object.entries({ nome: nome?.trim(), compraPorCompra, arquivada }).filter(([, v]) => v !== undefined));
+// `ativadaEm` ('AAAA-MM'): ao voltar a usar uma conta, a partir de quando ela volta a ser prevista.
+export function editarConta(casa, contaId, { nome, compraPorCompra, arquivada, ativadaEm }) {
+  const mudanca = Object.fromEntries(Object.entries({ nome: nome?.trim(), compraPorCompra, arquivada, ativadaEm }).filter(([, v]) => v !== undefined));
   return { ...casa, contas: casa.contas.map((c) => (c.id === contaId ? { ...c, ...mudanca } : c)) };
 }
 
+// Troca com a vizinha visível (as contas que não usa mais ficam escondidas nos Ajustes).
 export function moverConta(casa, contaId, delta) {
   const contas = [...casa.contas];
   const de = contas.findIndex((c) => c.id === contaId);
-  const para = de + delta;
-  if (de < 0 || para < 0 || para >= contas.length) return casa;
+  const passo = Math.sign(delta);
+  let para = de + passo;
+  while (para >= 0 && para < contas.length && contas[para].arquivada) para += passo;
+  if (de < 0 || !passo || para < 0 || para >= contas.length) return casa;
   [contas[de], contas[para]] = [contas[para], contas[de]];
   return { ...casa, contas };
 }
