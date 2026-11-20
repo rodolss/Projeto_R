@@ -204,12 +204,14 @@ function desenhar(container, ctx) {
     h('div', { class: 'casa-ajuste' },
       h('h3', { style: 'margin:0' }, 'Aparelhos'),
       ...(casa.aparelhos ?? []).map((a) => h('div', { class: 'casa-ajuste-linha' },
-        h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho' : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
+        h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho'
+          : !a.perfilId ? `Pedido de aparelho novo (${a.desde.split('-').reverse().join('/')})` : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
         h('select', {
           class: 'entrada', 'aria-label': 'Perfil do aparelho', style: 'flex:0 1 150px',
           disabled: a.id === ctx.perfil.impressao, // este aparelho não sai do próprio perfil por engano
-          onchange: (e) => salvar((c) => vincularAparelho(c, { impressao: a.id, perfilId: e.target.value, hoje: a.desde }), 'Aparelho atualizado.'),
-        }, ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
+          onchange: (e) => { if (e.target.value) salvar((c) => vincularAparelho(c, { impressao: a.id, perfilId: e.target.value, hoje: a.desde }), 'Aparelho atualizado.'); },
+        }, !a.perfilId && h('option', { value: '', selected: true }, 'Escolha o perfil'),
+        ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
         a.id !== ctx.perfil.impressao && botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.'))))));
 
   container.replaceChildren(...[

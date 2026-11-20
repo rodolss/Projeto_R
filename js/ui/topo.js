@@ -3,7 +3,7 @@
 // aparelho); todos trocam a foto do perfil que estão vendo; quem administra, no próprio perfil, vai para
 // "Perfis e aparelhos".
 import { h, cartao } from './dom.js';
-import { trocarFoto, perfisParaEscolher } from '../core/perfis.js';
+import { trocarFoto, perfisParaEscolher, perfisEscondidos, pedirAparelho, aparelhoPediu } from '../core/perfis.js';
 
 const CORES = ['#1d4ed8', '#047857', '#b45309', '#7c3aed', '#be123c', '#0e7490'];
 const corDo = (texto) => CORES[[...String(texto)].reduce((s, c) => s + c.codePointAt(0), 0) % CORES.length];
@@ -104,9 +104,22 @@ export function telaQuemUsa(container, ctx) {
       await ctx.perfil.vincular(p.id);
     },
   }, avatar(p, { grande: true }), h('span', {}, p.nome)));
+  // Quem administra e já tem aparelho não aparece: um aparelho novo dela pede para ser liberado.
+  const pediu = aparelhoPediu(ctx.casa, ctx.perfil.impressao);
+  const pedidos = perfisEscondidos(ctx.casa).map((p) => (pediu
+    ? h('p', { class: 'suave pequeno', style: 'margin:0' }, `Pedido feito. No aparelho de ${p.nome}: Ajustes da casa › Perfis e aparelhos, e escolha ${p.nome} para o aparelho novo.`)
+    : h('button', {
+      type: 'button', class: 'botao-link',
+      onclick: async (e) => {
+        e.currentTarget.disabled = true;
+        await ctx.salvarCasa((c) => pedirAparelho(c, { impressao: ctx.perfil.impressao, hoje: ctx.hoje }));
+        ctx.rerender();
+      },
+    }, `É o aparelho de ${p.nome}? Pedir para liberar`)));
   container.replaceChildren(
     h('h1', {}, 'Quem usa este celular?'),
     cartao(
       h('p', {}, 'Escolha uma vez. Este celular vai abrir sempre no seu perfil, com os seus cartões.'),
-      h('div', { class: 'quem-usa' }, ...botoes)));
+      h('div', { class: 'quem-usa' }, ...botoes),
+      ...pedidos));
 }
