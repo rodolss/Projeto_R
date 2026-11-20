@@ -79,3 +79,12 @@ export function gastoMedioFechado(casa, pessoaId, mes, hoje, n = 3) {
 
 // O gasto real passou 10% do custo mensal do orçamento do plano: hora de revisar.
 export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => saiu != null && custoMensal > 0 && saiu > custoMensal * 1.1;
+
+// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
+// Quem administra investe só o que sobrou no mês, separando uma parte para lazer.
+export const LAZER = 0.1;
+export function divisaoDaSobra(sobra, lazerPct = LAZER) {
+  const base = centavos(Math.max(0, sobra));
+  const lazer = centavos(base * lazerPct);
+  return { sobra: base, lazer, investir: centavos(base - lazer) };
+}

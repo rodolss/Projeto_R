@@ -253,3 +253,14 @@ test('"quanto seria preciso para o alvo" é o mesmo no painel e no simulador, co
   perto(p.necessarioAlvo, r.alvo.necessario, 0.5);
   assert.ok(p.necessarioAlvo > p.pmtNec);
 });
+
+// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
+test('investir a sobra: o valor definido pelo Balanço substitui o excedente do orçamento (sem provisão nem anuais)', () => {
+  const r = calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10', investirDefinido: 1800 });
+  assert.deepEqual([r.excedente, r.paraAnuais, r.provisao, r.guardarParaProximoMes, r.semAporte, r.paraDiaADia], [1800, 0, 0, 0, false, 6000]);
+  assert.equal(r.sugestoes.reduce((s, x) => s + x.valor, 0), 1800);
+  const nada = calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10', investirDefinido: 0 });
+  assert.deepEqual([nada.semAporte, nada.motivo, nada.excedente], [true, 'sem-sobra', 0]);
+  // Sem o valor definido: como antes (pelo orçamento).
+  assert.equal(calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10' }).excedente, 2800);
+});

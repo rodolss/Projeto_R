@@ -215,22 +215,42 @@ export function saldosAtuais(estado, hoje) {
 
 // ---------- tela do mês ----------
 
-export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje }) {
+// O mesmo formato de calcularExcedente, com o quanto investir já decidido.
+function excedenteDefinido({ recebidoEfetivo, investir }) {
+  const excedente = Math.max(0, investir);
+  return {
+    recebidoEfetivo,
+    semAporte: excedente <= 0,
+    motivo: excedente <= 0 ? 'sem-sobra' : null,
+    excedente,
+    paraAnuais: 0,
+    provisao: 0,
+    guardarParaProximoMes: 0,
+    paraDiaADia: Math.max(0, recebidoEfetivo - excedente),
+  };
+}
+
+// `investirDefinido` (desenho 2026-11-20-investir-a-sobra): o quanto investir já decidido fora daqui (a sobra do
+// Balanço, menos o lazer). Ele substitui o excedente do orçamento — sem provisão, anuais nem "guardar para o mês que
+// vem", que o Balanço já conta quando acontecem; a divisão entre reserva, carteira e caixa continua a mesma.
+export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje, investirDefinido = null }) {
   const cx = contexto(estado, hoje, saldosAtualizados, { excluirMes: hoje.slice(0, 7) });
   const { mes, custo, salario, grupo } = cx;
 
   const anterior = estado.meses.find((m) => m.mes === somarMeses(mes, -1));
   const atual = estado.meses.find((m) => m.mes === mes);
   const contadores = somarAoCiclo(estado.contadoresAnuais, mes, -(atual?.paraAnuais ?? 0));
-  const exc = calcularExcedente({
-    recebido,
-    pendenteDoMesAnterior: anterior?.guardarParaProximoMes ?? 0,
-    salario,
-    custoMensal: custo.mensal,
-    provisao: cx.provisao,
-    tipoExtra,
-    anuaisFaltando: anuaisFaltando({ anual: custo.anual, contadores, mes }),
-  });
+  const exc = investirDefinido == null
+    ? calcularExcedente({
+      recebido,
+      pendenteDoMesAnterior: anterior?.guardarParaProximoMes ?? 0,
+      salario,
+      custoMensal: custo.mensal,
+      provisao: cx.provisao,
+      tipoExtra,
+      anuaisFaltando: anuaisFaltando({ anual: custo.anual, contadores, mes }),
+    })
+    : excedenteDefinido({ recebidoEfetivo: recebido + (anterior?.guardarParaProximoMes ?? 0), investir: investirDefinido });
 
   const avisos = [];
   if (cx.diasDesdeAtualizacao > DIAS_SALDOS) avisos.push('saldos-desatualizados');
