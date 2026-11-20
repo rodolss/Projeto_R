@@ -1,9 +1,11 @@
 // Contas da casa (desenho de 2026-11-19): as contas do mês divididas entre duas pessoas em proporção à renda.
 // O mês é o mês em que as contas são pagas. Valor digitado = confirmado; sem ele, o app prevê pelo último
 // valor conhecido ("a confirmar"). No cartão compra por compra, o valor é a soma das compras do mês.
+// Versão 2 (desenho 2026-11-19-cartao): o cartão de uma das pessoas guarda também compras dela e de outras
+// pessoas (`para`); a conta da casa ligada ao cartão soma só a parte da casa e as de todo mês da casa.
 import { somarMeses } from './meses.js';
 
-export const SCHEMA_CASA = 1;
+export const SCHEMA_CASA = 2;
 
 export const centavos = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const soma = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
@@ -20,10 +22,12 @@ export function criarCasa({ nomes, novoId = idPadrao }) {
     pessoas: [{ id: 'p1', nome: nomes[0] }, { id: 'p2', nome: nomes[1] }],
     contas: CONTAS_SUGERIDAS.map(([nome, compraPorCompra]) => ({ id: novoId(), nome, compraPorCompra, arquivada: false })),
     meses: [],
+    cartao: null,
   };
 }
 
 export function migrarCasa(estado) {
+  if (estado?.schemaVersion === 1) return { ...estado, schemaVersion: SCHEMA_CASA, cartao: null };
   if (estado?.schemaVersion !== SCHEMA_CASA) throw new Error('versao-desconhecida');
   return estado;
 }
@@ -32,16 +36,29 @@ const ordenados = (casa) => [...casa.meses].sort((a, b) => (a.mes < b.mes ? -1 :
 const registro = (casa, mes) => casa.meses.find((m) => m.mes === mes) ?? null;
 const comprasDa = (reg, contaId) => (reg?.compras ?? []).filter((c) => c.contaId === contaId);
 
+// Compra sem `para` é da casa (as anotadas antes do cartão).
+export const ehDaCasa = (item) => !item.para || item.para === 'casa';
+
+// As de todo mês do cartão que valem no mês (fatura).
+export const fixasNoMes = (casa, mes) => (casa.cartao?.fixas ?? [])
+  .filter((f) => f.desde <= mes && (!f.ate || mes <= f.ate));
+
+// O que a conta da casa soma no mês: compras da casa e, na conta ligada ao cartão, as de todo mês da casa.
+function itensDaCasa(casa, reg, mes, conta) {
+  if (!conta.compraPorCompra) return [];
+  const compras = comprasDa(reg, conta.id).filter(ehDaCasa);
+  const fixas = conta.id === casa.cartao?.contaId ? fixasNoMes(casa, mes).filter(ehDaCasa) : [];
+  return [...compras, ...fixas];
+}
+
 export function primeiroMes(casa) {
   return ordenados(casa)[0]?.mes ?? null;
 }
 
 // O valor que o mês tem de fato para a conta (sem previsão): compras do cartão ou o valor digitado.
-function valorDefinido(reg, conta) {
-  if (conta.compraPorCompra) {
-    const compras = comprasDa(reg, conta.id);
-    if (compras.length) return soma(compras);
-  }
+function valorDefinido(casa, reg, conta) {
+  const itens = itensDaCasa(casa, reg, reg.mes, conta);
+  if (itens.length) return soma(itens);
   return tem(reg.valores, conta.id) ? reg.valores[conta.id] : null;
 }
 
@@ -52,7 +69,7 @@ export function valorDaConta(casa, mes, contaId) {
   if (!conta) return VAZIO;
   const reg = registro(casa, mes);
   const confirmado = tem(reg?.valores, contaId);
-  const compras = conta.compraPorCompra ? comprasDa(reg, contaId) : [];
+  const compras = itensDaCasa(casa, reg, mes, conta);
   if (compras.length) return { valor: soma(compras), situacao: confirmado ? 'confirmado' : 'a-confirmar', compras, deOnde: null };
   if (confirmado) return { valor: reg.valores[contaId], situacao: 'confirmado', compras, deOnde: null };
   if (conta.arquivada) return VAZIO;
@@ -60,7 +77,7 @@ export function valorDaConta(casa, mes, contaId) {
   if (conta.ativadaEm && mes < conta.ativadaEm) return VAZIO;
   const anteriores = ordenados(casa).filter((m) => m.mes < mes);
   for (let k = anteriores.length - 1; k >= 0; k--) {
-    const valor = valorDefinido(anteriores[k], conta);
+    const valor = valorDefinido(casa, anteriores[k], conta);
     if (valor != null) return { valor, situacao: 'a-confirmar', compras: [], deOnde: anteriores[k].mes };
   }
   return VAZIO;
@@ -111,7 +128,7 @@ export function resumoDoMes(casa, mes) {
 // ---------- mutações (devolvem uma casa nova) ----------
 
 // Aplica `alterar` ao registro do mês (criado se faltar). Registro que fica vazio sai da lista.
-function comMes(casa, mes, alterar) {
+export function comMes(casa, mes, alterar) {
   const meses = [...casa.meses];
   const k = meses.findIndex((m) => m.mes === mes);
   const atual = k >= 0 ? structuredClone(meses[k]) : {};
@@ -127,9 +144,9 @@ function comMes(casa, mes, alterar) {
   return { ...casa, meses: ordenados({ meses }) };
 }
 
-// Fatura já conferida acompanha a soma das compras.
+// Fatura já conferida acompanha a soma das compras da casa (com compras, o valor digitado só marca "conferida").
 function acompanharFatura(reg, contaId) {
-  if (tem(reg.valores, contaId)) reg.valores[contaId] = soma(comprasDa(reg, contaId));
+  if (tem(reg.valores, contaId)) reg.valores[contaId] = soma(comprasDa(reg, contaId).filter(ehDaCasa));
 }
 
 export function salvarValor(casa, { mes, contaId, valor }) {
@@ -146,12 +163,13 @@ export function salvarSalario(casa, { mes, pessoaId, valor }) {
   });
 }
 
-export function adicionarCompra(casa, { mes, contaId, nome, valor, vezes = 1, novoId = idPadrao }) {
+// `extra`: campos do cartão copiados em cada parcela (`data` da compra e `para` quem).
+export function adicionarCompra(casa, { mes, contaId, nome, valor, vezes = 1, novoId = idPadrao, extra = {} }) {
   const parcelas = Math.max(1, Math.floor(vezes));
   const grupo = parcelas > 1 ? novoId() : null;
   let resultado = casa;
   for (let k = 0; k < parcelas; k++) {
-    const compra = { id: novoId(), contaId, nome: nome.trim(), valor: centavos(valor) };
+    const compra = { id: novoId(), contaId, nome: nome.trim(), valor: centavos(valor), ...extra };
     if (grupo) Object.assign(compra, { grupo, parcela: { n: k + 1, de: parcelas } });
     resultado = comMes(resultado, somarMeses(mes, k), (reg) => {
       reg.compras.push(compra);
@@ -186,7 +204,8 @@ export function parcelasSeguintes(casa, { mes, compraId }) {
 }
 
 export function conferirFatura(casa, { mes, contaId }) {
-  return comMes(casa, mes, (reg) => { reg.valores[contaId] = soma(comprasDa(reg, contaId)); });
+  const conta = casa.contas.find((c) => c.id === contaId);
+  return comMes(casa, mes, (reg) => { reg.valores[contaId] = conta ? soma(itensDaCasa(casa, reg, mes, conta)) : 0; });
 }
 
 export function adicionarConta(casa, { nome, compraPorCompra = false, novoId = idPadrao }) {
