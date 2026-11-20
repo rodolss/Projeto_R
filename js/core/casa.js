@@ -145,7 +145,7 @@ export function comMes(casa, mes, alterar) {
 }
 
 // Fatura já conferida acompanha a soma das compras da casa (com compras, o valor digitado só marca "conferida").
-function acompanharFatura(reg, contaId) {
+export function acompanharFatura(reg, contaId) {
   if (tem(reg.valores, contaId)) reg.valores[contaId] = soma(comprasDa(reg, contaId).filter(ehDaCasa));
 }
 
