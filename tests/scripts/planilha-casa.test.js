@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarXlsx } from './xlsx-falso.js';
-import { lerXlsx, importarPlanilha, importarCartao } from '../../scripts/planilha-casa.mjs';
+import { lerXlsx, importarPlanilha, importarCartao, marcasAmarelas, aplicarMarcas } from '../../scripts/planilha-casa.mjs';
+import { anotarCompra, faturaDoCartao } from '../../js/core/cartao.js';
 
 // Planilha INVENTADA no formato da do casal: abas de ano (contas na linha 3 até "Total", pessoas com "Salario"
 // na linha 4, meses de Jan a Dez nas linhas 5 a 16), a aba do cartão da casa (colunas = mês da compra) e a aba
@@ -28,7 +29,7 @@ function abaDeAno(nome, contas, linhas) {
   return { nome, celulas };
 }
 
-function planilha({ totalDezembro = 400 } = {}) {
+function planilha({ totalDezembro = 400, cores = {} } = {}) {
   return criarXlsx([
     abaDeAno('2025', ['Apê', 'Luz', 'RESERVA', 'CARTÃO CASA'], (k) => ({
       valores: [2000, k === 0 ? 74.040000000000006 : 100, k === 2 ? 0 : 50, 400], ana: 3000, bia: 1000,
@@ -54,7 +55,7 @@ function planilha({ totalDezembro = 400 } = {}) {
       B7: 'Plano do celular', C7: 40, D7: 40, E7: 40,
       D9: 'TIO', E9: 500,
       B10: 'Só quadro', D10: 'X', E10: 77,
-    } },
+    }, cores },
   ]);
 }
 
@@ -195,4 +196,54 @@ test('revisão: aba pessoal de janeiro a dezembro lida em novembro fica no ano a
   };
   const r = importarCartao(lerXlsx(criarXlsx([{ nome: 'BIA', celulas }])), { hoje: '2026-11-19', casa, novoId });
   assert.deepEqual(r.casa.meses.map((m) => [m.mes, m.compras.map((c) => c.nome)]), [['2026-01', ['Livro']], ['2026-12', ['Curso']]]);
+});
+
+// ---------- "Já tenho" (desenho 2026-11-20-ja-tenho): as células amarelas da aba pessoal ----------
+const AMARELO = 'FFFFFF00';
+
+test('cores: lerXlsx devolve a cor de fundo da célula', () => {
+  const bia = lerXlsx(planilha({ cores: { C4: AMARELO, C5: 'FFD6DCE4' } })).find((a) => a.nome === 'BIA');
+  assert.equal(bia.cor('C4'), AMARELO);
+  assert.equal(bia.cor('C5'), 'FFD6DCE4');
+  assert.equal(bia.cor('C2'), null);
+  assert.equal(bia.cor('Z99'), null);
+});
+
+test('marcas amarelas: só as amarelas da aba pessoal, por fatura', () => {
+  const { casa } = importar();
+  // E4 é o número de um quadro ao lado (texto logo à esquerda): amarelo, mas não é compra. C5 tem outra cor.
+  const abas = lerXlsx(planilha({ cores: { C4: AMARELO, C6: AMARELO, D7: AMARELO, E4: AMARELO, C5: 'FFD6DCE4' } }));
+  const r = marcasAmarelas(abas, { hoje: '2026-11-19', casa });
+  assert.equal(r.cartaoId, casa.cartoes[0].id);
+  assert.deepEqual(r.marcas, [
+    { fatura: '2026-12', nome: 'Livro', valor: 45 },
+    { fatura: '2026-12', nome: 'Remédio [3x]', valor: 30 },
+    { fatura: '2027-01', nome: 'Plano do celular', valor: 40 },
+  ]);
+  assert.deepEqual(marcasAmarelas(abas, { hoje: '2026-11-19', casa: { ...casa, cartoes: [] } }), { cartaoId: null, marcas: [] });
+});
+
+test('aplicar marcas: nome e valor na fatura; repetidas usam uma compra cada; o que não achar volta em faltando', () => {
+  const { casa } = importar();
+  const K = casa.cartoes[0].id;
+  let c = anotarCompra(casa, { cartaoId: K, fatura: '2026-12', nome: 'Cantina', valor: 17, para: 'p2', novoId });
+  c = anotarCompra(c, { cartaoId: K, fatura: '2026-12', nome: 'Cantina', valor: 17, para: 'p2', novoId });
+  const marcas = [
+    { fatura: '2026-12', nome: 'Livro', valor: 45 },
+    { fatura: '2026-12', nome: 'Remédio [3x]', valor: 30 },
+    { fatura: '2026-12', nome: 'cantina', valor: 17 },
+    { fatura: '2026-12', nome: 'Academia', valor: 90 },
+    { fatura: '2026-12', nome: 'Sumiu', valor: 9 },
+  ];
+  const r = aplicarMarcas(c, { cartaoId: K, marcas });
+  assert.equal(r.achadas, 4);
+  assert.deepEqual(r.faltando, [{ fatura: '2026-12', nome: 'Sumiu', valor: 9 }]);
+  const f = faturaDoCartao(r.casa, K, '2026-12');
+  assert.deepEqual(f.compras.filter((x) => x.jaTenho).map((x) => x.nome).sort(), ['Cantina', 'Livro', 'Remédio']);
+  assert.equal(f.fixas.find((x) => x.nome === 'Academia').jaTenho, true);
+  assert.equal(faturaDoCartao(r.casa, K, '2027-01').fixas.find((x) => x.nome === 'Academia').jaTenho, false);
+  // Rodar de novo não marca a segunda "Cantina": cada marca usa primeiro a compra que já está marcada.
+  const deNovo = aplicarMarcas(r.casa, { cartaoId: K, marcas });
+  assert.equal(deNovo.achadas, 4);
+  assert.deepEqual(deNovo.casa, r.casa);
 });
