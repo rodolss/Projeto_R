@@ -6,6 +6,16 @@ const ABAS = {
   casa: 'casa', 'casa-balanco': 'casa-balanco', 'casa-cartao': 'casa-cartao', 'casa-ano': 'casa-ano', 'casa-ajustes': 'casa-ajustes',
 };
 
+// Visão única (desenho 2026-11-20-visao-unica): para quem administra, vendo o próprio perfil, com o planejador, um
+// menu só — Balanço · Contas · Cartão · Plano · Mais. Os outros (a outra pessoa, aparelho sem perfil, quem
+// administra vendo outro perfil) continuam com os dois espaços.
+export const visaoUnica = ({ visto, temEstado }) => Boolean(visto?.admin) && Boolean(temEstado);
+const ABAS_UNICA = {
+  'casa-balanco': 'casa-balanco', casa: 'casa', 'casa-cartao': 'casa-cartao',
+  inicio: 'inicio', mes: 'inicio', // o Plano (a rotina do mês da aposentadoria abre pelo Início e pelos lembretes)
+  simular: 'mais', mais: 'mais', orcamento: 'mais', historico: 'mais', config: 'mais', 'casa-ano': 'mais', 'casa-ajustes': 'mais',
+};
+
 // Telas da casa que o aparelho lembra para abrir da próxima vez.
 export const LEMBRADAS = ['casa', 'casa-balanco', 'casa-cartao'];
 
@@ -21,7 +31,7 @@ export function resolverRota(hash, temEstado, espaco = 'aposentadoria') {
   return TELAS.includes(rota) ? rota : 'inicio';
 }
 
-export const abaDoMenu = (rota) => ABAS[rota] ?? null;
+export const abaDoMenu = (rota, unica = false) => (unica ? ABAS_UNICA : ABAS)[rota] ?? null;
 
 // O que o aparelho lembra para abrir da próxima vez: na casa, a última tela entre Balanço, Mês e Cartão.
 export function espacoParaLembrar(rota, anterior) {
