@@ -128,3 +128,15 @@ export function desvioDaTela({ daCasa, perfil }) {
   if (!daCasa && perfil.visto && !veAposentadoria(perfil.visto)) return 'casa';
   return null;
 }
+
+// Aparelho novo de quem administra (o computador, um celular novo): como a escolha não oferece o perfil dela,
+// o aparelho fica esperando (sem perfil) até ela liberar em Ajustes da casa › Perfis e aparelhos.
+export const pedirAparelho = (casa, { impressao, hoje }) => vincularAparelho(casa, { impressao, perfilId: null, hoje });
+export const aparelhoPediu = (casa, impressao) => (casa.aparelhos ?? []).some((a) => a.id === impressao && !a.perfilId);
+export function perfisEscondidos(casa) {
+  const oferecidos = new Set(perfisParaEscolher(casa).map((p) => p.id));
+  return (casa.perfis ?? []).filter((p) => !oferecidos.has(p.id));
+}
+
+// Código curto do aparelho (4 primeiros caracteres da impressão), mostrado no pedido e nos Ajustes.
+export const codigoDoAparelho = (impressao) => String(impressao ?? '').slice(0, 4).toUpperCase();

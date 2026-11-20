@@ -4,6 +4,7 @@ import {
   impressaoDaChave, acharPerfil, perfilDoAparelho, vincularAparelho, desvincularAparelho, adicionarPerfil,
   renomearPerfil, trocarFoto, perfilVisto, cartoesDoPerfil, veAposentadoria, parteDaCasaNoCartao,
   perfilDoMomento, perfisParaEscolher, levarLigacao, cartoesVisiveis, donoDeOutroCartao, aoTocarConta, desvioDaTela,
+  pedirAparelho, perfisEscondidos, aparelhoPediu, codigoDoAparelho,
 } from '../../js/core/perfis.js';
 import { migrarCasa, renomearPessoa } from '../../js/core/casa.js';
 import { adicionarCartao, anotarCompra, opcoesPara, nomeDoPara, rotuloDoCartao } from '../../js/core/cartao.js';
@@ -166,4 +167,26 @@ test('revisão: antes de desenhar uma tela — primeiro quem usa, depois o plane
   assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: ana, precisaEscolher: false } }), null);
   assert.equal(desvioDaTela({ daCasa: true, perfil: { visto: leo, precisaEscolher: false } }), null);
   assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: null, precisaEscolher: false } }), null);
+});
+
+test('revisão: aparelho novo de quem administra pede para ser liberado (fica esperando, sem perfil)', () => {
+  const casa = pedirAparelho(ligada(), { impressao: 'pc', hoje: '2026-11-21' });
+  assert.deepEqual(casa.aparelhos.at(-1), { id: 'pc', perfilId: null, desde: '2026-11-21' });
+  assert.equal(perfilDoAparelho(casa, 'pc'), null);
+  assert.equal(perfilDoMomento({ casa, conectado: true, impressao: 'pc', salvo: null, escolhido: null }).precisaEscolher, true);
+  assert.deepEqual(perfisParaEscolher(casa).map((p) => p.id), ['p2']);
+  assert.deepEqual(perfisEscondidos(casa).map((p) => p.nome), ['Ana']);
+  assert.equal(aparelhoPediu(casa, 'pc'), true);
+  assert.equal(aparelhoPediu(casa, 'leo'), false);
+  // Quem administra libera pelos Ajustes: vira uma ligação normal.
+  assert.equal(perfilDoAparelho(vincularAparelho(casa, { impressao: 'pc', perfilId: 'p1', hoje: '2026-11-21' }), 'pc').nome, 'Ana');
+});
+
+test('revisão: código curto do aparelho (para liberar o aparelho certo)', () => {
+  assert.equal(codigoDoAparelho('a1b2c3d4e5f60718'), 'A1B2');
+  assert.equal(codigoDoAparelho(null), '');
+  // Aparelho esperando liberação não vê nada, mesmo com um perfil escolhido guardado.
+  const casa = pedirAparelho(ligada(), { impressao: 'pc', hoje: '2026-11-21' });
+  const r = perfilDoMomento({ casa, conectado: true, impressao: 'pc', salvo: null, escolhido: 'p1' });
+  assert.deepEqual([r.visto, r.admin, r.precisaEscolher], [null, false, true]);
 });
