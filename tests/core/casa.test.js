@@ -20,14 +20,15 @@ function casaBase() {
       { id: 'c4', nome: 'Cartão', compraPorCompra: true, arquivada: false },
     ],
     meses: [],
-    cartao: null,
+    cartoes: [],
+    outrasPessoas: [],
   };
 }
 
 test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por compra', () => {
   const casa = criarCasa({ nomes: ['Ana', 'Bia'], novoId: ids() });
-  assert.equal(casa.schemaVersion, 2);
-  assert.equal(casa.cartao, null);
+  assert.equal(casa.schemaVersion, 3);
+  assert.deepEqual([casa.cartoes, casa.outrasPessoas], [[], []]);
   assert.deepEqual(casa.pessoas, [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }]);
   assert.deepEqual(casa.contas.map((c) => c.nome), ['Condomínio', 'Água', 'Luz', 'Internet', 'Cartão da casa']);
   assert.deepEqual(casa.contas.filter((c) => c.compraPorCompra).map((c) => c.nome), ['Cartão da casa']);
@@ -35,12 +36,20 @@ test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por co
   assert.deepEqual(casa.meses, []);
 });
 
-test('migrarCasa aceita a versão 2, leva a 1 para a 2 (sem cartão) e recusa outras', () => {
+test('migrarCasa aceita a versão 3, leva a 1 e a 2 para a 3 e recusa outras', () => {
   const casa = casaBase();
   assert.equal(migrarCasa(casa), casa);
-  const { cartao, ...v1 } = { ...casaBase(), schemaVersion: 1 };
-  assert.deepEqual(migrarCasa(v1), { ...v1, schemaVersion: 2, cartao: null });
-  assert.throws(() => migrarCasa({ schemaVersion: 3 }), /versao-desconhecida/);
+  const { cartoes, outrasPessoas, ...resto } = casaBase();
+  assert.deepEqual(migrarCasa({ ...resto, schemaVersion: 1 }), casa);
+  assert.deepEqual(migrarCasa({ ...resto, schemaVersion: 2, cartao: null }), casa);
+  // O cartão da versão 2 vira o primeiro da lista (id = conta ligada) e as pessoas dele valem para todos.
+  const v2 = { ...resto, schemaVersion: 2, cartao: { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'c4', pessoas: [{ id: 'q1', nome: 'Mãe' }], fixas: [{ id: 'f1' }] } };
+  assert.deepEqual(migrarCasa(v2), {
+    ...resto, schemaVersion: 3,
+    cartoes: [{ id: 'c4', contaId: 'c4', donaId: 'p2', viraNoDia: 3, venceNoDia: 10, fixas: [{ id: 'f1' }] }],
+    outrasPessoas: [{ id: 'q1', nome: 'Mãe' }],
+  });
+  assert.throws(() => migrarCasa({ schemaVersion: 4 }), /versao-desconhecida/);
   assert.throws(() => migrarCasa(null), /versao-desconhecida/);
 });
 
@@ -240,7 +249,8 @@ test('revisão: quantas parcelas seguintes uma compra leva junto ao ser apagada'
 // ---------- cartão de uma das pessoas (desenho 2026-11-19-cartao) ----------
 const comCartao = (fixas = []) => ({
   ...casaBase(),
-  cartao: { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'c4', pessoas: [{ id: 'q1', nome: 'Mãe' }], fixas },
+  cartoes: [{ id: 'c4', contaId: 'c4', donaId: 'p2', viraNoDia: 3, venceNoDia: 10, fixas }],
+  outrasPessoas: [{ id: 'q1', nome: 'Mãe' }],
 });
 
 test('cartão: a conta da casa soma só as compras da casa (e as antigas, sem "para")', () => {
@@ -263,9 +273,10 @@ test('cartão: as de todo mês da casa entram na conta nos meses em que valem', 
     { id: 'f2', nome: 'Academia', valor: 90, para: 'p2', desde: '2026-12' },
     { id: 'f3', nome: 'Jornal', valor: 10, para: 'casa', desde: '2026-12', ate: '2027-01' },
   ]);
-  assert.deepEqual(fixasNoMes(casa, '2027-01').map((f) => f.id), ['f1', 'f2', 'f3']);
-  assert.deepEqual(fixasNoMes(casa, '2027-02').map((f) => f.id), ['f1', 'f2']);
-  assert.deepEqual(fixasNoMes(casa, '2026-11'), []);
+  assert.deepEqual(fixasNoMes(casa.cartoes[0], '2027-01').map((f) => f.id), ['f1', 'f2', 'f3']);
+  assert.deepEqual(fixasNoMes(casa.cartoes[0], '2027-02').map((f) => f.id), ['f1', 'f2']);
+  assert.deepEqual(fixasNoMes(casa.cartoes[0], '2026-11'), []);
+  assert.deepEqual(fixasNoMes(undefined, '2027-01'), []);
   assert.equal(valorDaConta(casa, '2027-01', 'c4').valor, 50);
   assert.equal(valorDaConta(casa, '2027-03', 'c4').valor, 40);
   assert.equal(valorDaConta(casa, '2027-03', 'c4').situacao, 'a-confirmar');

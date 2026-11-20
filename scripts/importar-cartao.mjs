@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { lerXlsx, importarCartao } from './planilha-casa.mjs';
 import { migrarCasa } from '../js/core/casa.js';
-import { faturaDoCartao } from '../js/core/cartao.js';
+import { faturaDoCartao, rotuloDoCartao } from '../js/core/cartao.js';
 
 const args = process.argv.slice(2);
 const iHoje = args.indexOf('--hoje');
@@ -21,14 +21,15 @@ const { casa, avisos } = importarCartao(lerXlsx(readFileSync(planilha)), { hoje,
 writeFileSync(saida, `${JSON.stringify(casa, null, 2)}\n`);
 
 const brl = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const conta = casa.contas.find((c) => c.id === casa.cartao?.contaId);
-console.log(`Cartão de ${casa.pessoas.find((p) => p.id === casa.cartao?.donaId)?.nome ?? '?'}, ligado à conta ${conta?.nome ?? '?'}`);
-console.log(`Outras pessoas: ${casa.cartao?.pessoas.map((p) => p.nome).join(', ') || 'nenhuma'}`);
-console.log(`De todo mês: ${casa.cartao?.fixas.length ?? 0}`);
-const faturas = [...new Set(casa.meses.filter((m) => m.compras.some((c) => c.contaId === conta?.id && c.para)).map((m) => m.mes))];
-for (const f of faturas) {
-  const r = faturaDoCartao(casa, f);
-  console.log(`  ${f}: ${r.compras.length} compras + ${r.fixas.length} de todo mês · total ${brl(r.total)} · ${r.porPessoa.map((p) => `${p.nome} ${brl(p.valor)}`).join(' · ')}`);
+console.log(`Outras pessoas: ${casa.outrasPessoas.map((p) => p.nome).join(', ') || 'nenhuma'}`);
+for (const cartao of casa.cartoes) {
+  const conta = casa.contas.find((c) => c.id === cartao.contaId);
+  console.log(`Cartão ${rotuloDoCartao(casa, cartao)}, ligado à conta ${conta?.nome ?? '?'} · de todo mês: ${cartao.fixas.length}`);
+  const faturas = [...new Set(casa.meses.filter((m) => m.compras.some((c) => c.contaId === cartao.contaId && c.para)).map((m) => m.mes))];
+  for (const f of faturas) {
+    const r = faturaDoCartao(casa, cartao.id, f);
+    console.log(`  ${f}: ${r.compras.length} compras + ${r.fixas.length} de todo mês · total ${brl(r.total)} · ${r.porPessoa.map((p) => `${p.nome} ${brl(p.valor)}`).join(' · ')}`);
+  }
 }
 for (const a of avisos) console.log(`AVISO: ${a}`);
 console.log(`ok  ${saida}`);
