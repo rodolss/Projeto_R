@@ -2,7 +2,8 @@
 // GitHub dele: o casa.json guarda a impressão da chave (nunca a chave) ligada a um perfil. Quem administra troca
 // de perfil (só neste aparelho) e vê a tela exatamente como a outra pessoa vê. É seguro sem PIN porque só quem
 // administra cria chaves. Separação só no app: os dados continuam no mesmo arquivo.
-import { faturaDoCartao } from './cartao.js';
+import { faturaDoCartao, periodoDaFatura, cartaoPronto, primeiraFatura } from './cartao.js';
+import { valorDaConta } from './casa.js';
 
 const idPadrao = () => globalThis.crypto.randomUUID();
 
@@ -116,10 +117,41 @@ export function donoDeOutroCartao(casa, contaId, visto) {
   return [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === cartao.donaId) ?? { id: cartao.donaId, nome: 'outra pessoa' };
 }
 
-// Tocar numa conta no Mês: abre o cartão (dono, ou sem perfis), só a parte da casa (cartão de outro) ou a folha.
+// Tocar numa conta no Mês: a ligada a um cartão abre, para todos, a folha com a parte da casa daquela fatura
+// (desenho 2026-11-20-detalhe-cartao-no-mes); as outras, a folha da conta.
 export function aoTocarConta(casa, contaId, visto) {
-  if (!(casa.cartoes ?? []).some((c) => c.contaId === contaId)) return 'folha';
-  return donoDeOutroCartao(casa, contaId, visto) ? 'parte' : 'cartao';
+  return (casa.cartoes ?? []).some((c) => c.contaId === contaId) ? 'parte' : 'folha';
+}
+
+// O que a folha da conta do cartão no Mês mostra: só a parte da casa (nunca nada pessoal, nem para a dona).
+// Quem vê o cartão (a dona; sem perfis, todos) pode abri-lo. Sem compras da casa: o valor do mês e o porquê
+// ('planilha': confirmado e antes da primeira fatura com compras; 'previsao'; senão 'nenhuma').
+export function detalheDaContaNoMes(casa, contaId, mes, visto) {
+  const cartao = (casa.cartoes ?? []).find((c) => c.contaId === contaId);
+  if (!cartao) return null;
+  const dona = [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === cartao.donaId) ?? null;
+  const parte = parteDaCasaNoCartao(casa, cartao.id, mes);
+  const comItens = parte.compras.length + parte.fixas.length > 0;
+  const doMes = valorDaConta(casa, mes, contaId); // sem compras: a previsão ou o valor digitado
+  const primeira = primeiraFatura(casa, cartao.id);
+  let semDetalhe = null;
+  if (!comItens) {
+    if (doMes.situacao === 'a-confirmar' && doMes.deOnde) semDetalhe = 'previsao';
+    else if (doMes.situacao === 'confirmado' && doMes.valor !== 0 && primeira && mes < primeira) semDetalhe = 'planilha';
+    else semDetalhe = 'nenhuma';
+  }
+  return {
+    cartaoId: cartao.id,
+    dona: dona && { id: dona.id, nome: dona.nome },
+    podeAbrirCartao: !donoDeOutroCartao(casa, contaId, visto),
+    periodo: cartaoPronto(cartao) ? periodoDaFatura(mes, cartao) : null,
+    compras: parte.compras,
+    fixas: parte.fixas,
+    total: comItens ? parte.total : doMes.valor,
+    confirmado: comItens ? parte.conferida : doMes.situacao === 'confirmado',
+    semDetalhe,
+    deOnde: comItens ? null : doMes.deOnde ?? null,
+  };
 }
 
 // Antes de desenhar: primeiro "Quem usa este celular?"; depois, fora da casa, só quem administra.

@@ -4,10 +4,10 @@ import {
   impressaoDaChave, acharPerfil, perfilDoAparelho, vincularAparelho, desvincularAparelho, adicionarPerfil,
   renomearPerfil, trocarFoto, perfilVisto, cartoesDoPerfil, veAposentadoria, parteDaCasaNoCartao,
   perfilDoMomento, perfisParaEscolher, levarLigacao, cartoesVisiveis, donoDeOutroCartao, aoTocarConta, desvioDaTela,
-  pedirAparelho, perfisEscondidos, aparelhoPediu, codigoDoAparelho,
+  pedirAparelho, perfisEscondidos, aparelhoPediu, codigoDoAparelho, detalheDaContaNoMes,
 } from '../../js/core/perfis.js';
-import { migrarCasa, renomearPessoa } from '../../js/core/casa.js';
-import { adicionarCartao, anotarCompra, opcoesPara, nomeDoPara, rotuloDoCartao } from '../../js/core/cartao.js';
+import { migrarCasa, renomearPessoa, salvarValor } from '../../js/core/casa.js';
+import { adicionarCartao, anotarCompra, opcoesPara, nomeDoPara, rotuloDoCartao, configurarCartao } from '../../js/core/cartao.js';
 
 // Casa inventada: a Ana (p1) administra; o Leo (p2) tem o cartão c2; a Ana, o c9.
 function casaBase() {
@@ -153,9 +153,9 @@ test('revisão: o que cada perfil vê dos cartões e das contas ligadas a eles',
   assert.equal(donoDeOutroCartao(casa, 'c2', leo), null);
   assert.equal(donoDeOutroCartao(casa, 'c9', null), null);
   assert.equal(aoTocarConta(casa, 'c9', leo), 'parte');
-  assert.equal(aoTocarConta(casa, 'c2', leo), 'cartao');
-  assert.equal(aoTocarConta(casa, 'c9', null), 'cartao');
-  assert.equal(aoTocarConta(casa, 'c9', ana), 'cartao');
+  assert.equal(aoTocarConta(casa, 'c2', leo), 'parte'); // a mesma folha para todos (desenho 2026-11-20-detalhe-cartao-no-mes)
+  assert.equal(aoTocarConta(casa, 'c9', null), 'parte');
+  assert.equal(aoTocarConta(casa, 'c9', ana), 'parte');
   assert.equal(aoTocarConta(casa, 'outra', leo), 'folha');
 });
 
@@ -189,4 +189,49 @@ test('revisão: código curto do aparelho (para liberar o aparelho certo)', () =
   const casa = pedirAparelho(ligada(), { impressao: 'pc', hoje: '2026-11-21' });
   const r = perfilDoMomento({ casa, conectado: true, impressao: 'pc', salvo: null, escolhido: 'p1' });
   assert.deepEqual([r.visto, r.admin, r.precisaEscolher], [null, false, true]);
+});
+
+// ---------- compras do cartão no Mês da casa (desenho 2026-11-20-detalhe-cartao-no-mes) ----------
+
+test('detalhe da conta do cartão no Mês: a mesma parte da casa para todos; só quem vê o cartão abre o Cartão', () => {
+  let casa = casaBase();
+  const [ana, leo] = casa.perfis;
+  const novoId = (() => { let n = 0; return () => `k${++n}`; })();
+  // c9 é da Ana (vira 24, vence 1): compras de 24/10 a 23/11 caem na fatura de dezembro.
+  for (const [nome, para, data] of [['Mercado', 'casa', '2026-11-10'], ['Blusa', 'p1', '2026-11-11'], ['Presente', 'p2', '2026-11-12'], ['Farmácia', 'casa', '2026-11-15']]) {
+    casa = anotarCompra(casa, { cartaoId: 'c9', data, nome, valor: 10, para, novoId });
+  }
+  casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-10', nome: 'Streaming', valor: 5, todoMes: true, para: 'casa', novoId });
+  const doLeo = detalheDaContaNoMes(casa, 'c9', '2026-12', leo);
+  assert.equal(doLeo.cartaoId, 'c9');
+  assert.deepEqual(doLeo.dona, { id: 'p1', nome: 'Ana' });
+  assert.equal(doLeo.podeAbrirCartao, false);
+  assert.deepEqual(doLeo.compras.map((c) => c.nome), ['Farmácia', 'Mercado']);
+  assert.deepEqual(doLeo.fixas.map((c) => c.nome), ['Streaming']);
+  assert.deepEqual([doLeo.total, doLeo.confirmado, doLeo.semDetalhe], [25, false, null]);
+  assert.deepEqual(doLeo.periodo, { de: '2026-10-24', ate: '2026-11-23', vence: '2026-12-01' });
+  const daAna = detalheDaContaNoMes(casa, 'c9', '2026-12', ana);
+  assert.equal(daAna.podeAbrirCartao, true);
+  assert.deepEqual(daAna.compras.map((c) => c.nome), ['Farmácia', 'Mercado']); // nada pessoal, nem para a dona
+  assert.equal(detalheDaContaNoMes(casa, 'c9', '2026-12', null).podeAbrirCartao, true);
+  assert.equal(detalheDaContaNoMes(casa, 'outra', '2026-12', leo), null);
+});
+
+test('detalhe da conta do cartão no Mês: sem compras, planilha, previsão ou nenhuma; cartão sem os dias sem período', () => {
+  let casa = casaBase();
+  const [, leo] = casa.perfis;
+  casa = salvarValor(casa, { mes: '2026-10', contaId: 'c9', valor: 300 }); // veio da planilha: só o total
+  casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-10', nome: 'Mercado', valor: 10, para: 'casa', novoId: () => 'k1' }); // 1ª fatura com compras: 2026-12
+  const planilha = detalheDaContaNoMes(casa, 'c9', '2026-10', leo);
+  assert.deepEqual([planilha.semDetalhe, planilha.total, planilha.confirmado], ['planilha', 300, true]);
+  const previsto = detalheDaContaNoMes(casa, 'c9', '2026-11', leo);
+  assert.deepEqual([previsto.semDetalhe, previsto.total, previsto.confirmado, previsto.deOnde], ['previsao', 300, false, '2026-10']);
+  casa = salvarValor(casa, { mes: '2027-01', contaId: 'c9', valor: 50 });
+  const digitado = detalheDaContaNoMes(casa, 'c9', '2027-01', leo);
+  assert.deepEqual([digitado.semDetalhe, digitado.total, digitado.confirmado], ['nenhuma', 50, true]);
+  const vazio = detalheDaContaNoMes(casaBase(), 'c9', '2026-12', leo);
+  assert.deepEqual([vazio.semDetalhe, vazio.total], ['nenhuma', 0]);
+  const semDias = detalheDaContaNoMes(configurarCartao(casa, 'c9', { viraNoDia: null }), 'c9', '2026-12', leo);
+  assert.equal(semDias.periodo, null);
+  assert.deepEqual(semDias.compras.map((c) => c.nome), ['Mercado']);
 });
