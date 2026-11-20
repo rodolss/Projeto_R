@@ -6,24 +6,27 @@ const ABAS = {
   casa: 'casa', 'casa-balanco': 'casa-balanco', 'casa-cartao': 'casa-cartao', 'casa-ano': 'casa-ano', 'casa-ajustes': 'casa-ajustes',
 };
 
+// Telas da casa que o aparelho lembra para abrir da próxima vez.
+export const LEMBRADAS = ['casa', 'casa-balanco', 'casa-cartao'];
+
 export const ehDaCasa = (rota) => String(rota ?? '').startsWith('casa');
 
 // As contas da casa funcionam sem plano de aposentadoria; o resto, sem plano, leva ao assistente.
-// Sem rota (ou rota desconhecida), abre no último espaço usado neste aparelho (na casa: o Mês ou o Cartão).
+// Sem rota (ou rota desconhecida), abre no último espaço usado neste aparelho (na casa: o Balanço, o Mês ou o Cartão).
 export function resolverRota(hash, temEstado, espaco = 'aposentadoria') {
   const rota = String(hash ?? '').replace(/^#\/?/, '').split('?')[0];
   if (TELAS.includes(rota) && ehDaCasa(rota)) return rota;
-  if (!TELAS.includes(rota) && ehDaCasa(espaco)) return espaco === 'casa-cartao' ? 'casa-cartao' : 'casa';
+  if (!TELAS.includes(rota) && ehDaCasa(espaco)) return LEMBRADAS.includes(espaco) ? espaco : 'casa';
   if (!temEstado) return 'boas-vindas';
   return TELAS.includes(rota) ? rota : 'inicio';
 }
 
 export const abaDoMenu = (rota) => ABAS[rota] ?? null;
 
-// O que o aparelho lembra para abrir da próxima vez: na casa, a última tela entre Mês e Cartão.
+// O que o aparelho lembra para abrir da próxima vez: na casa, a última tela entre Balanço, Mês e Cartão.
 export function espacoParaLembrar(rota, anterior) {
   if (!ehDaCasa(rota)) return 'aposentadoria';
-  if (rota === 'casa' || rota === 'casa-cartao') return rota;
+  if (LEMBRADAS.includes(rota)) return rota;
   return ehDaCasa(anterior) ? anterior : 'casa';
 }
 

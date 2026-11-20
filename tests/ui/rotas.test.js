@@ -101,3 +101,10 @@ test('balanço do mês: rota da casa, com o próprio botão no menu (desenho 202
   assert.equal(abaDoMenu('casa-balanco'), 'casa-balanco');
   assert.equal(ehDaCasa('casa-balanco'), true);
 });
+
+test('balanço: também é lembrado como a tela de abertura da casa', () => {
+  assert.equal(resolverRota('', true, 'casa-balanco'), 'casa-balanco');
+  assert.equal(resolverRota('#/xyz', false, 'casa-balanco'), 'casa-balanco');
+  assert.equal(espacoParaLembrar('casa-balanco', 'casa'), 'casa-balanco');
+  assert.equal(espacoParaLembrar('casa-ano', 'casa-balanco'), 'casa-balanco');
+});

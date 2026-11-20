@@ -43,7 +43,7 @@ test('balanço: entrou o salário; saiu a parte das contas e o que é seu no car
   assert.deepEqual(leo.contas, { valor: 120, total: 300, fatia: 0.03, aConfirmar: false });
   // A parte da casa do cartão já está nas contas: no cartão entra só o que é dele (Blusa + Academia).
   assert.deepEqual(leo.cartoes, [{
-    cartaoId: 'c2', nome: 'Cartão Leo', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, aberta: false, conferida: true,
+    cartaoId: 'c2', nome: 'Cartão Leo', fatura: '2026-12', vence: '2026-12-10', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, aberta: false, conferida: true,
   }]);
   assert.deepEqual([leo.entrou, leo.saiu, leo.sobra, leo.previsao], [4000, 290, 3710, false]);
   // O cartão do Leo é só dele: o presente para a Ana não aparece no balanço dela.
@@ -81,4 +81,24 @@ test('revisão: o salário da outra pessoa ainda a confirmar muda a sua parte da
   assert.equal(leo.salario.situacao, 'confirmado');
   assert.equal(leo.contas.aConfirmar, true);
   assert.equal(leo.previsao, true);
+});
+
+test('revisão: cartão que vence no começo do mês seguinte entra no mês em que a fatura fecha (as compras do mês)', () => {
+  // Vira no dia 24 e vence no dia 1: compras de 24/10 a 23/11 vencem em 01/12 e são as de novembro.
+  let casa = migrarCasa({
+    schemaVersion: 3,
+    pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }],
+    contas: [{ id: 'c2', nome: 'Cartão Leo', compraPorCompra: true, arquivada: false }],
+    meses: [],
+    cartoes: [{ id: 'c2', contaId: 'c2', donaId: 'p2', viraNoDia: 24, venceNoDia: 1, fixas: [] }],
+    outrasPessoas: [],
+  });
+  casa = anotarCompra(casa, { cartaoId: 'c2', data: '2026-10-10', nome: 'Livro', valor: 40, para: 'p2', novoId: () => 'k1' }); // vence 01/11
+  casa = anotarCompra(casa, { cartaoId: 'c2', data: '2026-11-10', nome: 'Tênis', valor: 300, para: 'p2', novoId: () => 'k2' }); // vence 01/12
+  const novembro = balancoDoMes(casa, '2026-11', 'p2', '2026-11-20');
+  assert.deepEqual([novembro.cartoes[0].fatura, novembro.cartoes[0].vence, novembro.cartoes[0].seu, novembro.cartoes[0].aberta], ['2026-12', '2026-12-01', 300, true]);
+  assert.deepEqual([balancoDoMes(casa, '2026-10', 'p2', '2026-11-20').cartoes[0].seu], [40]);
+  // Cartão sem os dias: a fatura do próprio mês, sem vencimento.
+  const semDias = { ...casa, cartoes: [{ ...casa.cartoes[0], viraNoDia: null, venceNoDia: null }] };
+  assert.deepEqual([balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].fatura, balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].vence], ['2026-12', null]);
 });

@@ -12,6 +12,7 @@ import { nomeDoMes, mesDaTela } from './casa.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
+const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde) : `${nomeDoMes(deOnde)} de ${deOnde.slice(0, 4)}`);
 
 // A fatura do mês no Cartão: o "De quem é" dela mostra o mesmo "Já tenho / falta" da linha tocada (o Cofrinho
@@ -84,7 +85,7 @@ function desenhar(container, ctx) {
   aoTocar && h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
   const selo = (texto) => h('span', { class: 'selo' }, texto);
   const irAoMes = () => ctx.navegar(`#/casa?mes=${mes}`);
-  const irAoCartao = (c) => () => ctx.navegar(enderecoDaFatura(c.cartaoId, mes));
+  const irAoCartao = (c) => () => ctx.navegar(enderecoDaFatura(c.cartaoId, c.fatura));
 
   const s = b.salario;
   const entrou = h('section', { class: 'cartao casa-lista' },
@@ -110,7 +111,9 @@ function desenhar(container, ctx) {
     }),
     ...b.cartoes.map((k) => linha({
       titulo: k.nome,
-      detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ', `seu cartão: o que é seu na fatura de ${nomeDoMes(mes)}`],
+      // A fatura que fecha no mês; o vencimento diz qual é (com vencimento no dia 1, a do mês seguinte).
+      detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ',
+        k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`],
       valor: formatarBRL(k.seu),
       aoTocar: irAoCartao(k),
     })),
@@ -119,7 +122,7 @@ function desenhar(container, ctx) {
   const saiu = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Saiu'),
     linhasSaiu.length ? h('div', {}, ...linhasSaiu) : h('p', { class: 'suave balanco-nota' }, 'Nada saiu neste mês.'),
-    temParteDaCasa && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'O que é da casa nos cartões já está nas contas da casa, dividido pela renda.'));
+    temParteDaCasa && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'A parte da casa dos cartões entra nas contas da casa do mês em que a fatura vence, dividida pela renda.'));
 
   const comOutras = b.cartoes.filter((k) => k.outras.valor > 0);
   const outras = comOutras.length > 0 && h('section', { class: 'cartao casa-lista' },
