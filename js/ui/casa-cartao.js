@@ -44,6 +44,17 @@ export function situacaoDaFatura({ hoje, periodo, conferida }) {
   return hoje >= periodo.de ? 'aberta' : 'futura';
 }
 
+// Nomes já usados que combinam com o que foi digitado: os que começam assim primeiro, depois os que têm no meio.
+// A lista nativa do navegador (datalist) cobria a tela no Android; estas viram botõezinhos embaixo do campo.
+export function sugestoesDoNome(sugestoes, texto, limite = 4) {
+  const chave = semAcento(texto);
+  if (!chave) return [];
+  const nomes = sugestoes.map((s) => s.nome).filter((nome) => semAcento(nome) !== chave);
+  const comeca = nomes.filter((nome) => semAcento(nome).startsWith(chave));
+  const meio = nomes.filter((nome) => !semAcento(nome).startsWith(chave) && semAcento(nome).includes(chave));
+  return [...comeca, ...meio].slice(0, limite);
+}
+
 export function paraSugerido(sugestoes, nome) {
   const chave = semAcento(nome);
   if (!chave) return null;
@@ -381,14 +392,20 @@ function desenharFatura(container, ctx, cfg) {
     mostrarFatura();
 
     const para = escolhaPara(null, (id) => { nova.para = id; nova.paraNaMao = true; });
-    const nomeCampo = campoTexto({
-      rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', lista: 'cartao-nomes',
-      aoMudar: (v) => {
-        nova.nome = v.trim();
-        const sugerido = paraSugerido(sugestoes, nova.nome);
-        if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
-      },
-    });
+    const caixaSugestoes = h('div', { class: 'cartao-sugestoes', role: 'group', 'aria-label': 'Sugestões' });
+    const mudarNome = (v) => {
+      nova.nome = v.trim();
+      const sugerido = paraSugerido(sugestoes, nova.nome);
+      if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
+      caixaSugestoes.replaceChildren(...sugestoesDoNome(sugestoes, v).map((nome) => h('button', {
+        type: 'button', class: 'chip pequeno',
+        // Depois de escolher, o próximo é o valor: o teclado de números já abre.
+        onclick: () => { nomeCampo.input.value = nome; mudarNome(nome); valorCampo.input.focus(); },
+      }, nome)));
+    };
+    const nomeCampo = campoTexto({ rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', aoMudar: mudarNome });
+    nomeCampo.input.classList.add('cartao-nome');
+    const blocoDoNome = h('div', { class: 'campo' }, nomeCampo, caixaSugestoes); // as sugestões fora do <label>
     const totalTexto = h('span', { class: 'campo-dica' });
     const mostrarTotal = () => {
       totalTexto.textContent = nova.valor ? `Total: ${formatarBRL(nova.valor * nova.vezes)} em ${nova.vezes} vezes.` : '';
@@ -441,8 +458,7 @@ function desenharFatura(container, ctx, cfg) {
 
     return [
       titulo('Anotar compra'),
-      h('datalist', { id: 'cartao-nomes' }, ...sugestoes.map((s) => h('option', { value: s.nome }))),
-      nomeCampo, valorCampo, dataCampo, para, forma,
+      blocoDoNome, valorCampo, dataCampo, para, forma,
       h('div', { class: 'botoes' }, anotarBotao, botao('Fechar', fechar, { secundario: true })),
     ];
   }

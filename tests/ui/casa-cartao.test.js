@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome } from '../../js/ui/casa-cartao.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -43,4 +43,19 @@ test('cartão da tela: o do endereço, senão o último usado no aparelho, senã
   assert.equal(cartaoDaTela('#/casa-cartao', casa, 'sumiu'), 'c1');
   assert.equal(cartaoDaTela('#/casa-cartao', casa, null), 'c1');
   assert.equal(cartaoDaTela('#/casa-cartao', { cartoes: [] }, 'c1'), null);
+});
+
+test('sugestões do nome: começo do nome primeiro, depois no meio; sem acento; sem a que já está escrita; no máximo 4', () => {
+  const nomes = ['Café', 'Farmácia', 'Sofá', 'Faxina', 'Fast food', 'Farofa', 'Fatura', 'Pão de forma'].map((nome) => ({ nome, para: 'casa' }));
+  // Cinco começam com "fa" (só cabem 4) e "Sofá" tem "fa" no meio, antes na lista: os do começo vêm primeiro.
+  assert.deepEqual(sugestoesDoNome(nomes, 'fa'), ['Farmácia', 'Faxina', 'Fast food', 'Farofa']);
+  // Poucas do começo: as do meio vêm depois delas.
+  assert.deepEqual(sugestoesDoNome(nomes, 'fat'), ['Fatura']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'ofa'), ['Sofá', 'Farofa']);
+  assert.deepEqual(sugestoesDoNome([...nomes, { nome: 'Fofa', para: 'casa' }], 'fa'), ['Farmácia', 'Faxina', 'Fast food', 'Farofa']);
+  assert.deepEqual(sugestoesDoNome(nomes.slice(0, 4), 'fa'), ['Farmácia', 'Faxina', 'Sofá']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'FOR'), ['Pão de forma']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'farmacia'), []);
+  assert.deepEqual(sugestoesDoNome(nomes, ''), []);
+  assert.deepEqual(sugestoesDoNome(nomes, '  '), []);
 });

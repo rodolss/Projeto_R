@@ -390,3 +390,6 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-troca { display: flex; justify-content: center; }
 .cartao-troca .chips { justify-content: center; }
 .cartao-outro { align-self: center; padding: 8px 4px; }
+.cartao-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.cartao-sugestoes:empty { display: none; }
+.chip.pequeno { padding: 5px 12px; font-size: 14px; background: var(--cartao-2); border-color: var(--cartao-2); }
