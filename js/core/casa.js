@@ -4,9 +4,13 @@
 // Versão 2 (desenho 2026-11-19-cartao): o cartão de uma das pessoas guarda também compras dela e de outras
 // pessoas (`para`); a conta da casa ligada ao cartão soma só a parte da casa e as de todo mês da casa.
 // Versão 3: vários cartões (`cartoes`, um por conta da casa, id = contaId) e `outrasPessoas` para todos.
+// Versão 4: perfis (um por pessoa da casa, a primeira administra) e `aparelhos` (impressão da chave → perfil).
 import { somarMeses } from './meses.js';
 
-export const SCHEMA_CASA = 3;
+export const SCHEMA_CASA = 4;
+
+// Um perfil por pessoa da casa, com o mesmo id; a primeira (quem começou as contas) administra.
+const perfisDasPessoas = (pessoas) => pessoas.map((p, k) => ({ id: p.id, nome: p.nome, ...(k === 0 ? { admin: true } : {}) }));
 
 export const centavos = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const soma = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
@@ -18,13 +22,16 @@ const CONTAS_SUGERIDAS = [
 ];
 
 export function criarCasa({ nomes, novoId = idPadrao }) {
+  const pessoas = [{ id: 'p1', nome: nomes[0] }, { id: 'p2', nome: nomes[1] }];
   return {
     schemaVersion: SCHEMA_CASA,
-    pessoas: [{ id: 'p1', nome: nomes[0] }, { id: 'p2', nome: nomes[1] }],
+    pessoas,
     contas: CONTAS_SUGERIDAS.map(([nome, compraPorCompra]) => ({ id: novoId(), nome, compraPorCompra, arquivada: false })),
     meses: [],
     cartoes: [],
     outrasPessoas: [],
+    perfis: perfisDasPessoas(pessoas),
+    aparelhos: [],
   };
 }
 
@@ -36,7 +43,10 @@ export function migrarCasa(estado) {
     const cartoes = cartao?.contaId
       ? [{ id: cartao.contaId, contaId: cartao.contaId, donaId: cartao.donaId ?? null, viraNoDia: cartao.viraNoDia ?? null, venceNoDia: cartao.venceNoDia ?? null, fixas: cartao.fixas ?? [] }]
       : [];
-    return { ...resto, schemaVersion: SCHEMA_CASA, cartoes, outrasPessoas: cartao?.pessoas ?? [] };
+    return migrarCasa({ ...resto, schemaVersion: 3, cartoes, outrasPessoas: cartao?.pessoas ?? [] });
+  }
+  if (estado?.schemaVersion === 3) {
+    return { ...estado, schemaVersion: SCHEMA_CASA, perfis: perfisDasPessoas(estado.pessoas ?? []), aparelhos: [] };
   }
   if (estado?.schemaVersion !== SCHEMA_CASA) throw new Error('versao-desconhecida');
   return estado;
@@ -241,6 +251,8 @@ export function moverConta(casa, contaId, delta) {
   return { ...casa, contas };
 }
 
+// O perfil com o mesmo id da pessoa muda junto.
 export function renomearPessoa(casa, pessoaId, nome) {
-  return { ...casa, pessoas: casa.pessoas.map((p) => (p.id === pessoaId ? { ...p, nome: nome.trim() } : p)) };
+  const trocar = (lista) => lista?.map((p) => (p.id === pessoaId ? { ...p, nome: nome.trim() } : p));
+  return { ...casa, pessoas: trocar(casa.pessoas), ...(casa.perfis ? { perfis: trocar(casa.perfis) } : {}) };
 }
