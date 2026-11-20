@@ -7,7 +7,7 @@ import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
-import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS, visaoUnica } from './ui/rotas.js';
+import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS, visaoUnica, mostraTopo } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
@@ -207,7 +207,8 @@ async function renderizar() {
   const perfil = perfilDoMomento();
   const desvio = desvioDaTela({ daCasa, perfil });
   // Planejador de aposentadoria (e o assistente dele): só para quem administra, vendo o próprio perfil.
-  if (desvio === 'casa') { navegar('#/casa'); return; }
+  // Troca a entrada (não empilha): "voltar" não cai de novo na tela do planejador, que mandaria para cá outra vez.
+  if (desvio === 'casa') { location.replace('#/casa'); return; }
   if (!desvio) {
     if (nome !== 'boas-vindas') gravarLocal(CHAVE_ESPACO, espacoParaLembrar(nome, lerEspaco()));
     if (nome !== 'boas-vindas' && !daCasa && !lerLocal(CHAVE_USOU_APOSENTADORIA)) {
@@ -239,7 +240,7 @@ async function renderizar() {
     return;
   }
   // A foto do perfil: nas telas da casa e, na visão única, em todas (trocar de perfil de qualquer lugar).
-  if (daCasa || unica) desenharTopo(topo, contexto());
+  if (mostraTopo({ nome, daCasa, unica })) desenharTopo(topo, contexto());
   else topo.hidden = true;
   try {
     const modulo = await import(`./ui/${nome}.js`);

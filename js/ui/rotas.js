@@ -10,6 +10,9 @@ const ABAS = {
 // menu só — Balanço · Contas · Cartão · Plano · Mais. Os outros (a outra pessoa, aparelho sem perfil, quem
 // administra vendo outro perfil) continuam com os dois espaços.
 export const visaoUnica = ({ visto, temEstado }) => Boolean(visto?.admin) && Boolean(temEstado);
+// A foto do perfil (trocar de perfil): nas telas da casa e, na visão única, em todas — nunca no assistente, onde
+// trocar de perfil perderia o que foi preenchido.
+export const mostraTopo = ({ nome, daCasa, unica }) => nome !== 'boas-vindas' && Boolean(daCasa || unica);
 const ABAS_UNICA = {
   'casa-balanco': 'casa-balanco', casa: 'casa', 'casa-cartao': 'casa-cartao',
   inicio: 'inicio', mes: 'inicio', // o Plano (a rotina do mês da aposentadoria abre pelo Início e pelos lembretes)

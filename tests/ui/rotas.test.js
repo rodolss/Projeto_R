@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  resolverRota, abaDoMenu, visaoUnica, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
+  resolverRota, abaDoMenu, visaoUnica, mostraTopo, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
   espacoParaLembrar,
 } from '../../js/ui/rotas.js';
 
@@ -115,7 +115,7 @@ test('visão única: só para quem administra, vendo o próprio perfil, com o pl
   const leo = { id: 'p2', nome: 'Leo' };
   assert.equal(visaoUnica({ visto: ana, temEstado: true }), true);
   assert.equal(visaoUnica({ visto: ana, temEstado: false }), false); // sem planejador
-  assert.equal(visaoUnica({ visto: leo, temEstado: true }), false); // a outra pessoa (ou a Ana vendo o perfil dela)
+  assert.equal(visaoUnica({ visto: leo, temEstado: true }), false); // a outra pessoa (ou a Ana vendo o perfil dele)
   assert.equal(visaoUnica({ visto: null, temEstado: true }), false); // aparelho sem perfil: como antes
 });
 
@@ -127,4 +127,11 @@ test('visão única: cada tela acende uma das 5 abas; fora dela, como antes', ()
   assert.equal(abaDoMenu('casa-ano'), 'casa-ano');
   assert.equal(abaDoMenu('simular'), 'simular');
   assert.equal(abaDoMenu('config'), 'mais');
+});
+
+test('revisão: a foto do perfil aparece na casa e, na visão única, em todas as telas — nunca no assistente', () => {
+  assert.equal(mostraTopo({ nome: 'casa', daCasa: true, unica: false }), true);
+  assert.equal(mostraTopo({ nome: 'inicio', daCasa: false, unica: true }), true);
+  assert.equal(mostraTopo({ nome: 'inicio', daCasa: false, unica: false }), false);
+  assert.equal(mostraTopo({ nome: 'boas-vindas', daCasa: false, unica: true }), false); // "Refazer mesmo assim"
 });
