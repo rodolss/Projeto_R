@@ -421,6 +421,22 @@ a.barra-item:active { background: var(--cartao-2); }
 .ja-interruptor:disabled { opacity: 0.75; cursor: progress; }
 @media (prefers-reduced-motion: reduce) { .ja-trilho, .ja-trilho::after, .ja-pessoa-barra i { transition: none; } }
 
+.cofrinho-botao { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--texto); cursor: pointer;
+  border-color: var(--amarelo-borda); }
+.cofrinho-botao:active { background: var(--cartao-2); }
+.cofrinho-botao .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cofrinho-botao .rotulo { margin: 0; }
+.cofrinho-botao b { font-family: var(--fonte-titulo); font-size: 18px; font-variant-numeric: tabular-nums; }
+.cofrinho-botao small { color: var(--suave); font-size: 13.5px; }
+.cofrinho-botao .seta { color: var(--suave); font-size: 22px; line-height: 1; }
+.cofrinho-voltar { align-self: flex-start; padding: 4px 0; }
+.cofrinho-total { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.cofrinho-total .rotulo { margin: 0; }
+.cofrinho-nota { margin: 0; padding: 0 16px 12px; }
+.casa-lista > div + .cofrinho-nota { padding-top: 10px; border-top: 1px solid var(--borda); }
+.cofrinho-item { padding-left: 28px; border-top: 0; }
+.cofrinho-item .texto b { font-weight: 500; }
+
 /* ---------- Perfis (desenho 2026-11-20-perfis) ---------- */
 .topo { position: relative; display: flex; justify-content: flex-end; max-width: 560px; margin: 0 auto; padding: 10px 16px 0; }
 .topo[hidden] { display: none; }

@@ -1,6 +1,6 @@
 // Service worker: o app abre sem internet. Estratégia network-first: com conexão, sempre busca a
 // versão nova (e atualiza o cache); sem conexão, usa o cache. APIs externas nunca passam pelo cache.
-const VERSAO = 'projeto-r-v12'; // igual a js/versao.js (um teste confere)
+const VERSAO = 'projeto-r-v13'; // igual a js/versao.js (um teste confere)
 const CASCA = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png',
@@ -11,7 +11,7 @@ const CASCA = [
   './js/core/lembretes.js', './js/core/lista-mes.js', './js/core/marcos.js', './js/core/meses.js', './js/core/perfis.js', './js/core/metas.js', './js/core/motor.js', './js/core/projecao.js',
   './js/core/protecao.js', './js/core/simulador.js',
   './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/mesclar.js', './js/dados/mesclar-casa.js',
-  './js/ui/atualizacao.js', './js/ui/boas-vindas.js', './js/ui/casa.js', './js/ui/casa-cartao.js', './js/ui/casa-ajustes.js', './js/ui/casa-ano.js', './js/ui/config.js', './js/ui/conectar.js', './js/ui/detalhes.js', './js/ui/dom.js', './js/ui/festa.js', './js/ui/grafico.js', './js/ui/historico.js',
+  './js/ui/atualizacao.js', './js/ui/boas-vindas.js', './js/ui/casa.js', './js/ui/casa-cartao.js', './js/ui/casa-cofrinho.js', './js/ui/casa-ajustes.js', './js/ui/casa-ano.js', './js/ui/config.js', './js/ui/conectar.js', './js/ui/detalhes.js', './js/ui/dom.js', './js/ui/festa.js', './js/ui/grafico.js', './js/ui/historico.js',
   './js/ui/inicio.js', './js/ui/mais.js', './js/ui/mes.js', './js/ui/mes-rascunho.js', './js/ui/movimento.js', './js/ui/nativo.js', './js/ui/orcamento.js', './js/ui/rotas.js', './js/ui/simular.js', './js/ui/topo.js',
 ];
 

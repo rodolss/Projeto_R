@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome, textoDaFalta, dicaDoJaTenho } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome, textoDaFalta, dicaDoJaTenho, telaDoCartao } from '../../js/ui/casa-cartao.js';
+import { textoQuemDeve } from '../../js/ui/casa-cofrinho.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -75,4 +76,17 @@ test('dica do já tenho: à vista, parcelado, todo mês, parcela e de todo mês'
   assert.equal(dicaDoJaTenho({ forma: 'fixa', nomeDaFatura: 'janeiro' }), 'Vale só para a fatura de janeiro.');
   assert.equal(dicaDoJaTenho({ forma: 'parcela', parcela: { n: 2, de: 6 } }), 'Vale só para esta parcela (2 de 6).');
   assert.equal(dicaDoJaTenho({ forma: 'parcela' }), 'Vale só para esta parcela.');
+});
+
+test('tela do cartão: cofrinho só com tela=cofrinho', () => {
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&fatura=2027-01&tela=cofrinho'), 'cofrinho');
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&tela=cofrinho&folha=compra-k1'), 'cofrinho');
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&fatura=2027-01'), 'fatura');
+  assert.equal(telaDoCartao('#/casa-cartao?tela=outra'), 'fatura');
+});
+
+test('quem deve: ninguém, uma pessoa, várias', () => {
+  assert.equal(textoQuemDeve(0), 'Ninguém te deve');
+  assert.equal(textoQuemDeve(1), '1 pessoa te deve');
+  assert.equal(textoQuemDeve(3), '3 pessoas te devem');
 });

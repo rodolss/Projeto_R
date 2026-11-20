@@ -3,7 +3,7 @@
 // e mostra quanto é de cada um. A parte da casa entra sozinha nas contas da casa.
 // Vários cartões (um por pessoa, ou mais): botões no topo para trocar; o aparelho lembra o último aberto.
 // Endereço: #/casa-cartao?cartao=<id>&fatura=…&folha=anotar|compra-<id>|fixa-<id> (o voltar do celular fecha a
-// folha) e #/casa-cartao?novo=1 para criar outro cartão.
+// folha), #/casa-cartao?novo=1 para criar outro cartão e &tela=cofrinho para a tela do Cofrinho (casa-cofrinho.js).
 import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
@@ -11,8 +11,9 @@ import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
   anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
-  acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho,
+  acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
+import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes } from './casa.js';
 import { cartoesVisiveis } from '../core/perfis.js';
@@ -208,6 +209,10 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
 let abertaAqui = false;
+// O mesmo para a tela do Cofrinho: "Voltar para a fatura" = voltar no histórico.
+let cofrinhoAbertoAqui = false;
+
+export const telaDoCartao = (hash) => (parametroDoHash(hash, 'tela') === 'cofrinho' ? 'cofrinho' : 'fatura');
 // Depois de anotar, a próxima compra começa com a mesma data (quem anota várias de uma vez agradece).
 let ultimaData = null;
 
@@ -295,7 +300,10 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const dona = quemE(casa, cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
 
-  const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${extra}`;
+  // Na tela do Cofrinho, o endereço leva `&tela=cofrinho` (abrir e fechar uma folha não sai dela).
+  const naTela = telaDoCartao(location.hash);
+  if (naTela === 'fatura') cofrinhoAbertoAqui = false;
+  const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${naTela === 'cofrinho' ? '&tela=cofrinho' : ''}${extra}`;
   const abrir = (folha) => {
     abertaAqui = true;
     location.hash = endereco(`&folha=${folha}`);
@@ -395,7 +403,33 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     }, { secundario: true })),
     h('p', { class: 'nota' }, 'Use quando a fatura fechar e o total bater com o app do banco.'));
 
-  container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir, outroCartao()].filter(Boolean));
+  // ---------- cofrinho ----------
+  const cofrinho = cofrinhoDoCartao(casa, cfg.id, hoje);
+  const botaoCofrinho = cofrinho && botaoDoCofrinho({
+    cofrinho,
+    aoAbrir: () => { cofrinhoAbertoAqui = true; location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}&tela=cofrinho`; },
+  });
+  const voltarDoCofrinho = () => {
+    if (cofrinhoAbertoAqui) {
+      cofrinhoAbertoAqui = false;
+      history.back();
+    } else {
+      location.replace(`#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}`);
+    }
+  };
+  // A folha da compra abre por cima do Cofrinho, na fatura dela; fechar volta para o Cofrinho já atualizado.
+  const abrirDoCofrinho = (item) => {
+    abertaAqui = true;
+    location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${item.fatura}&tela=cofrinho&folha=${item.tipo === 'fixa' ? 'fixa' : 'compra'}-${item.id}`;
+  };
+
+  if (naTela === 'cofrinho' && cofrinho) {
+    container.replaceChildren(...conteudoDoCofrinho({
+      cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
+    }));
+  } else {
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, outroCartao()].filter(Boolean));
+  }
 
   // ---------- folhas ----------
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // digitado ainda não salvo: a atualização automática espera
