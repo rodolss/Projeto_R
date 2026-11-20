@@ -180,7 +180,10 @@ function desenharMes(container, ctx) {
     }
     return compras;
   };
-  const tocarConta = (conta) => () => abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
+  // A conta ligada ao cartão abre a tela do Cartão naquela fatura (lá dá para ver e anotar compra por compra).
+  const tocarConta = (conta) => () => (conta.id === casa.cartao?.contaId
+    ? ctx.navegar(`#/casa-cartao?fatura=${mes}`)
+    : abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`));
   const linhasContas = r.contas.map((c) => linha({
     titulo: c.conta.nome, detalhe: detalheConta(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
   }));
