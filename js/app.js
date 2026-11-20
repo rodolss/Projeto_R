@@ -19,7 +19,7 @@ import { desenharTopo, telaQuemUsa } from './ui/topo.js';
 
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
-const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'casa-cartao' | 'aposentadoria': o app abre no último espaço usado
+const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'casa-balanco' | 'casa-cartao' | 'aposentadoria': o app abre no último espaço usado
 const CHAVE_USOU_APOSENTADORIA = 'projetoR.usouAposentadoria';
 const CHAVE_PERFIL_VISTO = 'projetoR.perfilVisto'; // quem administra: o perfil que está vendo neste aparelho
 const CHAVE_PERFIL_PROPRIO = 'projetoR.perfilProprio'; // o perfil deste aparelho, guardado: sem chave, continua nele

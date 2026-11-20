@@ -1,5 +1,5 @@
-// Balanço do mês (desenho 2026-11-20-balanco-do-mes): o que entrou e o que saiu para uma pessoa, no mês em que se
-// paga (como no Mês da casa). Entrou: o salário. Saiu: a parte dela nas contas da casa — que já inclui a parte da
+// Balanço do mês (desenho 2026-11-20-balanco-do-mes): o que entrou e o que saiu para uma pessoa no mês. Salário e
+// contas da casa: os do mês em que se paga (como no Mês da casa). Entrou: o salário. Saiu: a parte dela nas contas da casa — que já inclui a parte da
 // casa dos cartões, dividida pela renda — e o que é dela própria nos cartões dela (a fatura que fecha no mês).
 // O que ela passou no cartão para outras pessoas fica à parte e não entra na sobra: volta para ela.
 // O cartão de uma pessoa só aparece no balanço dela (como nos perfis).

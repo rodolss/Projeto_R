@@ -33,12 +33,16 @@ Núcleo `balancoDoMes(casa, mes, pessoaId, hoje)` em `js/core/balanco.js` (reapr
 
 ## Adendo (versão 16): a fatura que fecha no mês; Balanço em primeiro
 
-- **Problema relatado:** "não adicionou a conta do meu cartão". Os cartões da casa viram no dia 24 e vencem no
-  dia 1. O balanço usava a fatura que *vence* no mês: em novembro entrava a fatura que venceu em 01/11 (compras de
-  24/09 a 23/10, quase nada anotado no app), e a fatura das compras de novembro (vence em 01/12) só em dezembro.
-- **Decisão:** no balanço, cada cartão entra com a fatura que **fecha** no mês (as compras do mês). Com o vencimento
-  antes do melhor dia, é a fatura que vence no começo do mês seguinte — paga com o dinheiro deste mês, antes do
-  próximo salário. Com o vencimento depois do melhor dia (vira 3, vence 10), nada muda. Sem os dias: a do próprio
-  mês. A linha diz "o que é seu na fatura que vence em dd/mm" e leva a essa fatura. As contas da casa não mudam.
+- **Problema relatado:** o cartão da pessoa não aparecia no balanço do mês. Exemplo inventado: o cartão do Leo vira
+  no dia 24 e vence no dia 1. O balanço usava a fatura que *vence* no mês: em novembro entrava a fatura que venceu
+  em 01/11 (compras de 24/09 a 23/10), e a fatura das compras de novembro (vence em 01/12) só em dezembro.
+- **Decisão:** no balanço, cada cartão entra com a fatura que **fecha** no mês. Com o vencimento antes do melhor dia,
+  é a fatura que vence no começo do mês seguinte (as compras feitas no mês), paga com o dinheiro deste mês, antes do
+  próximo salário. Com o vencimento depois do melhor dia (vira 3, vence 10) nada muda; com vira = 1, a fatura do mês
+  traz as compras do mês anterior, como antes. Sem os dias: a do próprio mês. A linha diz "o que é seu na fatura que
+  vence em dd/mm" e leva a essa fatura.
+- **As contas da casa não mudam:** a parte da casa de uma fatura continua nas contas do mês em que ela vence (a regra
+  da planilha). Com vencimento no dia 1, a parte da pessoa e a parte da casa da mesma fatura aparecem em meses
+  vizinhos; cada uma conta uma vez só. O rodapé da tela diz isso.
 - **Menu:** Balanço · Mês · Cartão · Ano · Ajustes. O aparelho também lembra o Balanço como tela de abertura da
   casa (como já lembrava Mês e Cartão).

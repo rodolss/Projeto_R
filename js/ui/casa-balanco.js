@@ -122,7 +122,7 @@ function desenhar(container, ctx) {
   const saiu = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Saiu'),
     linhasSaiu.length ? h('div', {}, ...linhasSaiu) : h('p', { class: 'suave balanco-nota' }, 'Nada saiu neste mês.'),
-    temParteDaCasa && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'O que é da casa nos cartões já está nas contas da casa, dividido pela renda.'));
+    temParteDaCasa && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'A parte da casa dos cartões entra nas contas da casa do mês em que a fatura vence, dividida pela renda.'));
 
   const comOutras = b.cartoes.filter((k) => k.outras.valor > 0);
   const outras = comOutras.length > 0 && h('section', { class: 'cartao casa-lista' },
