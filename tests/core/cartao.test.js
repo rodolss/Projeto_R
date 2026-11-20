@@ -189,7 +189,7 @@ test('revisão: mudar o valor de uma de todo mês numa fatura futura não muda a
   casa = editarFixa(casa, { fixaId: 'f1', fatura: '2027-03', valor: 45, novoId: () => 'f2' });
   assert.deepEqual(casa.cartao.fixas, [
     { id: 'f1', nome: 'Streaming', valor: 40, para: 'casa', desde: '2026-12', ate: '2027-02' },
-    { id: 'f2', nome: 'Streaming', valor: 45, para: 'casa', desde: '2027-03' },
+    { id: 'f2', nome: 'Streaming', valor: 45, para: 'casa', desde: '2027-03', serie: 'f1' },
   ]);
   assert.equal(faturaDoCartao(casa, '2027-02').total, 40);
   assert.equal(faturaDoCartao(casa, '2027-03').total, 45);
@@ -226,4 +226,30 @@ test('primeira fatura com compras ou de todo mês', () => {
   assert.equal(primeiraFatura(casa), '2027-02');
   casa = anotarCompra(casa, { data: '2026-11-19', nome: 'B', valor: 1, todoMes: true, para: 'casa', novoId: ids('f') });
   assert.equal(primeiraFatura(casa), '2026-12');
+});
+
+test('revisão: parar uma de todo mês que já mudou de valor para também os trechos seguintes', () => {
+  let casa = anotarCompra(casaBase(), { data: '2026-11-19', nome: 'Academia', valor: 90, todoMes: true, para: 'p2', novoId: () => 'f1' });
+  casa = editarFixa(casa, { fixaId: 'f1', fatura: '2027-02', valor: 95, novoId: () => 'f2' });
+  assert.equal(casa.cartao.fixas[1].serie, 'f1');
+  const parada = pararFixa(casa, { fixaId: 'f1', fatura: '2027-01' });
+  assert.deepEqual(parada.cartao.fixas.map((f) => [f.id, f.ate ?? null]), [['f1', '2026-12']]);
+  for (const m of ['2027-01', '2027-02', '2027-06']) assert.equal(faturaDoCartao(parada, m).total, 0, m);
+  assert.equal(faturaDoCartao(parada, '2026-12').total, 90);
+  // Parar no trecho mais novo não mexe no anterior.
+  const depois = pararFixa(casa, { fixaId: 'f2', fatura: '2027-04' });
+  assert.deepEqual(depois.cartao.fixas.map((f) => [f.id, f.ate ?? null]), [['f1', '2027-01'], ['f2', '2027-03']]);
+});
+
+test('revisão: mudar uma de todo mês num trecho antigo vale desta fatura em diante, também depois do trecho seguinte', () => {
+  let casa = anotarCompra(casaBase(), { data: '2026-11-19', nome: 'Academia', valor: 90, todoMes: true, para: 'p2', novoId: () => 'f1' });
+  casa = editarFixa(casa, { fixaId: 'f1', fatura: '2027-03', valor: 95, novoId: () => 'f2' });
+  // Só o nome: os preços planejados ficam.
+  const renomeada = editarFixa(casa, { fixaId: 'f1', fatura: '2027-01', nome: 'Pilates', valor: 90, para: 'p2', novoId: () => 'f3' });
+  assert.deepEqual(['2026-12', '2027-01', '2027-03', '2027-08'].map((m) => faturaDoCartao(renomeada, m).fixas.map((f) => `${f.nome} ${f.valor}`).join()), [
+    'Academia 90', 'Pilates 90', 'Pilates 95', 'Pilates 95',
+  ]);
+  // O valor: vale para todas as faturas desta em diante.
+  const outroValor = editarFixa(casa, { fixaId: 'f1', fatura: '2027-01', nome: 'Academia', valor: 100, para: 'p2', novoId: () => 'f4' });
+  assert.deepEqual(['2026-12', '2027-01', '2027-03', '2027-08'].map((m) => faturaDoCartao(outroValor, m).total), [90, 100, 100, 100]);
 });

@@ -121,8 +121,11 @@ function lerAbaDeCompras(aba, hoje, { porFatura = false } = {}) {
   // Ano da primeira coluna: o que deixa o mês mais perto de hoje.
   const mesHoje = hoje.slice(0, 7);
   const anoHoje = Number(hoje.slice(0, 4));
-  const primeiro = [anoHoje - 1, anoHoje, anoHoje + 1].map((a) => `${a}-${doisDigitos(colunas[0].m)}`)
-    .sort((x, y) => Math.abs(diffMeses(mesHoje, x)) - Math.abs(diffMeses(mesHoje, y)))[0];
+  // O ano em que as colunas contêm o mês atual (ou o seguinte: a aba por fatura começa na fatura aberta).
+  const candidatos = [anoHoje - 1, anoHoje, anoHoje + 1].map((a) => `${a}-${doisDigitos(colunas[0].m)}`);
+  const contem = (inicio, mes) => { const d = diffMeses(inicio, mes); return d >= 0 && d < colunas.length; };
+  const primeiro = candidatos.find((c) => contem(c, mesHoje)) ?? candidatos.find((c) => contem(c, somarMeses(mesHoje, 1)))
+    ?? [...candidatos].sort((x, y) => Math.abs(diffMeses(mesHoje, x)) - Math.abs(diffMeses(mesHoje, y)))[0];
   const faturaDa = (j) => somarMeses(primeiro, j + (porFatura ? 0 : 1));
   const itens = [];
   let grupo = '';
@@ -212,9 +215,15 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
           if (ultimo && Math.abs(ultimo.valor - v.valor) < 0.005) ultimo.ate = v.fatura;
           else trechos.push({ valor: v.valor, desde: v.fatura, ate: v.fatura });
         }
-        trechos.forEach((t, k) => acrescentarFixa({
-          id: novoId(), nome, valor: centavos(t.valor), para, desde: t.desde, ...(k < trechos.length - 1 ? { ate: t.ate } : {}),
-        }));
+        let serie = null;
+        trechos.forEach((t, k) => {
+          const id = novoId();
+          serie ??= id;
+          acrescentarFixa({
+            id, nome, valor: centavos(t.valor), para, desde: t.desde,
+            ...(k > 0 ? { serie } : {}), ...(k < trechos.length - 1 ? { ate: t.ate } : {}),
+          });
+        });
         continue;
       }
       // "[Nx]": a última coluna com valor é a parcela N. Sem marca, a sequência é de 1 até o fim.

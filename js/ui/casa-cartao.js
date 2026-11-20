@@ -21,6 +21,9 @@ export function faturaDaTela(hash, padrao) {
   return fatura && /^\d{4}-(0[1-9]|1[0-2])$/.test(fatura) ? fatura : padrao;
 }
 
+// Compra com grupo é parcela, mesmo sem o número da parcela (importação antiga).
+export const ehParcelada = (compra) => Boolean(compra.grupo);
+
 export const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const dataComAno = (iso) => `${dataCurta(iso)}/${iso.slice(0, 4)}`;
 
@@ -378,7 +381,8 @@ function desenharFatura(container, ctx) {
 
   function folhaCompra(compra, folha) {
     const editado = { nome: compra.nome, valor: compra.valor, para: compra.para ?? 'casa', data: compra.data ?? null, fatura };
-    const parcela = compra.grupo ? compra.parcela : null;
+    const ehParcela = ehParcelada(compra);
+    const parcela = compra.parcela ?? null;
     const faturaNome = h('output', { class: 'casa-vezes cartao-fatura-nome' });
     const mostrarFatura = () => { faturaNome.textContent = nomeDaFatura(editado.fatura, hoje); };
     mostrarFatura();
@@ -390,12 +394,12 @@ function desenharFatura(container, ctx) {
       salvar.disabled = true;
       await ctx.salvarCasa((c) => editarCompraDoCartao(c, {
         fatura, compraId: compra.id, nome: editado.nome, valor: editado.valor, para: editado.para,
-        data: editado.data ?? undefined, novaFatura: parcela ? undefined : editado.fatura,
+        data: editado.data ?? undefined, novaFatura: ehParcela ? undefined : editado.fatura,
       }));
-      ctx.aviso(!parcela && editado.fatura !== fatura ? `Salvo. Foi para a fatura de ${nomeDaFatura(editado.fatura, hoje)}.` : 'Salvo.', 'ok', 3000);
+      ctx.aviso(!ehParcela && editado.fatura !== fatura ? `Salvo. Foi para a fatura de ${nomeDaFatura(editado.fatura, hoje)}.` : 'Salvo.', 'ok', 3000);
       terminar(folha);
     });
-    const apagar = botaoDoisToques('Apagar compra', parcela ? 'Toque de novo para apagar (e as próximas parcelas)' : 'Toque de novo para apagar', async () => {
+    const apagar = botaoDoisToques('Apagar compra', ehParcela ? 'Toque de novo para apagar (e as próximas parcelas)' : 'Toque de novo para apagar', async () => {
       const seguintes = parcelasSeguintes(casa, { mes: fatura, compraId: compra.id });
       await ctx.salvarCasa((c) => apagarCompra(c, { mes: fatura, compraId: compra.id }));
       ctx.aviso(seguintes ? `Compra apagada, junto com ${plural(seguintes, 'parcela seguinte', 'parcelas seguintes')}.` : 'Compra apagada.', 'ok', 3500);
@@ -404,12 +408,12 @@ function desenharFatura(container, ctx) {
 
     return [
       titulo(compra.nome),
-      h('p', { class: 'suave pequeno' }, parcela
-        ? `Parcela ${parcela.n} de ${parcela.de}${compra.data ? `, comprada em ${dataComAno(compra.data)}` : ''}. O que mudar aqui vale para esta parcela e as próximas.`
+      h('p', { class: 'suave pequeno' }, ehParcela
+        ? `${parcela ? `Parcela ${parcela.n} de ${parcela.de}` : 'Repete nas faturas seguintes'}${compra.data ? `, comprada em ${dataComAno(compra.data)}` : ''}. O que mudar aqui vale para esta e as próximas.`
         : compra.data ? `Comprada em ${dataComAno(compra.data)}.` : 'Veio da planilha, sem data.'),
       campoTexto({ rotulo: 'O que foi', valor: compra.nome, aoMudar: (v) => { editado.nome = v; } }),
-      campoMoeda({ rotulo: parcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
-      !parcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
+      campoMoeda({ rotulo: ehParcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
+      !ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
         h('input', {
           class: 'entrada', type: 'date', value: compra.data ?? '',
           onchange: (e) => {
@@ -419,7 +423,7 @@ function desenharFatura(container, ctx) {
             mostrarFatura();
           },
         })),
-      !parcela && h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Fatura'),
+      !ehParcela && h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Fatura'),
         h('div', { class: 'casa-passo' },
           h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura anterior', onclick: () => trocarFatura(-1) }, '‹'),
           faturaNome,

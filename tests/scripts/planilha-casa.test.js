@@ -180,3 +180,15 @@ test('revisão: nos meses reais, toda conta ausente da aba entra como zero (tamb
   assert.equal(mes(casa, '2026-03').valores[idDe(casa, 'Apartamento')], 0);
   assert.equal(mes(casa, '2026-12').valores[idDe(casa, 'Reserva')], undefined); // mês previsto: sem zeros
 });
+
+test('revisão: aba pessoal de janeiro a dezembro lida em novembro fica no ano atual, não no seguinte', () => {
+  const meses = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+  const celulas = { A2: 'PARCELAS', B2: 'Livro', C2: 45, B3: 'Curso', N3: 60 };
+  meses.forEach((m, k) => { celulas[`${'CDEFGHIJKLMN'[k]}1`] = m; });
+  const casa = {
+    schemaVersion: 2, pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }],
+    contas: [{ id: 'c1', nome: 'Cartão', compraPorCompra: true, arquivada: false }], meses: [], cartao: null,
+  };
+  const r = importarCartao(lerXlsx(criarXlsx([{ nome: 'BIA', celulas }])), { hoje: '2026-11-19', casa, novoId });
+  assert.deepEqual(r.casa.meses.map((m) => [m.mes, m.compras.map((c) => c.nome)]), [['2026-01', ['Livro']], ['2026-12', ['Curso']]]);
+});

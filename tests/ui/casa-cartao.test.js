@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada } from '../../js/ui/casa-cartao.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -28,4 +28,10 @@ test('para quem sugerido: o da última vez com o mesmo nome (sem acento e sem ca
   assert.equal(paraSugerido(sugestoes, ' GASOLINA '), 'casa');
   assert.equal(paraSugerido(sugestoes, 'Gas'), null);
   assert.equal(paraSugerido(sugestoes, ''), null);
+});
+
+test('revisão: compra com grupo é parcela, mesmo sem o número da parcela (importação antiga)', () => {
+  assert.equal(ehParcelada({ grupo: 'g1', parcela: { n: 2, de: 6 } }), true);
+  assert.equal(ehParcelada({ grupo: 'g1' }), true);
+  assert.equal(ehParcelada({ id: 'k1' }), false);
 });

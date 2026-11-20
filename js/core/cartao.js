@@ -160,28 +160,41 @@ export function editarCompraDoCartao(casa, { fatura, compraId, nome, valor, para
   });
 }
 
-// Mudar numa fatura depois da primeira fecha a antiga no mês anterior e começa uma nova: o passado não muda.
+// Trechos da mesma de todo mês (o valor mudou numa fatura) formam uma série: o primeiro trecho dá o nome à série.
+const serieDe = (f) => f.serie ?? f.id;
+
+// Mudar numa fatura depois da primeira fecha o trecho no mês anterior e começa um novo: o passado não muda.
+// O que mudou (só o que mudou) vale também para os trechos seguintes da série: "desta fatura em diante".
 export function editarFixa(casa, { fixaId, fatura, nome, valor, para, novoId = idPadrao }) {
   const fixa = casa.cartao?.fixas?.find((f) => f.id === fixaId);
   if (!fixa) return casa;
-  const mudanca = definidos({ nome: nome?.trim(), valor: valor == null ? undefined : centavos(valor), para });
-  if (Object.entries(mudanca).every(([k, v]) => fixa[k] === v)) return casa;
-  if (fatura <= fixa.desde) {
-    return comCartao(casa, (c) => ({ ...c, fixas: c.fixas.map((f) => (f.id === fixaId ? { ...f, ...mudanca } : f)) }));
-  }
-  const nova = { ...fixa, ...mudanca, id: novoId(), desde: fatura };
-  return comCartao(casa, (c) => ({
-    ...c,
-    fixas: c.fixas.flatMap((f) => (f.id === fixaId ? [{ ...f, ate: somarMeses(fatura, -1) }, nova] : [f])),
-  }));
-}
-
-export function pararFixa(casa, { fixaId, fatura }) {
+  const pedida = definidos({ nome: nome?.trim(), valor: valor == null ? undefined : centavos(valor), para });
+  const mudanca = Object.fromEntries(Object.entries(pedida).filter(([k, v]) => fixa[k] !== v));
+  if (!Object.keys(mudanca).length) return casa;
+  const serie = serieDe(fixa);
+  const seguinte = (f) => f.id !== fixa.id && serieDe(f) === serie && f.desde > fixa.desde;
   return comCartao(casa, (c) => ({
     ...c,
     fixas: c.fixas.flatMap((f) => {
+      if (seguinte(f)) return [{ ...f, ...mudanca }];
       if (f.id !== fixaId) return [f];
-      return fatura <= f.desde ? [] : [{ ...f, ate: somarMeses(fatura, -1) }];
+      if (fatura <= f.desde) return [{ ...f, ...mudanca }];
+      return [{ ...f, ate: somarMeses(fatura, -1) }, { ...f, ...mudanca, id: novoId(), serie, desde: fatura }];
+    }),
+  }));
+}
+
+// Parar some desta fatura em diante em toda a série (um preço novo planejado não volta sozinho).
+export function pararFixa(casa, { fixaId, fatura }) {
+  const fixa = casa.cartao?.fixas?.find((f) => f.id === fixaId);
+  if (!fixa) return casa;
+  const serie = serieDe(fixa);
+  return comCartao(casa, (c) => ({
+    ...c,
+    fixas: c.fixas.flatMap((f) => {
+      if (serieDe(f) !== serie) return [f];
+      if (f.desde >= fatura) return [];
+      return f.ate && f.ate < fatura ? [f] : [{ ...f, ate: somarMeses(fatura, -1) }];
     }),
   }));
 }
