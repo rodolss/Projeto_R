@@ -1,0 +1,41 @@
+// Balanço do mês (desenho 2026-11-20-balanco-do-mes): o que entrou e o que saiu para uma pessoa, no mês em que se
+// paga (como no Mês da casa). Entrou: o salário. Saiu: a parte dela nas contas da casa — que já inclui a parte da
+// casa dos cartões, dividida pela renda — e o que é dela própria nos cartões dela (faturas que vencem no mês).
+// O que ela passou no cartão para outras pessoas fica à parte e não entra na sobra: volta para ela.
+// O cartão de uma pessoa só aparece no balanço dela (como nos perfis).
+import { centavos, resumoDoMes } from './casa.js';
+import { faturaDoCartao, periodoDaFatura, cartaoPronto } from './cartao.js';
+
+const somar = (lista) => centavos(lista.reduce((s, x) => s + (x ?? 0), 0));
+
+export function balancoDoMes(casa, mes, pessoaId, hoje) {
+  const r = resumoDoMes(casa, mes);
+  // Quem não é pessoa da casa (um perfil novo) não divide as contas: sem salário nem parte das contas.
+  const daCasa = r.pessoas.find((p) => p.pessoa.id === pessoaId) ?? null;
+  const salario = daCasa && { valor: daCasa.salario, situacao: daCasa.situacaoSalario, deOnde: daCasa.deOnde };
+  const contas = daCasa && {
+    valor: daCasa.paga, // null sem divisão (salários vazios)
+    total: r.total,
+    fatia: r.fatiaDaRenda,
+    aConfirmar: r.contas.some((c) => c.situacao === 'a-confirmar'),
+  };
+  const cartoes = (casa.cartoes ?? []).filter((c) => c.donaId === pessoaId).map((cartao) => {
+    const f = faturaDoCartao(casa, cartao.id, mes);
+    const de = (filtro) => f.porPessoa.filter(filtro);
+    const outras = de((p) => p.para !== 'casa' && p.para !== pessoaId);
+    return {
+      cartaoId: cartao.id,
+      nome: casa.contas.find((c) => c.id === cartao.contaId)?.nome ?? 'Cartão',
+      seu: somar(de((p) => p.para === pessoaId).map((p) => p.valor)),
+      daCasa: somar(de((p) => p.para === 'casa').map((p) => p.valor)),
+      outras: { valor: somar(outras.map((p) => p.valor)), jaTenho: somar(outras.map((p) => p.jaTenho)), falta: somar(outras.map((p) => p.falta)) },
+      // Ainda dá para entrar compra nesta fatura.
+      aberta: cartaoPronto(cartao) && hoje <= periodoDaFatura(mes, cartao).ate,
+      conferida: f.conferida,
+    };
+  });
+  const entrou = centavos(salario?.valor ?? 0);
+  const saiu = somar([contas?.valor, ...cartoes.map((c) => c.seu)]);
+  const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
+  return { mes, pessoaId, salario, contas, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
+}
