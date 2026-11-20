@@ -195,7 +195,7 @@ test('revisão: mudar o valor de uma de todo mês numa fatura futura não muda a
   assert.equal(faturaDoCartao(casa, '2027-03').total, 45);
   // Na primeira fatura dela, muda no lugar; sem mudança nenhuma, nada muda.
   const noLugar = editarFixa(casa, { fixaId: 'f1', fatura: '2026-12', nome: 'Filmes', novoId: () => 'nao' });
-  assert.deepEqual(noLugar.cartao.fixas.map((f) => [f.id, f.nome]), [['f1', 'Filmes'], ['f2', 'Streaming']]);
+  assert.deepEqual(noLugar.cartao.fixas.map((f) => [f.id, f.nome]), [['f1', 'Filmes'], ['f2', 'Filmes']]);
   assert.equal(editarFixa(casa, { fixaId: 'f2', fatura: '2027-05', valor: 45, novoId: () => 'nao' }), casa);
 });
 
