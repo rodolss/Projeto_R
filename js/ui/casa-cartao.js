@@ -1,7 +1,9 @@
 // Contas da casa · Cartão (desenho 2026-11-19-cartao): o cartão de uma das pessoas, usado para ela, para a casa
 // e para outras pessoas. Anotar uma compra pede o que foi, o valor, a data e para quem; o app descobre a fatura
 // e mostra quanto é de cada um. A parte da casa entra sozinha nas contas da casa.
-// Folhas pelo endereço (#/casa-cartao?fatura=…&folha=anotar|compra-<id>|fixa-<id>): o voltar do celular fecha.
+// Vários cartões (um por pessoa, ou mais): botões no topo para trocar; o aparelho lembra o último aberto.
+// Endereço: #/casa-cartao?cartao=<id>&fatura=…&folha=anotar|compra-<id>|fixa-<id> (o voltar do celular fecha a
+// folha) e #/casa-cartao?novo=1 para criar outro cartão.
 import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
@@ -9,6 +11,7 @@ import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
   anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
+  acharCartao, adicionarCartao, rotuloDoCartao,
 } from '../core/cartao.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes } from './casa.js';
@@ -19,6 +22,14 @@ const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 export function faturaDaTela(hash, padrao) {
   const fatura = parametroDoHash(hash, 'fatura');
   return fatura && /^\d{4}-(0[1-9]|1[0-2])$/.test(fatura) ? fatura : padrao;
+}
+
+export function cartaoDaTela(hash, casa, lembrado) {
+  const ids = (casa.cartoes ?? []).map((c) => c.id);
+  const pedido = parametroDoHash(hash, 'cartao');
+  if (pedido && ids.includes(pedido)) return pedido;
+  if (lembrado && ids.includes(lembrado)) return lembrado;
+  return ids[0] ?? null;
 }
 
 // Compra com grupo é parcela, mesmo sem o número da parcela (importação antiga).
@@ -54,7 +65,7 @@ function chips(opcoes, escolhido, aoEscolher, rotulo) {
 }
 
 // Botão que pede um segundo toque antes de fazer algo que não volta (apagar, parar de repetir).
-function botaoDoisToques(texto, confirmar, aoConfirmar) {
+export function botaoDoisToques(texto, confirmar, aoConfirmar) {
   const b = h('button', { type: 'button', class: 'botao-link perigo-link' }, texto);
   let pronto = false;
   b.addEventListener('click', async () => {
@@ -90,41 +101,54 @@ function campoDia({ rotulo, dica, valor, aoMudar }) {
     dica && h('span', { class: 'campo-dica' }, dica));
 }
 
-// Configuração do cartão (também usada nos Ajustes da casa).
-export function formularioDoCartao(ctx, { aoSalvar, textoDoBotao = 'Salvar' }) {
+// Configuração de um cartão (também usada nos Ajustes da casa). Sem `cartaoId`, cria um cartão novo; `aoSalvar(id)`.
+export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar = null, textoDoBotao = 'Salvar' }) {
   const { casa } = ctx;
-  const atual = casa.cartao ?? {};
-  const escolha = { donaId: atual.donaId ?? null, viraNoDia: atual.viraNoDia ?? null, venceNoDia: atual.venceNoDia ?? null, contaId: atual.contaId ?? null };
-  const candidatas = casa.contas.filter((c) => c.compraPorCompra && !c.arquivada);
-  if (!escolha.contaId && candidatas.length === 1) escolha.contaId = candidatas[0].id;
-  const contaLigada = casa.contas.find((c) => c.id === escolha.contaId);
+  const atual = cartaoId ? acharCartao(casa, cartaoId) : null;
+  const escolha = { donaId: atual?.donaId ?? null, viraNoDia: atual?.viraNoDia ?? null, venceNoDia: atual?.venceNoDia ?? null, nome: '' };
+  const cartoes = casa.cartoes ?? [];
+  const ligadas = new Set(cartoes.map((c) => c.contaId));
+  const livres = casa.contas.filter((c) => c.compraPorCompra && !c.arquivada && !ligadas.has(c.id));
+  // O mesmo critério de adicionarCartao: o primeiro cartão fica com a conta compra por compra que já existe.
+  const contaLigada = atual ? casa.contas.find((c) => c.id === atual.contaId) : (!cartoes.length && livres.length === 1 ? livres[0] : null);
+  const nomeCampo = !contaLigada && campoTexto({
+    rotulo: 'Nome do cartão', placeholder: 'Ex.: Cartão Leo', aoMudar: (v) => { escolha.nome = v.trim(); },
+  });
+  const sugerirNome = () => {
+    const dona = casa.pessoas.find((p) => p.id === escolha.donaId);
+    if (nomeCampo && dona) nomeCampo.input.placeholder = `Cartão ${dona.nome}`;
+  };
+  sugerirNome();
 
   const salvar = botao(textoDoBotao, async () => {
     if (!escolha.donaId) { ctx.aviso('Escolha de quem é o cartão.', 'atencao', 3000); return; }
     if (!escolha.viraNoDia || !escolha.venceNoDia) { ctx.aviso('Escolha os dois dias do cartão.', 'atencao', 3000); return; }
     salvar.disabled = true;
-    await ctx.salvarCasa((c) => configurarCartao(c, escolha));
-    ctx.aviso('Cartão salvo.', 'ok', 2500);
-    aoSalvar();
+    let id = cartaoId;
+    const { donaId, viraNoDia, venceNoDia, nome } = escolha;
+    await ctx.salvarCasa((c) => {
+      if (cartaoId) return configurarCartao(c, cartaoId, { donaId, viraNoDia, venceNoDia });
+      const r = adicionarCartao(c, { donaId, viraNoDia, venceNoDia, nome });
+      id = r.id;
+      return r.casa;
+    });
+    ctx.aviso(cartaoId ? 'Cartão salvo.' : 'Cartão criado.', 'ok', 2500);
+    aoSalvar(id);
   });
 
   return h('div', { class: 'cartao-config', 'data-sem-recarregar': '' },
     h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'De quem é o cartão?'),
-      chips(casa.pessoas, escolha.donaId, (id) => { escolha.donaId = id; }, 'De quem é o cartão')),
+      chips(casa.pessoas, escolha.donaId, (id) => { escolha.donaId = id; sugerirNome(); }, 'De quem é o cartão')),
+    nomeCampo,
     campoDia({
       rotulo: 'Melhor dia de compra', valor: escolha.viraNoDia, aoMudar: (d) => { escolha.viraNoDia = d; },
       dica: 'O dia em que o cartão "vira": compras desse dia em diante vão para a fatura seguinte. Está no app do banco.',
     }),
     campoDia({ rotulo: 'Dia do vencimento', valor: escolha.venceNoDia, aoMudar: (d) => { escolha.venceNoDia = d; } }),
-    !atual.contaId && candidatas.length > 1
-      ? h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'A parte da casa entra em qual conta?'),
-        h('select', { class: 'entrada', onchange: (e) => { escolha.contaId = e.target.value || null; } },
-          h('option', { value: '' }, 'Escolha a conta'),
-          ...candidatas.map((c) => h('option', { value: c.id }, c.nome))))
-      : h('p', { class: 'suave pequeno', style: 'margin:0' }, contaLigada
-        ? `A parte da casa entra na conta "${contaLigada.nome}" das contas da casa.`
-        : 'O app cria a conta "Cartão da casa" nas contas da casa para receber a parte da casa.'),
-    h('div', { class: 'botoes' }, salvar));
+    h('p', { class: 'suave pequeno', style: 'margin:0' }, contaLigada
+      ? `A parte da casa entra na conta "${contaLigada.nome}" das contas da casa.`
+      : 'A parte da casa entra numa conta nova das contas da casa, com o nome do cartão.'),
+    h('div', { class: 'botoes' }, salvar, aoCancelar && botao('Cancelar', aoCancelar, { secundario: true })));
 }
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
@@ -140,6 +164,22 @@ export function atualizar(container, ctx) {
   desenhar(container, ctx);
 }
 
+const CHAVE_CARTAO = 'projetoR.cartao'; // o último cartão aberto neste aparelho
+const lerLembrado = () => { try { return localStorage.getItem(CHAVE_CARTAO); } catch { return null; } };
+const lembrar = (id) => { try { localStorage.setItem(CHAVE_CARTAO, id); } catch { /* sem armazenamento: só não lembra */ } };
+
+// Botões no topo para trocar de cartão (só com dois ou mais).
+function trocaDeCartao(casa, atualId) {
+  const cartoes = casa.cartoes ?? [];
+  if (cartoes.length < 2) return null;
+  return h('div', { class: 'cartao-troca' },
+    chips(cartoes.map((c) => ({ id: c.id, nome: rotuloDoCartao(casa, c) })), atualId,
+      (id) => location.replace(`#/casa-cartao?cartao=${id}`), 'Qual cartão'));
+}
+const outroCartao = () => h('button', {
+  type: 'button', class: 'botao-link cartao-outro', onclick: () => { location.hash = '#/casa-cartao?novo=1'; },
+}, 'Adicionar outro cartão');
+
 function desenhar(container, ctx) {
   const { casa } = ctx;
   if (!casa) {
@@ -147,30 +187,53 @@ function desenhar(container, ctx) {
     location.replace('#/casa');
     return;
   }
-  if (!cartaoPronto(casa)) {
+  const cartoes = casa.cartoes ?? [];
+  if (!cartoes.length || parametroDoHash(location.hash, 'novo')) {
     esconderFolha();
-    container.replaceChildren(
-      h('h1', {}, 'Cartão'),
+    const primeiro = !cartoes.length;
+    container.replaceChildren(...[
+      h('h1', {}, primeiro ? 'Cartão' : 'Novo cartão'),
       cartao(
-        h('p', {}, 'Anote cada compra do cartão com a data e para quem é. O app descobre em qual fatura ela cai, mostra quanto é de cada pessoa e leva a parte da casa para as contas da casa.'),
-        h('p', { class: 'suave' }, 'Antes, conte três coisas sobre o cartão:'),
-        formularioDoCartao(ctx, { textoDoBotao: 'Começar a usar', aoSalvar: () => ctx.rerender() })));
+        primeiro && h('p', {}, 'Anote cada compra do cartão com a data e para quem é. O app descobre em qual fatura ela cai, mostra quanto é de cada pessoa e leva a parte da casa para as contas da casa.'),
+        h('p', { class: 'suave' }, primeiro ? 'Antes, conte algumas coisas sobre o cartão:' : 'Cada um anota as compras no seu cartão. Conte sobre este:'),
+        formularioDoCartao(ctx, {
+          textoDoBotao: primeiro ? 'Começar a usar' : 'Criar cartão',
+          aoSalvar: (id) => location.replace(`#/casa-cartao?cartao=${id}`),
+          aoCancelar: primeiro ? null : () => location.replace('#/casa-cartao'),
+        })),
+    ].filter(Boolean));
     return;
   }
-  desenharFatura(container, ctx);
+  const atual = acharCartao(casa, cartaoDaTela(location.hash, casa, lerLembrado()));
+  lembrar(atual.id);
+  if (!cartaoPronto(atual)) {
+    // Cartão que veio da planilha (ou criado no outro celular) sem os dias: completa aqui.
+    esconderFolha();
+    const dona = casa.pessoas.find((p) => p.id === atual.donaId);
+    container.replaceChildren(...[
+      trocaDeCartao(casa, atual.id),
+      h('h1', {}, dona ? `Cartão de ${dona.nome}` : 'Cartão'),
+      cartao(
+        h('p', {}, 'Falta pouco: conte de quem é este cartão e os dois dias dele. Estão no app do banco.'),
+        formularioDoCartao(ctx, { cartaoId: atual.id, textoDoBotao: 'Começar a usar', aoSalvar: () => ctx.rerender() })),
+      h('p', { class: 'suave pequeno', style: 'text-align:center;margin:0' }, 'Não é o seu cartão?'),
+      outroCartao(),
+    ].filter(Boolean));
+    return;
+  }
+  desenharFatura(container, ctx, atual);
 }
 
-function desenharFatura(container, ctx) {
+function desenharFatura(container, ctx, cfg) {
   const { casa, hoje } = ctx;
-  const cfg = casa.cartao;
   const aberta = faturaDaCompra(hoje, cfg);
   const fatura = faturaDaTela(location.hash, aberta);
-  const f = faturaDoCartao(casa, fatura);
+  const f = faturaDoCartao(casa, cfg.id, fatura);
   const periodo = periodoDaFatura(fatura, cfg);
   const dona = casa.pessoas.find((p) => p.id === cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
 
-  const endereco = (extra = '') => `#/casa-cartao?fatura=${fatura}${extra}`;
+  const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${extra}`;
   const abrir = (folha) => {
     abertaAqui = true;
     location.hash = endereco(`&folha=${folha}`);
@@ -189,10 +252,10 @@ function desenharFatura(container, ctx) {
     if (acao === 'fechar') fechar();
     else if (acao === 'redesenhar' && !folhaAberta(location.hash)) ctx.rerender();
   };
-  const irPara = (m) => location.replace(`#/casa-cartao?fatura=${m}`);
+  const irPara = (m) => location.replace(`#/casa-cartao?cartao=${cfg.id}&fatura=${m}`);
 
   // ---------- cabeçalho ----------
-  const primeira = [primeiraFatura(casa) ?? aberta, aberta].sort()[0];
+  const primeira = [primeiraFatura(casa, cfg.id) ?? aberta, aberta].sort()[0];
   const cabecalho = h('div', { class: 'casa-mes' },
     h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura anterior', disabled: fatura <= primeira, onclick: () => irPara(somarMeses(fatura, -1)) }, '‹'),
     h('h1', {}, `Fatura de ${nomeDoMes(fatura)}`),
@@ -264,7 +327,7 @@ function desenharFatura(container, ctx) {
     }, { secundario: true })),
     h('p', { class: 'nota' }, 'Use quando a fatura fechar e o total bater com o app do banco.'));
 
-  container.replaceChildren(...[cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir].filter(Boolean));
+  container.replaceChildren(...[trocaDeCartao(casa, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir, outroCartao()].filter(Boolean));
 
   // ---------- folhas ----------
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // digitado ainda não salvo: a atualização automática espera
@@ -272,7 +335,7 @@ function desenharFatura(container, ctx) {
 
   // Para quem: chips com as pessoas e "+ Outra pessoa", que abre um campo para o nome ali mesmo.
   function escolhaPara(inicial, aoEscolher) {
-    let opcoes = opcoesPara(casa);
+    let opcoes = opcoesPara(casa, cfg.id);
     let atual = inicial;
     const caixa = h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Para quem'));
     const area = h('div');
@@ -319,7 +382,7 @@ function desenharFatura(container, ctx) {
       aoMudar: (v) => {
         nova.nome = v.trim();
         const sugerido = paraSugerido(sugestoes, nova.nome);
-        if (!nova.paraNaMao && sugerido && opcoesPara(casa).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
+        if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
       },
     });
     const totalTexto = h('span', { class: 'campo-dica' });
@@ -361,6 +424,7 @@ function desenharFatura(container, ctx) {
       anotarBotao.disabled = true;
       const fat = faturaDaCompra(nova.data, cfg);
       await ctx.salvarCasa((c) => anotarCompra(c, {
+        cartaoId: cfg.id,
         data: nova.data, nome: nova.nome, valor: nova.valor, para: nova.para,
         vezes: nova.forma === 'parcelado' ? nova.vezes : 1, todoMes: nova.forma === 'todoMes',
       }));
@@ -442,12 +506,12 @@ function desenharFatura(container, ctx) {
       if (!editado.nome.trim()) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
       if (editado.valor == null || editado.valor <= 0) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
       salvar.disabled = true;
-      await ctx.salvarCasa((c) => editarFixa(c, { fixaId: fixa.id, fatura, ...editado }));
+      await ctx.salvarCasa((c) => editarFixa(c, { cartaoId: cfg.id, fixaId: fixa.id, fatura, ...editado }));
       ctx.aviso('Salvo.', 'ok', 2500);
       terminar(folha);
     });
     const parar = botaoDoisToques('Parar de repetir a partir desta fatura', 'Toque de novo para parar', async () => {
-      await ctx.salvarCasa((c) => pararFixa(c, { fixaId: fixa.id, fatura }));
+      await ctx.salvarCasa((c) => pararFixa(c, { cartaoId: cfg.id, fixaId: fixa.id, fatura }));
       ctx.aviso(`${fixa.nome} não aparece mais a partir da fatura de ${nomeDaFatura(fatura, hoje)}.`, 'ok', 3500);
       terminar(folha);
     });

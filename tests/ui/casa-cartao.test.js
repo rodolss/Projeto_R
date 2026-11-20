@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela } from '../../js/ui/casa-cartao.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -34,4 +34,13 @@ test('revisão: compra com grupo é parcela, mesmo sem o número da parcela (imp
   assert.equal(ehParcelada({ grupo: 'g1', parcela: { n: 2, de: 6 } }), true);
   assert.equal(ehParcelada({ grupo: 'g1' }), true);
   assert.equal(ehParcelada({ id: 'k1' }), false);
+});
+
+test('cartão da tela: o do endereço, senão o último usado no aparelho, senão o primeiro', () => {
+  const casa = { cartoes: [{ id: 'c1' }, { id: 'c2' }] };
+  assert.equal(cartaoDaTela('#/casa-cartao?cartao=c2&fatura=2026-12', casa, 'c1'), 'c2');
+  assert.equal(cartaoDaTela('#/casa-cartao?cartao=sumiu', casa, 'c2'), 'c2');
+  assert.equal(cartaoDaTela('#/casa-cartao', casa, 'sumiu'), 'c1');
+  assert.equal(cartaoDaTela('#/casa-cartao', casa, null), 'c1');
+  assert.equal(cartaoDaTela('#/casa-cartao', { cartoes: [] }, 'c1'), null);
 });
