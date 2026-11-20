@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome, textoDaFalta, dicaDoJaTenho, telaDoCartao, depoisDeMarcar } from '../../js/ui/casa-cartao.js';
+import { textoQuemDeve } from '../../js/ui/casa-cofrinho.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -58,4 +59,42 @@ test('sugestões do nome: começo do nome primeiro, depois no meio; sem acento; 
   assert.deepEqual(sugestoesDoNome(nomes, 'farmacia'), []);
   assert.deepEqual(sugestoesDoNome(nomes, ''), []);
   assert.deepEqual(sugestoesDoNome(nomes, '  '), []);
+});
+
+test('texto da falta: quanto falta ou já tenho tudo', () => {
+  assert.equal(textoDaFalta(0), 'Já tenho tudo ✓');
+  assert.equal(textoDaFalta(-0.01), 'Já tenho tudo ✓');
+  const falta = textoDaFalta(50);
+  assert.ok(falta.startsWith('Falta '), falta);
+  assert.ok(falta.includes('50,00'), falta);
+});
+
+test('dica do já tenho: à vista, parcelado, todo mês, parcela e de todo mês', () => {
+  assert.equal(dicaDoJaTenho({ forma: 'vista' }), 'Já guardou no cofrinho, ou a pessoa já te pagou.');
+  assert.equal(dicaDoJaTenho({ forma: 'parcelado' }), 'Vale só para a 1ª parcela (a desta fatura).');
+  assert.equal(dicaDoJaTenho({ forma: 'todoMes', nomeDaFatura: 'janeiro' }), 'Vale só para a fatura de janeiro.');
+  assert.equal(dicaDoJaTenho({ forma: 'fixa', nomeDaFatura: 'janeiro' }), 'Vale só para a fatura de janeiro.');
+  assert.equal(dicaDoJaTenho({ forma: 'parcela', parcela: { n: 2, de: 6 } }), 'Vale só para esta parcela (2 de 6).');
+  assert.equal(dicaDoJaTenho({ forma: 'parcela' }), 'Vale só para esta parcela.');
+});
+
+test('tela do cartão: cofrinho só com tela=cofrinho', () => {
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&fatura=2027-01&tela=cofrinho'), 'cofrinho');
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&tela=cofrinho&folha=compra-k1'), 'cofrinho');
+  assert.equal(telaDoCartao('#/casa-cartao?cartao=c2&fatura=2027-01'), 'fatura');
+  assert.equal(telaDoCartao('#/casa-cartao?tela=outra'), 'fatura');
+});
+
+test('quem deve: ninguém, uma pessoa, várias', () => {
+  assert.equal(textoQuemDeve(0), 'Ninguém te deve');
+  assert.equal(textoQuemDeve(1), '1 pessoa te deve');
+  assert.equal(textoQuemDeve(3), '3 pessoas te devem');
+});
+
+test('revisão: depois de salvar o "já tenho", com a folha aberta não mexe; fechada na tela do cartão (ou no Cofrinho) redesenha; em outra tela não mexe', () => {
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2027-01&folha=compra-k1'), 'nada');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&folha=anotar'), 'nada');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2027-01'), 'redesenhar');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2026-12&tela=cofrinho'), 'redesenhar');
+  assert.equal(depoisDeMarcar('#/casa'), 'nada');
 });

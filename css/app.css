@@ -17,6 +17,7 @@
   --ok: #1a7a50; --ok-fundo: #dcf1e5; --ouro: #9a6514; --ouro-fundo: #f4e7cf;
   --atencao: #a8731a; --atencao-fundo: #f6ecd8; --alerta: #b4462b; --alerta-fundo: #f8e3dc;
   --info: #1c3b72; --info-fundo: #e0e8f6;
+  --amarelo: #ffd84a; --amarelo-fundo: #fff4bf; --amarelo-borda: #d4ad00; --amarelo-tinta: #3a2f00;
   --plano: #8a96ad; --faixa: rgba(28, 59, 114, 0.12);
   --c-ruim: #c0533a; --c-moderado: #a8731a; --c-normal: #1c3b72; --c-bom: #1a7a50;
   --fonte-texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -32,6 +33,7 @@
     --ok: #5fcf9a; --ok-fundo: #12301f; --ouro: #eab54d; --ouro-fundo: #33290f;
     --atencao: #e3b04f; --atencao-fundo: #33270c; --alerta: #f08a6c; --alerta-fundo: #3a1d14;
     --info: #8aaaf0; --info-fundo: #1a2950;
+    --amarelo: #f2cf4a; --amarelo-fundo: #36300f; --amarelo-borda: #8f7a1c; --amarelo-tinta: #3a2f00;
     --plano: #6b7790; --faixa: rgba(138, 170, 240, 0.16);
     --c-ruim: #f08a6c; --c-moderado: #e3b04f; --c-normal: #8aaaf0; --c-bom: #5fcf9a;
     --sombra: none;
@@ -44,6 +46,7 @@
   --ok: #5fcf9a; --ok-fundo: #12301f; --ouro: #eab54d; --ouro-fundo: #33290f;
   --atencao: #e3b04f; --atencao-fundo: #33270c; --alerta: #f08a6c; --alerta-fundo: #3a1d14;
   --info: #8aaaf0; --info-fundo: #1a2950;
+    --amarelo: #f2cf4a; --amarelo-fundo: #36300f; --amarelo-borda: #8f7a1c; --amarelo-tinta: #3a2f00;
   --plano: #6b7790; --faixa: rgba(138, 170, 240, 0.16);
   --c-ruim: #f08a6c; --c-moderado: #e3b04f; --c-normal: #8aaaf0; --c-bom: #5fcf9a;
   --sombra: none;
@@ -393,6 +396,46 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .cartao-sugestoes:empty { display: none; }
 .chip.pequeno { padding: 5px 12px; font-size: 14px; background: var(--cartao-2); border-color: var(--cartao-2); }
+
+/* ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ---------- */
+.ja-etiqueta { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 99px; background: var(--amarelo); color: var(--amarelo-tinta);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.6; vertical-align: 1px; white-space: nowrap; }
+.ja-pessoa { display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--borda); }
+.ja-pessoa-cima, .ja-pessoa-baixo { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.ja-pessoa-cima b { font-weight: 600; }
+.ja-pessoa-barra { height: 8px; border-radius: 99px; background: var(--cartao-2); overflow: hidden; }
+.ja-pessoa-barra i { display: block; height: 100%; border-radius: 99px; background: var(--amarelo); transition: width 300ms ease; }
+.ja-pessoa-baixo { font-size: 13.5px; color: var(--suave); }
+.ja-falta { color: var(--texto); font-weight: 600; }
+.ja-tudo { color: var(--ok); font-weight: 600; }
+.ja-interruptor { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 14px;
+  background: var(--cartao); color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.ja-interruptor-texto { flex: 1; font-weight: 600; }
+.ja-trilho { position: relative; flex: none; width: 50px; height: 30px; border-radius: 99px; background: var(--cartao-2); border: 1px solid var(--borda);
+  transition: background 200ms ease; }
+.ja-trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--suave);
+  transition: transform 200ms ease, background 200ms ease; }
+.ja-interruptor[aria-checked="true"] { border-color: var(--amarelo-borda); background: var(--amarelo-fundo); }
+.ja-interruptor[aria-checked="true"] .ja-trilho { background: var(--amarelo); border-color: var(--amarelo-borda); }
+.ja-interruptor[aria-checked="true"] .ja-trilho::after { transform: translateX(20px); background: var(--amarelo-tinta); }
+.ja-interruptor:disabled { opacity: 0.75; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .ja-trilho, .ja-trilho::after, .ja-pessoa-barra i { transition: none; } }
+
+.cofrinho-botao { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--texto); cursor: pointer;
+  border-color: var(--amarelo-borda); }
+.cofrinho-botao:active { background: var(--cartao-2); }
+.cofrinho-botao .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cofrinho-botao .rotulo { margin: 0; }
+.cofrinho-botao b { font-family: var(--fonte-titulo); font-size: 18px; font-variant-numeric: tabular-nums; }
+.cofrinho-botao small { color: var(--suave); font-size: 13.5px; }
+.cofrinho-botao .seta { color: var(--suave); font-size: 22px; line-height: 1; }
+.cofrinho-voltar { align-self: flex-start; padding: 4px 0; }
+.cofrinho-total { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.cofrinho-total .rotulo { margin: 0; }
+.cofrinho-nota { margin: 0; padding: 0 16px 12px; }
+.casa-lista > div + .cofrinho-nota { padding-top: 10px; border-top: 1px solid var(--borda); }
+.cofrinho-item { padding-left: 28px; border-top: 0; }
+.cofrinho-item .texto b { font-weight: 500; }
 
 /* ---------- Perfis (desenho 2026-11-20-perfis) ---------- */
 .topo { position: relative; display: flex; justify-content: flex-end; max-width: 560px; margin: 0 auto; padding: 10px 16px 0; }

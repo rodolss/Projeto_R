@@ -1,5 +1,5 @@
 // Monta um .xlsx em memória (zip + XML mínimos) para testar a importação sem nenhuma planilha real.
-// abas: [{ nome, celulas: { 'C3': 'texto', 'C5': 12.5, 'G5': { f: 'SUM(C5:F5)', v: 30 } } }]
+// abas: [{ nome, celulas: { 'C3': 'texto', 'C5': 12.5, 'G5': { f: 'SUM(C5:F5)', v: 30 } }, cores?: { 'C5': 'FFFFFF00' } }]
 import { deflateRawSync, crc32 } from 'node:zlib';
 
 const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -52,15 +52,17 @@ export function criarXlsx(abas) {
     if (k < 0) { k = textos.length; textos.push(t); }
     return k;
   };
-  const planilhas = abas.map(({ celulas }) => {
+  const coresUsadas = [...new Set(abas.flatMap((a) => Object.values(a.cores ?? {})))];
+  const planilhas = abas.map(({ celulas, cores = {} }) => {
     const linhas = new Map();
     for (const [ref, valor] of Object.entries(celulas)) {
       const r = Number(ref.match(/\d+/)[0]);
       if (!linhas.has(r)) linhas.set(r, []);
       let xml;
-      if (typeof valor === 'string') xml = `<c r="${ref}" t="s"><v>${indiceDe(valor)}</v></c>`;
-      else if (typeof valor === 'number') xml = `<c r="${ref}"><v>${valor}</v></c>`;
-      else xml = `<c r="${ref}"><f>${esc(valor.f)}</f><v>${valor.v}</v></c>`;
+      const s = cores[ref] ? ` s="${coresUsadas.indexOf(cores[ref]) + 1}"` : '';
+      if (typeof valor === 'string') xml = `<c r="${ref}"${s} t="s"><v>${indiceDe(valor)}</v></c>`;
+      else if (typeof valor === 'number') xml = `<c r="${ref}"${s}><v>${valor}</v></c>`;
+      else xml = `<c r="${ref}"${s}><f>${esc(valor.f)}</f><v>${valor.v}</v></c>`;
       linhas.get(r).push(xml);
     }
     const corpo = [...linhas.entries()].sort((a, b) => a[0] - b[0]).map(([r, cs]) => `<row r="${r}">${cs.join('')}</row>`).join('');
@@ -73,5 +75,9 @@ export function criarXlsx(abas) {
   };
   planilhas.forEach((xml, k) => { arquivos[`xl/worksheets/sheet${k + 1}.xml`] = xml; });
   arquivos['xl/sharedStrings.xml'] = `<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${textos.map((t) => `<si><t>${esc(t)}</t></si>`).join('')}</sst>`;
+  // Um preenchimento sólido por cor usada (os dois primeiros são os que o Excel sempre tem) e um estilo de célula para cada.
+  const preenchimentos = coresUsadas.map((cor) => `<fill><patternFill patternType="solid"><fgColor rgb="${cor}"/><bgColor indexed="64"/></patternFill></fill>`).join('');
+  const estilos = coresUsadas.map((_, k) => `<xf numFmtId="0" fontId="0" fillId="${k + 2}" borderId="0" applyFill="1"/>`).join('');
+  arquivos['xl/styles.xml'] = `<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fills count="${coresUsadas.length + 2}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${preenchimentos}</fills><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${coresUsadas.length + 1}"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>${estilos}</cellXfs></styleSheet>`;
   return zip(arquivos);
 }

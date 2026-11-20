@@ -3,7 +3,7 @@
 import { inflateRawSync } from 'node:zlib';
 import { somarMeses, diffMeses } from '../js/core/meses.js';
 import { centavos, comMes, compraDaCasa, fixasNoMes, SCHEMA_CASA, migrarCasa } from '../js/core/casa.js';
-import { adicionarPessoaDoCartao, acharCartao } from '../js/core/cartao.js';
+import { adicionarPessoaDoCartao, acharCartao, faturaDoCartao, marcarJaTenho, podeTerJaTenho } from '../js/core/cartao.js';
 
 // ---------- zip + XML ----------
 function arquivosDoZip(buf) {
@@ -44,12 +44,20 @@ export function lerXlsx(buf) {
   const compartilhados = [...ler('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textosDe(m[1]));
   const alvos = Object.fromEntries([...ler('xl/_rels/workbook.xml.rels').matchAll(/<Relationship\s[^>]*>/g)]
     .map((m) => atributos(m[0])).map((a) => [a.Id, a.Target]));
+  // Cor de fundo de cada estilo de célula: o `rgb` (ARGB) do preenchimento; cor do tema ou sem preenchimento: null.
+  const estilos = ler('xl/styles.xml');
+  const corDoPreenchimento = [...(estilos.match(/<fills[^>]*>([\s\S]*?)<\/fills>/)?.[1] ?? '').matchAll(/<fill>([\s\S]*?)<\/fill>|<fill\/>/g)]
+    .map((m) => (m[1] ?? '').match(/<fgColor\s[^>]*?rgb="([0-9A-Fa-f]{8})"/)?.[1]?.toUpperCase() ?? null);
+  const corDoEstilo = [...(estilos.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/)?.[1] ?? '').matchAll(/<xf\s([^>]*?)\/?>/g)]
+    .map((m) => corDoPreenchimento[Number(atributos(m[1]).fillId ?? 0)] ?? null);
   return [...ler('xl/workbook.xml').matchAll(/<sheet\s[^>]*>/g)].map((m) => {
     const a = atributos(m[0]);
     const caminho = `xl/${alvos[a['r:id']].replace(/^\/?(xl\/)?/, '')}`;
     const celulas = new Map();
+    const cores = new Map();
     for (const c of ler(caminho).matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const at = atributos(c[1]);
+      if (at.s !== undefined && corDoEstilo[Number(at.s)]) cores.set(at.r, corDoEstilo[Number(at.s)]);
       const corpo = c[2] ?? '';
       const v = corpo.match(/<v>([\s\S]*?)<\/v>/)?.[1];
       let valor = null;
@@ -61,7 +69,7 @@ export function lerXlsx(buf) {
       else valor = Number(v);
       celulas.set(at.r, valor);
     }
-    return { nome: a.name, celula: (ref) => celulas.get(ref) ?? null };
+    return { nome: a.name, celula: (ref) => celulas.get(ref) ?? null, cor: (ref) => cores.get(ref) ?? null };
   });
 }
 
@@ -111,6 +119,34 @@ function lerAbaDeAno(aba) {
 // Valores de uma linha: só a sequência a partir do primeiro mês com valor; número com texto logo à esquerda é
 // de um quadro ao lado, não da linha.
 function lerAbaDeCompras(aba, hoje, { porFatura = false } = {}) {
+  const lidas = colunasDaAba(aba, hoje, { porFatura });
+  if (!lidas) return null;
+  const { colunas, faturaDa } = lidas;
+  const itens = [];
+  let grupo = '';
+  for (let r = 2; r < 300; r++) {
+    const rotulo = aba.celula(`A${r}`);
+    if (typeof rotulo === 'string' && rotulo.trim()) grupo = rotulo.trim();
+    const nome = aba.celula(`B${r}`);
+    if (typeof nome !== 'string' || !nome.trim() || semAcento(nome) === 'total') continue;
+    const valorEm = (j) => valorDaCelula(aba, colunas, r, j);
+    const inicio = colunas.findIndex((_, j) => valorEm(j) != null && !textoAntes(aba, colunas, r, j));
+    if (inicio < 0) continue;
+    const valores = [];
+    for (let j = inicio; j < colunas.length && valorEm(j) != null; j++) valores.push({ fatura: faturaDa(j), valor: valorEm(j) });
+    itens.push({ nome: nome.trim(), grupo, valores, ateOFim: inicio + valores.length === colunas.length });
+  }
+  return { primeiraFatura: faturaDa(0), itens };
+}
+
+const valorDaCelula = (aba, colunas, r, j) => { const v = numero(aba.celula(`${colunas[j].col}${r}`)); return v != null && v > 0 ? v : null; };
+const textoAntes = (aba, colunas, r, j) => {
+  const antes = j > 0 ? aba.celula(`${colunas[j - 1].col}${r}`) : null;
+  return typeof antes === 'string' && antes.trim() !== '';
+};
+
+// Os meses da linha 1 (a partir da coluna C) e a fatura de cada coluna.
+function colunasDaAba(aba, hoje, { porFatura = false } = {}) {
   const colunas = [];
   for (let k = 2; k < 40; k++) {
     const m = MESES_LONGOS.indexOf(semAcento(aba.celula(`${letra(k)}1`)));
@@ -126,24 +162,7 @@ function lerAbaDeCompras(aba, hoje, { porFatura = false } = {}) {
   const contem = (inicio, mes) => { const d = diffMeses(inicio, mes); return d >= 0 && d < colunas.length; };
   const primeiro = candidatos.find((c) => contem(c, mesHoje)) ?? candidatos.find((c) => contem(c, somarMeses(mesHoje, 1)))
     ?? [...candidatos].sort((x, y) => Math.abs(diffMeses(mesHoje, x)) - Math.abs(diffMeses(mesHoje, y)))[0];
-  const faturaDa = (j) => somarMeses(primeiro, j + (porFatura ? 0 : 1));
-  const itens = [];
-  let grupo = '';
-  for (let r = 2; r < 300; r++) {
-    const rotulo = aba.celula(`A${r}`);
-    if (typeof rotulo === 'string' && rotulo.trim()) grupo = rotulo.trim();
-    const nome = aba.celula(`B${r}`);
-    if (typeof nome !== 'string' || !nome.trim() || semAcento(nome) === 'total') continue;
-    const celula = (j) => aba.celula(`${colunas[j].col}${r}`);
-    const valorEm = (j) => { const v = numero(celula(j)); return v != null && v > 0 ? v : null; };
-    const textoAntes = (j) => j > 0 && typeof celula(j - 1) === 'string' && celula(j - 1).trim() !== '';
-    const inicio = colunas.findIndex((_, j) => valorEm(j) != null && !textoAntes(j));
-    if (inicio < 0) continue;
-    const valores = [];
-    for (let j = inicio; j < colunas.length && valorEm(j) != null; j++) valores.push({ fatura: faturaDa(j), valor: valorEm(j) });
-    itens.push({ nome: nome.trim(), grupo, valores, ateOFim: inicio + valores.length === colunas.length });
-  }
-  return { primeiraFatura: faturaDa(0), itens };
+  return { colunas, faturaDa: (j) => somarMeses(primeiro, j + (porFatura ? 0 : 1)) };
 }
 
 // Grupos da coluna A que são da dona do cartão (os outros rótulos são pessoas) e os que repetem todo mês.
@@ -253,6 +272,57 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
     if (!Object.keys(reg.salarios).length) c = comMes(c, reg.mes, (r) => { delete r.valores[conta.id]; });
   }
   return { casa: c, avisos };
+}
+
+// ---------- "Já tenho" (desenho 2026-11-20-ja-tenho): as células amarelas da aba pessoal ----------
+const AMARELO = 'FFFFFF00';
+const chaveDoNome = (t) => semAcento(String(t).replace(MARCA_PARCELAS, ' ').replace(/\s+/g, ' '));
+
+// As compras pintadas de amarelo (dinheiro já guardado) na aba pessoal da dona de um cartão: a mesma aba e o mesmo
+// cartão que importarCartao usa. Número com texto logo à esquerda é de um quadro ao lado, não de uma compra.
+export function marcasAmarelas(abas, { hoje, casa }) {
+  const dona = casa.pessoas.find((p) => abas.some((a) => semAcento(a.nome) === semAcento(p.nome)));
+  const cartao = dona ? (casa.cartoes ?? []).find((c) => c.donaId === dona.id) : null;
+  const aba = dona && abas.find((a) => semAcento(a.nome) === semAcento(dona.nome));
+  const lidas = aba && colunasDaAba(aba, hoje, { porFatura: true });
+  if (!cartao || !lidas) return { cartaoId: null, marcas: [] };
+  const { colunas, faturaDa } = lidas;
+  const marcas = [];
+  for (let r = 2; r < 300; r++) {
+    const nome = aba.celula(`B${r}`);
+    if (typeof nome !== 'string' || !nome.trim() || semAcento(nome) === 'total') continue;
+    colunas.forEach((col, j) => {
+      const valor = valorDaCelula(aba, colunas, r, j);
+      if (valor == null || textoAntes(aba, colunas, r, j) || aba.cor(`${col.col}${r}`) !== AMARELO) return;
+      marcas.push({ fatura: faturaDa(j), nome: nome.trim(), valor: centavos(valor) });
+    });
+  }
+  return { cartaoId: cartao.id, marcas };
+}
+
+// Marca "já tenho" na compra (ou de todo mês) da fatura com o mesmo nome (sem acento, sem "[Nx]") e o mesmo valor.
+// Cada marca usa um item; a que já está marcada vem primeiro, então rodar de novo não marca nada a mais.
+export function aplicarMarcas(casa, { cartaoId, marcas }) {
+  let c = casa;
+  let achadas = 0;
+  const faltando = [];
+  const usados = new Set();
+  for (const marca of marcas) {
+    const f = faturaDoCartao(c, cartaoId, marca.fatura);
+    const chave = (tipo, item) => `${marca.fatura}:${tipo}:${item.id}`;
+    const igual = (tipo) => (item) => !usados.has(chave(tipo, item)) && podeTerJaTenho(item)
+      && chaveDoNome(item.nome) === chaveDoNome(marca.nome) && Math.abs(item.valor - marca.valor) < 0.005;
+    const alvo = [
+      ...f.compras.filter(igual('compra')).map((item) => ({ tipo: 'compra', item })),
+      ...f.fixas.filter(igual('fixa')).map((item) => ({ tipo: 'fixa', item })),
+    ].sort((a, b) => Number(b.item.jaTenho) - Number(a.item.jaTenho))[0];
+    if (!alvo) { faltando.push(marca); continue; }
+    usados.add(chave(alvo.tipo, alvo.item));
+    achadas += 1;
+    const qual = alvo.tipo === 'fixa' ? { fixaId: alvo.item.id } : { compraId: alvo.item.id };
+    c = marcarJaTenho(c, { cartaoId, fatura: marca.fatura, ...qual, jaTenho: true });
+  }
+  return { casa: c, achadas, faltando };
 }
 
 export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.randomUUID() }) {

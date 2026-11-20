@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
 import { salvarValor, adicionarCompra, apagarCompra, editarConta, migrarCasa } from '../../js/core/casa.js';
-import { anotarCompra, adicionarCartao, configurarCartao, adicionarPessoaDoCartao, editarFixa } from '../../js/core/cartao.js';
+import { anotarCompra, adicionarCartao, configurarCartao, adicionarPessoaDoCartao, editarFixa, editarCompraDoCartao, marcarJaTenho } from '../../js/core/cartao.js';
 
 function base() {
   return {
@@ -134,4 +134,32 @@ test('perfis: dois aparelhos ligando chaves ao mesmo tempo: as duas ligações f
   const remoto = vincularAparelho(b, { impressao: 'bbbb', perfilId: 'p2', hoje: '2026-11-20' });
   const r = mesclarCasa({ base: b, local, remoto });
   assert.deepEqual(r.aparelhos.map((a) => [a.id, a.perfilId]), [['aaaa', 'p1'], ['bbbb', 'p2']]);
+});
+
+// ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ----------
+
+test('um aparelho marca "já tenho" e o outro muda o nome da mesma compra: as duas mudanças ficam', () => {
+  const b = anotarCompra(baseV3(), { cartaoId: K, data: '2026-11-19', nome: 'Farmácia', valor: 30, para: 'p1', novoId: () => 'k1' });
+  const local = marcarJaTenho(b, { cartaoId: K, fatura: '2026-12', compraId: 'k1', jaTenho: true });
+  const remoto = editarCompraDoCartao(b, { fatura: '2026-12', compraId: 'k1', nome: 'Farmácia da Ana' });
+  const r = mesclarCasa({ base: b, local, remoto });
+  const compra = mes(r, '2026-12').compras.find((c) => c.id === 'k1');
+  assert.deepEqual([compra.nome, compra.jaTenho], ['Farmácia da Ana', true]);
+});
+
+test('cada aparelho marca uma fatura diferente da mesma de todo mês: as duas ficam', () => {
+  const b = anotarCompra(baseV3(), { cartaoId: K, data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'p1', novoId: () => 'f1' });
+  const local = marcarJaTenho(b, { cartaoId: K, fatura: '2026-12', fixaId: 'f1', jaTenho: true });
+  const remoto = marcarJaTenho(b, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.cartoes[0].fixas[0].jaTenhoEm, { '2026-12': true, '2027-01': true });
+});
+
+test('revisão: um aparelho desmarca a única marca de uma de todo mês e o outro marca outra fatura: a desmarcada não volta', () => {
+  let b = anotarCompra(baseV3(), { cartaoId: K, data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'p1', novoId: () => 'f1' });
+  b = marcarJaTenho(b, { cartaoId: K, fatura: '2026-12', fixaId: 'f1', jaTenho: true });
+  const local = marcarJaTenho(b, { cartaoId: K, fatura: '2026-12', fixaId: 'f1', jaTenho: false });
+  const remoto = marcarJaTenho(b, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.cartoes[0].fixas[0].jaTenhoEm, { '2027-01': true });
 });

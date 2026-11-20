@@ -3,7 +3,7 @@
 // e mostra quanto é de cada um. A parte da casa entra sozinha nas contas da casa.
 // Vários cartões (um por pessoa, ou mais): botões no topo para trocar; o aparelho lembra o último aberto.
 // Endereço: #/casa-cartao?cartao=<id>&fatura=…&folha=anotar|compra-<id>|fixa-<id> (o voltar do celular fecha a
-// folha) e #/casa-cartao?novo=1 para criar outro cartão.
+// folha), #/casa-cartao?novo=1 para criar outro cartão e &tela=cofrinho para a tela do Cofrinho (casa-cofrinho.js).
 import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
@@ -11,9 +11,10 @@ import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
   anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
-  acharCartao, adicionarCartao, rotuloDoCartao,
+  acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
-import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
+import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
+import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './rotas.js';
 import { nomeDoMes } from './casa.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 
@@ -62,6 +63,50 @@ export function paraSugerido(sugestoes, nome) {
   const chave = semAcento(nome);
   if (!chave) return null;
   return sugestoes.find((s) => semAcento(s.nome) === chave)?.para ?? null;
+}
+
+// "Já tenho" (desenho 2026-11-20-ja-tenho): em "De quem é", o que ainda falta de cada pessoa.
+export const textoDaFalta = (falta) => (falta <= 0 ? 'Já tenho tudo ✓' : `Falta ${formatarBRL(falta)}`);
+
+// A dica embaixo do interruptor: a marca vale só para o que está sendo anotado ou aberto.
+export function dicaDoJaTenho({ forma, nomeDaFatura = '', parcela = null }) {
+  if (forma === 'parcelado') return 'Vale só para a 1ª parcela (a desta fatura).';
+  if (forma === 'todoMes' || forma === 'fixa') return `Vale só para a fatura de ${nomeDaFatura}.`;
+  if (forma === 'parcela') return parcela ? `Vale só para esta parcela (${parcela.n} de ${parcela.de}).` : 'Vale só para esta parcela.';
+  return 'Já guardou no cofrinho, ou a pessoa já te pagou.';
+}
+
+// Depois de salvar o "já tenho" (o envio pode demorar): com uma folha aberta, nada (redesenhar apagaria o digitado);
+// sem folha, na tela do cartão ou no Cofrinho, redesenha (a pessoa fechou antes de terminar e a tela ficou velha).
+export const depoisDeMarcar = (hash) => (!folhaAberta(hash) && resolverRota(hash, true) === 'casa-cartao' ? 'redesenhar' : 'nada');
+
+// Interruptor "Já tenho o dinheiro". Muda na hora; `aoMudar(novo)` pode salvar (fica desabilitado enquanto isso
+// e volta ao estado de antes se der erro). `mudarDica(texto)` troca a dica de fora.
+function interruptorJaTenho({ ligado, dica, aoMudar }) {
+  let estado = Boolean(ligado);
+  const chave = h('button', { type: 'button', class: 'ja-interruptor', role: 'switch', 'aria-checked': String(estado) },
+    h('span', { class: 'ja-interruptor-texto' }, 'Já tenho o dinheiro'),
+    h('span', { class: 'ja-trilho', 'aria-hidden': 'true' }));
+  const textoDica = h('span', { class: 'campo-dica' }, dica);
+  const mostrar = () => chave.setAttribute('aria-checked', String(estado));
+  chave.addEventListener('click', async () => {
+    const antes = estado;
+    estado = !estado;
+    mostrar();
+    chave.disabled = true;
+    try {
+      await aoMudar(estado);
+    } catch (erro) {
+      estado = antes;
+      mostrar();
+      console.warn('Não deu para salvar o "já tenho"', erro);
+    } finally {
+      chave.disabled = false;
+    }
+  });
+  const caixa = h('div', { class: 'campo', 'data-sem-recarregar': '' }, chave, textoDica);
+  caixa.mudarDica = (texto) => { textoDica.textContent = texto; };
+  return caixa;
 }
 
 const nomeDaFatura = (fatura, hoje) => (fatura.slice(0, 4) === hoje.slice(0, 4) ? nomeDoMes(fatura) : `${nomeDoMes(fatura)} de ${fatura.slice(0, 4)}`);
@@ -168,6 +213,10 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
 let abertaAqui = false;
+// O mesmo para a tela do Cofrinho: "Voltar para a fatura" = voltar no histórico.
+let cofrinhoAbertoAqui = false;
+
+export const telaDoCartao = (hash) => (parametroDoHash(hash, 'tela') === 'cofrinho' ? 'cofrinho' : 'fatura');
 // Depois de anotar, a próxima compra começa com a mesma data (quem anota várias de uma vez agradece).
 let ultimaData = null;
 
@@ -255,7 +304,10 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const dona = quemE(casa, cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
 
-  const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${extra}`;
+  // Na tela do Cofrinho, o endereço leva `&tela=cofrinho` (abrir e fechar uma folha não sai dela).
+  const naTela = telaDoCartao(location.hash);
+  if (naTela === 'fatura') cofrinhoAbertoAqui = false;
+  const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${naTela === 'cofrinho' ? '&tela=cofrinho' : ''}${extra}`;
   const abrir = (folha) => {
     abertaAqui = true;
     location.hash = endereco(`&folha=${folha}`);
@@ -304,24 +356,29 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('div', { style: 'margin-top:4px' }, selo));
 
   // ---------- de quem é ----------
+  // A Casa leva às contas da casa; as outras pessoas (e a dona) mostram o total, quanto já tem e quanto falta.
   const linhaPessoa = (p) => {
-    const ehCasa = p.para === 'casa';
-    const detalhe = ehCasa ? `Entra nas contas da casa de ${nomeDoMes(fatura)}` : p.para === cfg.donaId ? null : 'A devolver';
-    const conteudo = [
-      h('span', { class: 'texto' }, h('b', {}, p.nome), detalhe && h('small', {}, detalhe)),
-      h('span', { class: 'quanto' }, formatarBRL(p.valor)),
-    ];
-    return ehCasa
-      ? h('button', { type: 'button', class: 'casa-linha', onclick: () => ctx.navegar(`#/casa?mes=${fatura}`) }, ...conteudo, h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'))
-      : h('div', { class: 'casa-linha estatica' }, ...conteudo);
+    if (p.para === 'casa') {
+      return h('button', { type: 'button', class: 'casa-linha', onclick: () => ctx.navegar(`#/casa?mes=${fatura}`) },
+        h('span', { class: 'texto' }, h('b', {}, p.nome), h('small', {}, `Entra nas contas da casa de ${nomeDoMes(fatura)}`)),
+        h('span', { class: 'quanto' }, formatarBRL(p.valor)),
+        h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
+    }
+    const fracao = p.valor > 0 ? Math.min(1, Math.max(0, p.jaTenho / p.valor)) : 0;
+    return h('div', { class: 'ja-pessoa' },
+      h('div', { class: 'ja-pessoa-cima' }, h('b', {}, p.nome), h('b', {}, formatarBRL(p.valor))),
+      h('div', { class: 'ja-pessoa-barra', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(fracao * 100)}%` })),
+      h('div', { class: 'ja-pessoa-baixo' },
+        h('span', {}, `Já tenho ${formatarBRL(p.jaTenho)}`),
+        h('span', { class: p.falta <= 0 ? 'ja-tudo' : 'ja-falta' }, textoDaFalta(p.falta))));
   };
   const deQuem = f.porPessoa.length > 0 && h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'De quem é'),
     h('div', {}, ...f.porPessoa.map(linhaPessoa)));
 
   // ---------- compras ----------
-  const linhaItem = ({ titulo, detalhe, valor, aoTocar }) => h('button', { type: 'button', class: 'casa-linha', onclick: aoTocar },
-    h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe)),
+  const linhaItem = ({ titulo, detalhe, valor, jaTenho, aoTocar }) => h('button', { type: 'button', class: 'casa-linha', onclick: aoTocar },
+    h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe, jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
     h('span', { class: 'quanto' }, formatarBRL(valor)),
     h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
   const compras = h('section', { class: 'cartao casa-lista' },
@@ -331,13 +388,14 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         titulo: c.nome,
         detalhe: [c.data && dataCurta(c.data), nomeDoPara(casa, c.para), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
         valor: c.valor,
+        jaTenho: c.jaTenho,
         aoTocar: () => abrir(`compra-${c.id}`),
       })))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Todo mês'),
     h('div', {}, ...f.fixas.map((x) => linhaItem({
-      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, aoTocar: () => abrir(`fixa-${x.id}`),
+      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, aoTocar: () => abrir(`fixa-${x.id}`),
     }))));
 
   const conferir = temItens && !f.conferida && h('div', { class: 'cartao-conferir' },
@@ -349,7 +407,33 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     }, { secundario: true })),
     h('p', { class: 'nota' }, 'Use quando a fatura fechar e o total bater com o app do banco.'));
 
-  container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir, outroCartao()].filter(Boolean));
+  // ---------- cofrinho ----------
+  const cofrinho = cofrinhoDoCartao(casa, cfg.id, hoje);
+  const botaoCofrinho = cofrinho && botaoDoCofrinho({
+    cofrinho,
+    aoAbrir: () => { cofrinhoAbertoAqui = true; location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}&tela=cofrinho`; },
+  });
+  const voltarDoCofrinho = () => {
+    if (cofrinhoAbertoAqui) {
+      cofrinhoAbertoAqui = false;
+      history.back();
+    } else {
+      location.replace(`#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}`);
+    }
+  };
+  // A folha da compra abre por cima do Cofrinho, na fatura dela; fechar volta para o Cofrinho já atualizado.
+  const abrirDoCofrinho = (item) => {
+    abertaAqui = true;
+    location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${item.fatura}&tela=cofrinho&folha=${item.tipo === 'fixa' ? 'fixa' : 'compra'}-${item.id}`;
+  };
+
+  if (naTela === 'cofrinho' && cofrinho) {
+    container.replaceChildren(...conteudoDoCofrinho({
+      cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
+    }));
+  } else {
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, outroCartao()].filter(Boolean));
+  }
 
   // ---------- folhas ----------
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // digitado ainda não salvo: a atualização automática espera
@@ -393,17 +477,34 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
 
   function folhaAnotar(folha) {
     const sugestoes = nomesUsados(casaVisivel, cfg.id); // só dos cartões que este perfil vê
-    const nova = { nome: '', valor: null, data: ultimaData ?? hoje, para: null, paraNaMao: false, forma: 'vista', vezes: 2 };
+    const nova = { nome: '', valor: null, data: ultimaData ?? hoje, para: null, paraNaMao: false, forma: 'vista', vezes: 2, jaTenho: false };
+    // "Já tenho" só com uma pessoa que não é a Casa (escolher a Casa desliga); a dica acompanha a forma e a fatura.
+    const caixaJa = h('div', { style: 'display:none' });
+    let interruptorJa = null;
+    const mostrarJa = () => {
+      if (!nova.para || nova.para === 'casa') {
+        nova.jaTenho = false;
+        interruptorJa = null;
+        caixaJa.replaceChildren();
+        caixaJa.style.display = 'none';
+        return;
+      }
+      const dica = dicaDoJaTenho({ forma: nova.forma, nomeDaFatura: nomeDaFatura(faturaDaCompra(nova.data, cfg), hoje) });
+      if (interruptorJa) { interruptorJa.mudarDica(dica); return; }
+      interruptorJa = interruptorJaTenho({ ligado: nova.jaTenho, dica, aoMudar: (v) => { nova.jaTenho = v; } });
+      caixaJa.replaceChildren(interruptorJa);
+      caixaJa.style.display = '';
+    };
     const faturaTexto = h('p', { class: 'suave pequeno cartao-vai' });
-    const mostrarFatura = () => { faturaTexto.textContent = textoDaFatura(faturaDaCompra(nova.data, cfg)); };
+    const mostrarFatura = () => { faturaTexto.textContent = textoDaFatura(faturaDaCompra(nova.data, cfg)); mostrarJa(); };
     mostrarFatura();
 
-    const para = escolhaPara(null, (id) => { nova.para = id; nova.paraNaMao = true; });
+    const para = escolhaPara(null, (id) => { nova.para = id; nova.paraNaMao = true; mostrarJa(); });
     const caixaSugestoes = h('div', { class: 'cartao-sugestoes', role: 'group', 'aria-label': 'Sugestões' });
     const mudarNome = (v) => {
       nova.nome = v.trim();
       const sugerido = paraSugerido(sugestoes, nova.nome);
-      if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
+      if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); mostrarJa(); }
       caixaSugestoes.replaceChildren(...sugestoesDoNome(sugestoes, v).map((nome) => h('button', {
         type: 'button', class: 'chip pequeno',
         // Depois de escolher, o próximo é o valor: o teclado de números já abre.
@@ -442,7 +543,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     mostrarForma();
     const forma = h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Como foi'),
       chips([{ id: 'vista', nome: 'À vista' }, { id: 'parcelado', nome: 'Parcelado' }, { id: 'todoMes', nome: 'Todo mês' }], nova.forma,
-        (id) => { nova.forma = id; mostrarForma(); }, 'Como foi'),
+        (id) => { nova.forma = id; mostrarForma(); mostrarJa(); }, 'Como foi'),
       detalheForma);
 
     const anotarBotao = botao('Anotar compra', async () => {
@@ -454,7 +555,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       await ctx.salvarCasa((c) => anotarCompra(c, {
         cartaoId: cfg.id,
         data: nova.data, nome: nova.nome, valor: nova.valor, para: nova.para,
-        vezes: nova.forma === 'parcelado' ? nova.vezes : 1, todoMes: nova.forma === 'todoMes',
+        vezes: nova.forma === 'parcelado' ? nova.vezes : 1, todoMes: nova.forma === 'todoMes', jaTenho: nova.jaTenho,
       }));
       ultimaData = nova.data;
       ctx.aviso(nova.forma === 'todoMes'
@@ -465,10 +566,24 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
 
     return [
       titulo('Anotar compra'),
-      blocoDoNome, valorCampo, dataCampo, para, forma,
+      blocoDoNome, valorCampo, dataCampo, para, forma, caixaJa,
       h('div', { class: 'botoes' }, anotarBotao, botao('Fechar', fechar, { secundario: true })),
     ];
   }
+
+  // O interruptor das folhas salva só a marca, na hora: a folha continua aberta com o que já foi digitado.
+  const salvarMarca = async (alvo, ligar) => {
+    await ctx.salvarCasa((c) => marcarJaTenho(c, { cartaoId: cfg.id, fatura, ...alvo, jaTenho: ligar }));
+    ctx.aviso(ligar ? 'Marcado: já tenho.' : 'Desmarcado.', 'ok', 2500);
+    if (depoisDeMarcar(location.hash) === 'redesenhar') ctx.rerender();
+  };
+  // Some se a pessoa escolhida na folha passar a ser a Casa (ao salvar, a marca sai).
+  const jaTenhoDaFolha = (item, dica, alvo) => {
+    if (!podeTerJaTenho(item)) return null;
+    const caixa = interruptorJaTenho({ ligado: item.jaTenho, dica: `${dica} Salva na hora.`, aoMudar: (v) => salvarMarca(alvo, v) });
+    caixa.paraEscolhido = (id) => { caixa.style.display = id === 'casa' ? 'none' : ''; };
+    return caixa;
+  };
 
   function folhaCompra(compra, folha) {
     const editado = { nome: compra.nome, valor: compra.valor, para: compra.para ?? 'casa', data: compra.data ?? null, fatura };
@@ -496,6 +611,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       ctx.aviso(seguintes ? `Compra apagada, junto com ${plural(seguintes, 'parcela seguinte', 'parcelas seguintes')}.` : 'Compra apagada.', 'ok', 3500);
       terminar(folha);
     });
+    const jaTenho = jaTenhoDaFolha(compra, dicaDoJaTenho(ehParcela ? { forma: 'parcela', parcela } : { forma: 'vista' }), { compraId: compra.id });
 
     return [
       titulo(compra.nome),
@@ -520,7 +636,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
           faturaNome,
           h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura seguinte', onclick: () => trocarFatura(1) }, '›')),
         h('span', { class: 'campo-dica' }, 'O app calcula pela data. Mude só se o banco colocou a compra em outra fatura.')),
-      escolhaPara(editado.para, (id) => { editado.para = id; }),
+      escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
+      jaTenho,
       h('div', { class: 'botoes' }, salvar, botao('Fechar', fechar, { secundario: true })),
       apagar,
     ];
@@ -542,12 +659,14 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       ctx.aviso(`${fixa.nome} não aparece mais a partir da fatura de ${nomeDaFatura(fatura, hoje)}.`, 'ok', 3500);
       terminar(folha);
     });
+    const jaTenho = jaTenhoDaFolha(fixa, dicaDoJaTenho({ forma: 'fixa', nomeDaFatura: nomeDaFatura(fatura, hoje) }), { fixaId: fixa.id });
     return [
       titulo(fixa.nome),
       h('p', { class: 'suave pequeno' }, `Todo mês desde a fatura de ${nomeDaFatura(fixa.desde, hoje)}.${depois ? ' O que mudar aqui vale desta fatura em diante; as anteriores ficam como estão.' : ''}`),
       campoTexto({ rotulo: 'O que é', valor: fixa.nome, aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
-      escolhaPara(editado.para, (id) => { editado.para = id; }),
+      escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
+      jaTenho,
       h('div', { class: 'botoes' }, salvar, botao('Fechar', fechar, { secundario: true })),
       parar,
     ];

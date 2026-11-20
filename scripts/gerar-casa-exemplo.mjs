@@ -66,8 +66,10 @@ const comprar = (data, nome, valor, para, extra = {}) => { casa = anotarCompra(c
 const aberta = faturaDaCompra(dia(0), acharCartao(casa, 'cartao'));
 const anterior = somarMeses(aberta, -1);
 comprar(dia(0), 'Mercado', 412.35, 'casa');
-comprar(dia(1), 'Farmácia', 86.9, 'mae');
-comprar(dia(1), 'Tênis de corrida', 159.9, 'p2');
+comprar(dia(1), 'Farmácia', 86.9, 'mae', { jaTenho: true }); // "já tenho": a Mãe já pagou
+comprar(dia(2), 'Remédio da Mãe', 42, 'mae');
+comprar(dia(2), 'Celular da Mãe', 38, 'mae', { todoMes: true });
+comprar(dia(1), 'Tênis de corrida', 159.9, 'p2', { jaTenho: true }); // guardado no cofrinho
 comprar(dia(3), 'Geladeira nova', 249.9, 'casa', { vezes: 10 });
 comprar(dia(4), 'Presente', 75, 'p1');
 comprar(dia(30), 'Mercado', 530.1, 'casa', { fatura: anterior });

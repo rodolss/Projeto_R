@@ -184,13 +184,14 @@ export function salvarSalario(casa, { mes, pessoaId, valor }) {
   });
 }
 
-// `extra`: campos do cartão copiados em cada parcela (`data` da compra e `para` quem).
-export function adicionarCompra(casa, { mes, contaId, nome, valor, vezes = 1, novoId = idPadrao, extra = {} }) {
+// `extra`: campos do cartão copiados em cada parcela (`data` da compra e `para` quem). `extraDaPrimeira`: só na
+// primeira parcela (o "já tenho" vale só para a parcela marcada).
+export function adicionarCompra(casa, { mes, contaId, nome, valor, vezes = 1, novoId = idPadrao, extra = {}, extraDaPrimeira = {} }) {
   const parcelas = Math.max(1, Math.floor(vezes));
   const grupo = parcelas > 1 ? novoId() : null;
   let resultado = casa;
   for (let k = 0; k < parcelas; k++) {
-    const compra = { id: novoId(), contaId, nome: nome.trim(), valor: centavos(valor), ...extra };
+    const compra = { id: novoId(), contaId, nome: nome.trim(), valor: centavos(valor), ...extra, ...(k === 0 ? extraDaPrimeira : {}) };
     if (grupo) Object.assign(compra, { grupo, parcela: { n: k + 1, de: parcelas } });
     resultado = comMes(resultado, somarMeses(mes, k), (reg) => {
       reg.compras.push(compra);
