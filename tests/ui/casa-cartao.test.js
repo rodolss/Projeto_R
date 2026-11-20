@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome } from '../../js/ui/casa-cartao.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
   assert.equal(faturaDaTela('#/casa-cartao?fatura=2027-01', '2026-12'), '2027-01');
@@ -43,4 +43,13 @@ test('cartão da tela: o do endereço, senão o último usado no aparelho, senã
   assert.equal(cartaoDaTela('#/casa-cartao', casa, 'sumiu'), 'c1');
   assert.equal(cartaoDaTela('#/casa-cartao', casa, null), 'c1');
   assert.equal(cartaoDaTela('#/casa-cartao', { cartoes: [] }, 'c1'), null);
+});
+
+test('sugestões do nome: começo do nome primeiro, depois no meio; sem acento; sem a que já está escrita; no máximo 4', () => {
+  const nomes = ['Farmácia', 'Mercado', 'Feira', 'Farofa', 'Pão de forma', 'Gasolina', 'Faxina', 'Fast food'].map((nome) => ({ nome, para: 'casa' }));
+  assert.deepEqual(sugestoesDoNome(nomes, 'fa'), ['Farmácia', 'Farofa', 'Faxina', 'Fast food']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'FOR'), ['Pão de forma']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'farmacia'), []);
+  assert.deepEqual(sugestoesDoNome(nomes, ''), []);
+  assert.deepEqual(sugestoesDoNome(nomes, '  '), []);
 });
