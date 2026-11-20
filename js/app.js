@@ -12,7 +12,9 @@ import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
 import { VERSAO } from './versao.js';
-import { impressaoDaChave, perfilVisto, veAposentadoria, vincularAparelho } from './core/perfis.js';
+import {
+  impressaoDaChave, perfilDoMomento as calcularPerfil, vincularAparelho, levarLigacao, desvioDaTela,
+} from './core/perfis.js';
 import { desenharTopo, telaQuemUsa } from './ui/topo.js';
 
 const CHAVE_TOKEN = 'projetoR.token';
@@ -20,6 +22,7 @@ const CHAVE_DONO = 'projetoR.dono';
 const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'casa-cartao' | 'aposentadoria': o app abre no último espaço usado
 const CHAVE_USOU_APOSENTADORIA = 'projetoR.usouAposentadoria';
 const CHAVE_PERFIL_VISTO = 'projetoR.perfilVisto'; // quem administra: o perfil que está vendo neste aparelho
+const CHAVE_PERFIL_PROPRIO = 'projetoR.perfilProprio'; // o perfil deste aparelho, guardado: sem chave, continua nele
 const app = {
   estado: null, armazem: null, conexao: null, sincronizado: false,
   casa: null, armazemCasa: null, casaSincronizada: false, erroCasa: null,
@@ -104,14 +107,23 @@ async function atualizarImpressao() {
   }
 }
 
-// Perfis (desenho 2026-11-20-perfis): só com conexão e uma casa com perfis; sem isso, tudo como antes.
+const lerProprio = () => { try { return JSON.parse(lerLocal(CHAVE_PERFIL_PROPRIO) ?? 'null'); } catch { return null; } };
+
+// Perfis (desenho 2026-11-20-perfis). Pela chave quando dá; sem ela, o perfil que este aparelho já tinha
+// (uma troca de chave que falhou ou a casa carregando nunca mostram tudo). Nunca teve perfil: como antes.
 function perfilDoMomento() {
-  if (!app.conexao || !app.casa?.perfis?.length) return { visto: null, vinculado: null, admin: false, precisaEscolher: false, perfis: [] };
-  const r = perfilVisto({ casa: app.casa, impressao: app.impressao, escolhido: lerLocal(CHAVE_PERFIL_VISTO) });
-  return { ...r, precisaEscolher: !r.vinculado, perfis: app.casa.perfis };
+  const r = calcularPerfil({
+    casa: app.casa, conectado: Boolean(app.conexao), impressao: app.impressao, salvo: lerProprio(), escolhido: lerLocal(CHAVE_PERFIL_VISTO),
+  });
+  if (app.conexao && app.impressao && r.vinculado && !r.precisaEscolher) {
+    const { id, nome, admin } = r.vinculado;
+    gravarLocal(CHAVE_PERFIL_PROPRIO, JSON.stringify({ id, nome, admin: Boolean(admin) }));
+  }
+  return r;
 }
 
 async function conectar({ token, dono }) {
+  const impressaoAntiga = app.impressao;
   localStorage.setItem(CHAVE_TOKEN, token);
   localStorage.setItem(CHAVE_DONO, dono);
   montarArmazem();
@@ -123,14 +135,25 @@ async function conectar({ token, dono }) {
   app.erroCasa = leituraOk(rCasa.aviso) ? null : rCasa.aviso;
   app.casaSincronizada = !app.erroCasa;
   for (const fn of esperandoSincronizar.splice(0)) fn(app.estado);
+  // Chave trocada (renovada): a nova herda o perfil deste aparelho, sem perguntar de novo.
+  if (!app.erroCasa && app.casa?.perfis?.length) {
+    const levada = levarLigacao(app.casa, { antiga: impressaoAntiga, nova: app.impressao, salvoId: lerProprio()?.id, hoje: dataISO(new Date()) });
+    if (levada !== app.casa) await salvarCasa(() => levada);
+  }
   return { ...r, casa: rCasa };
 }
 
-function desconectar() {
-  localStorage.removeItem(CHAVE_TOKEN);
-  localStorage.removeItem(CHAVE_DONO);
+// `voltarPara`: a conexão de antes (troca de chave que falhou): volta a ela em vez de ficar sem chave.
+async function desconectar(voltarPara = null) {
+  if (voltarPara?.token && voltarPara.dono) {
+    localStorage.setItem(CHAVE_TOKEN, voltarPara.token);
+    localStorage.setItem(CHAVE_DONO, voltarPara.dono);
+  } else {
+    localStorage.removeItem(CHAVE_TOKEN);
+    localStorage.removeItem(CHAVE_DONO);
+  }
   montarArmazem();
-  app.impressao = null;
+  await atualizarImpressao();
 }
 
 const navegar = (hash) => { location.hash = hash; };
@@ -163,6 +186,7 @@ function contexto() {
       trocar: (id) => { gravarLocal(CHAVE_PERFIL_VISTO, id); renderizar(); },
       // Uma vez por chave: liga este aparelho a um perfil.
       vincular: async (perfilId) => {
+        if (!app.impressao) { mostrarAviso('Este aparelho não consegue ler a chave. Abra pelo app ou pelo site com https.', 'atencao'); return; }
         await salvarCasa((c) => vincularAparelho(c, { impressao: app.impressao, perfilId, hoje: dataISO(new Date()) }));
         gravarLocal(CHAVE_PERFIL_VISTO, perfilId);
         renderizar();
@@ -176,12 +200,15 @@ async function renderizar() {
   if (location.hash.replace(/^#\/?/, '').split('?')[0] !== nome) { navegar(`#/${nome}`); return; }
   const daCasa = ehDaCasa(nome);
   const perfil = perfilDoMomento();
+  const desvio = desvioDaTela({ daCasa, perfil });
   // Planejador de aposentadoria (e o assistente dele): só para quem administra, vendo o próprio perfil.
-  if (!daCasa && perfil.visto && !veAposentadoria(perfil.visto)) { navegar('#/casa'); return; }
-  if (nome !== 'boas-vindas') gravarLocal(CHAVE_ESPACO, espacoParaLembrar(nome, lerEspaco()));
-  if (nome !== 'boas-vindas' && !daCasa && !lerLocal(CHAVE_USOU_APOSENTADORIA)) {
-    gravarLocal(CHAVE_USOU_APOSENTADORIA, '1');
-    reagendarLembretes();
+  if (desvio === 'casa') { navegar('#/casa'); return; }
+  if (!desvio) {
+    if (nome !== 'boas-vindas') gravarLocal(CHAVE_ESPACO, espacoParaLembrar(nome, lerEspaco()));
+    if (nome !== 'boas-vindas' && !daCasa && !lerLocal(CHAVE_USOU_APOSENTADORIA)) {
+      gravarLocal(CHAVE_USOU_APOSENTADORIA, '1');
+      reagendarLembretes();
+    }
   }
   document.body.classList.toggle('espaco-casa', daCasa);
   document.body.classList.toggle('sem-abas', nome === 'boas-vindas' || (daCasa && !app.casa));
@@ -193,7 +220,7 @@ async function renderizar() {
 
   const tela = document.getElementById('tela');
   const topo = document.getElementById('topo');
-  if (perfil.precisaEscolher) {
+  if (desvio === 'escolher') {
     // Chave nova neste aparelho: pergunta uma vez quem usa, antes de qualquer tela.
     document.body.classList.add('sem-abas');
     topo.hidden = true;

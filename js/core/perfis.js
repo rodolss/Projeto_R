@@ -71,3 +71,60 @@ export function parteDaCasaNoCartao(casa, cartaoId, fatura) {
   const total = Math.round([...compras, ...fixas].reduce((s, x) => s + x.valor, 0) * 100) / 100;
   return { compras, fixas, total, conferida: f.conferida };
 }
+
+// ---------- decisões das telas (revisão: tudo aqui, testável) ----------
+
+// O perfil do momento. Com chave e casa com perfis: pela impressão da chave. Sem isso, se o aparelho já teve
+// perfil (`salvo`, guardado no aparelho), continua nele: uma troca de chave que falhou ou a casa ainda
+// carregando nunca abrem tudo (fecha, não abre). Aparelho que nunca teve perfil: como antes, sem perfis.
+export function perfilDoMomento({ casa, conectado, impressao, salvo, escolhido }) {
+  const perfis = casa?.perfis ?? [];
+  if (conectado && impressao && perfis.length) {
+    return { ...perfilVisto({ casa, impressao, escolhido }), perfis, precisaEscolher: !perfilDoAparelho(casa, impressao) };
+  }
+  if (salvo?.id) {
+    const vinculado = acharPerfil(casa, salvo.id) ?? { id: salvo.id, nome: salvo.nome ?? '', ...(salvo.admin ? { admin: true } : {}) };
+    const admin = Boolean(vinculado.admin);
+    const visto = admin && acharPerfil(casa, escolhido) ? acharPerfil(casa, escolhido) : vinculado;
+    return { vinculado, visto, admin, perfis, precisaEscolher: false };
+  }
+  return { vinculado: null, visto: null, admin: false, perfis: [], precisaEscolher: false };
+}
+
+// Em "Quem usa este celular?": quem administra só aparece enquanto não tiver aparelho (uma chave nova não vira
+// administradora; um aparelho dela muda pelos Ajustes de outro aparelho dela).
+export function perfisParaEscolher(casa) {
+  const comAparelho = new Set((casa.aparelhos ?? []).map((a) => a.perfilId));
+  return (casa.perfis ?? []).filter((p) => !(p.admin && comAparelho.has(p.id)));
+}
+
+// Chave trocada (renovada, ou depois de tirada): a nova herda o perfil da antiga (ou o guardado no aparelho).
+export function levarLigacao(casa, { antiga, nova, salvoId, hoje }) {
+  if (!nova || perfilDoAparelho(casa, nova)) return casa;
+  const perfilId = perfilDoAparelho(casa, antiga)?.id ?? (acharPerfil(casa, salvoId) ? salvoId : null);
+  if (!perfilId) return casa;
+  const ligada = vincularAparelho(casa, { impressao: nova, perfilId, hoje });
+  return antiga && antiga !== nova ? desvincularAparelho(ligada, antiga) : ligada;
+}
+
+export const cartoesVisiveis = (casa, visto) => (visto ? cartoesDoPerfil(casa, visto.id) : (casa.cartoes ?? []));
+
+// Conta ligada ao cartão de outro perfil: quem é o dono (para travar a conta e mostrar só a parte da casa).
+export function donoDeOutroCartao(casa, contaId, visto) {
+  const cartao = visto && (casa.cartoes ?? []).find((c) => c.contaId === contaId && c.donaId !== visto.id);
+  if (!cartao) return null;
+  return [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === cartao.donaId) ?? { id: cartao.donaId, nome: 'outra pessoa' };
+}
+
+// Tocar numa conta no Mês: abre o cartão (dono, ou sem perfis), só a parte da casa (cartão de outro) ou a folha.
+export function aoTocarConta(casa, contaId, visto) {
+  if (!(casa.cartoes ?? []).some((c) => c.contaId === contaId)) return 'folha';
+  return donoDeOutroCartao(casa, contaId, visto) ? 'parte' : 'cartao';
+}
+
+// Antes de desenhar: primeiro "Quem usa este celular?"; depois, fora da casa, só quem administra.
+export function desvioDaTela({ daCasa, perfil }) {
+  if (perfil.precisaEscolher) return 'escolher';
+  if (!daCasa && perfil.visto && !veAposentadoria(perfil.visto)) return 'casa';
+  return null;
+}

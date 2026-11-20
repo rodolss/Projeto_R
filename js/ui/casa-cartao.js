@@ -15,7 +15,7 @@ import {
 } from '../core/cartao.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes } from './casa.js';
-import { cartoesDoPerfil } from '../core/perfis.js';
+import { cartoesVisiveis } from '../core/perfis.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -204,7 +204,7 @@ function desenhar(container, ctx) {
   }
   const visto = ctx.perfil?.visto ?? null;
   // Com perfis, cada um vê só os próprios cartões e cria cartão para si.
-  const cartoes = visto ? cartoesDoPerfil(casa, visto.id) : (casa.cartoes ?? []);
+  const cartoes = cartoesVisiveis(casa, visto);
   const casaVisivel = { ...casa, cartoes };
   if (!cartoes.length || parametroDoHash(location.hash, 'novo')) {
     esconderFolha();

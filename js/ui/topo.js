@@ -3,7 +3,7 @@
 // aparelho); todos trocam a foto do perfil que estão vendo; quem administra, no próprio perfil, vai para
 // "Perfis e aparelhos".
 import { h, cartao } from './dom.js';
-import { trocarFoto } from '../core/perfis.js';
+import { trocarFoto, perfisParaEscolher } from '../core/perfis.js';
 
 const CORES = ['#1d4ed8', '#047857', '#b45309', '#7c3aed', '#be123c', '#0e7490'];
 const corDo = (texto) => CORES[[...String(texto)].reduce((s, c) => s + c.codePointAt(0), 0) % CORES.length];
@@ -96,7 +96,7 @@ export function desenharTopo(el, ctx) {
 
 // Uma vez por chave: quem usa este aparelho. Só quem administra muda depois (Ajustes da casa › Perfis e aparelhos).
 export function telaQuemUsa(container, ctx) {
-  const botoes = ctx.perfil.perfis.map((p) => h('button', {
+  const botoes = perfisParaEscolher(ctx.casa).map((p) => h('button', {
     type: 'button', class: 'quem-usa-perfil',
     onclick: async (e) => {
       for (const b of container.querySelectorAll('.quem-usa-perfil')) b.disabled = true;

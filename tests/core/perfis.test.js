@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   impressaoDaChave, acharPerfil, perfilDoAparelho, vincularAparelho, desvincularAparelho, adicionarPerfil,
   renomearPerfil, trocarFoto, perfilVisto, cartoesDoPerfil, veAposentadoria, parteDaCasaNoCartao,
+  perfilDoMomento, perfisParaEscolher, levarLigacao, cartoesVisiveis, donoDeOutroCartao, aoTocarConta, desvioDaTela,
 } from '../../js/core/perfis.js';
 import { migrarCasa, renomearPessoa } from '../../js/core/casa.js';
 import { adicionarCartao, anotarCompra, opcoesPara, nomeDoPara, rotuloDoCartao } from '../../js/core/cartao.js';
@@ -101,4 +102,68 @@ test('parte da casa no cartão de outra pessoa: só as compras da casa e as de t
   assert.deepEqual(r.compras.map((c) => c.nome), ['Mercado']);
   assert.deepEqual(r.fixas.map((c) => c.nome), ['Streaming']);
   assert.equal(r.total, 20);
+});
+
+const ligada = () => vincularAparelho(vincularAparelho(casaBase(), { impressao: 'ana', perfilId: 'p1', hoje: '2026-11-20' }),
+  { impressao: 'leo', perfilId: 'p2', hoje: '2026-11-20' });
+
+test('revisão: perfil do momento — com chave, pela impressão; sem chave, fica no perfil que o aparelho já tinha (fecha, não abre)', () => {
+  const casa = ligada();
+  const leo = perfilDoMomento({ casa, conectado: true, impressao: 'leo', salvo: null, escolhido: null });
+  assert.deepEqual([leo.visto.id, leo.admin, leo.precisaEscolher], ['p2', false, false]);
+  // A chave foi tirada (troca que falhou): continua no Leo, sem ver nada da Ana.
+  const semChave = perfilDoMomento({ casa, conectado: false, impressao: null, salvo: { id: 'p2', nome: 'Leo' }, escolhido: 'p1' });
+  assert.deepEqual([semChave.visto.id, semChave.admin, semChave.precisaEscolher], ['p2', false, false]);
+  // Casa ainda carregando: também fica fechado.
+  const carregando = perfilDoMomento({ casa: null, conectado: true, impressao: 'leo', salvo: { id: 'p2', nome: 'Leo' }, escolhido: null });
+  assert.equal(carregando.visto.id, 'p2');
+  assert.equal(veAposentadoria(carregando.visto), false);
+  // Quem administra, sem chave, continua podendo trocar.
+  assert.equal(perfilDoMomento({ casa, conectado: false, impressao: null, salvo: { id: 'p1', nome: 'Ana', admin: true }, escolhido: 'p2' }).visto.id, 'p2');
+  // Aparelho que nunca teve perfil e sem conexão: como antes (sem perfis).
+  assert.equal(perfilDoMomento({ casa, conectado: false, impressao: null, salvo: null, escolhido: null }).visto, null);
+  // Chave nova: pergunta.
+  assert.equal(perfilDoMomento({ casa, conectado: true, impressao: 'nova', salvo: null, escolhido: null }).precisaEscolher, true);
+  // Sem impressão (navegador sem criptografia): não pergunta (não daria para ligar).
+  assert.equal(perfilDoMomento({ casa, conectado: true, impressao: null, salvo: null, escolhido: null }).precisaEscolher, false);
+});
+
+test('revisão: "Quem usa este celular?" não oferece quem administra se ela já tem aparelho', () => {
+  assert.deepEqual(perfisParaEscolher(casaBase()).map((p) => p.id), ['p1', 'p2']);
+  assert.deepEqual(perfisParaEscolher(ligada()).map((p) => p.id), ['p2']);
+});
+
+test('revisão: chave trocada leva a ligação da antiga (ou do perfil guardado) para a nova', () => {
+  const casa = levarLigacao(ligada(), { antiga: 'leo', nova: 'leo2', salvoId: null, hoje: '2026-11-21' });
+  assert.deepEqual(casa.aparelhos.map((a) => [a.id, a.perfilId]), [['ana', 'p1'], ['leo2', 'p2']]);
+  const doGuardado = levarLigacao(ligada(), { antiga: null, nova: 'leo3', salvoId: 'p2', hoje: '2026-11-21' });
+  assert.deepEqual(doGuardado.aparelhos.map((a) => [a.id, a.perfilId]), [['ana', 'p1'], ['leo', 'p2'], ['leo3', 'p2']]);
+  const jaLigada = ligada();
+  assert.equal(levarLigacao(jaLigada, { antiga: 'leo', nova: 'ana', salvoId: null, hoje: 'x' }), jaLigada);
+  assert.equal(levarLigacao(jaLigada, { antiga: null, nova: 'nova', salvoId: null, hoje: 'x' }), jaLigada);
+});
+
+test('revisão: o que cada perfil vê dos cartões e das contas ligadas a eles', () => {
+  const casa = casaBase();
+  const [ana, leo] = casa.perfis;
+  assert.deepEqual(cartoesVisiveis(casa, leo).map((c) => c.id), ['c2']);
+  assert.deepEqual(cartoesVisiveis(casa, null).map((c) => c.id), ['c2', 'c9']);
+  assert.equal(donoDeOutroCartao(casa, 'c9', leo).nome, 'Ana');
+  assert.equal(donoDeOutroCartao(casa, 'c2', leo), null);
+  assert.equal(donoDeOutroCartao(casa, 'c9', null), null);
+  assert.equal(aoTocarConta(casa, 'c9', leo), 'parte');
+  assert.equal(aoTocarConta(casa, 'c2', leo), 'cartao');
+  assert.equal(aoTocarConta(casa, 'c9', null), 'cartao');
+  assert.equal(aoTocarConta(casa, 'c9', ana), 'cartao');
+  assert.equal(aoTocarConta(casa, 'outra', leo), 'folha');
+});
+
+test('revisão: antes de desenhar uma tela — primeiro quem usa, depois o planejador só para quem administra', () => {
+  const [ana, leo] = casaBase().perfis;
+  assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: null, precisaEscolher: true } }), 'escolher');
+  assert.equal(desvioDaTela({ daCasa: true, perfil: { visto: null, precisaEscolher: true } }), 'escolher');
+  assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: leo, precisaEscolher: false } }), 'casa');
+  assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: ana, precisaEscolher: false } }), null);
+  assert.equal(desvioDaTela({ daCasa: true, perfil: { visto: leo, precisaEscolher: false } }), null);
+  assert.equal(desvioDaTela({ daCasa: false, perfil: { visto: null, precisaEscolher: false } }), null);
 });
