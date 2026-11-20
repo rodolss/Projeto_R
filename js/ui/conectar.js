@@ -9,10 +9,11 @@ export function cartaoConectar(ctx, { titulo, texto }) {
     if (!dados.token || !dados.dono) { msg.replaceChildren(aviso('atencao', 'Preencha a chave e o usuário.')); return; }
     conectar.disabled = true;
     msg.replaceChildren(aviso('info', 'Conectando...'));
+    const anterior = ctx.conexao; // troca de chave: se a nova falhar, volta a esta (nunca fica sem chave)
     const r = await ctx.conectar({ token: dados.token, dono: dados.dono });
     conectar.disabled = false;
     if (r.aviso) {
-      ctx.desconectar();
+      await ctx.desconectar(anterior);
       msg.replaceChildren(aviso('alerta', textoConexao(r.aviso)));
       return;
     }

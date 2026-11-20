@@ -3,6 +3,7 @@ package io.github.rodolss.projetor
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -11,6 +12,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -39,6 +42,7 @@ class MainActivity : Activity() {
         const val EXTRA_ROTA = "rota"
         private const val TAG = "ProjetoR"
         private const val PEDIDO_NOTIFICACAO = 1
+        private const val PEDIDO_ARQUIVO = 2
         private const val ID_TESTE = 999
         private const val ESTADO_URL = "url"
         private val ROTA_VALIDA = Regex("^#/[a-z-]+$")
@@ -50,6 +54,9 @@ class MainActivity : Activity() {
 
     private lateinit var web: WebView
     private lateinit var semInternet: View
+
+    /** Quem espera o arquivo escolhido (a foto do perfil, no <input type="file"> do site). */
+    private var esperandoArquivo: ValueCallback<Array<Uri>>? = null
     private var ultimaResposta: JavaScriptReplyProxy? = null
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -68,6 +75,7 @@ class MainActivity : Activity() {
         web.settings.domStorageEnabled = true
         web.settings.cacheMode = WebSettings.LOAD_DEFAULT
         web.webViewClient = Cliente()
+        web.webChromeClient = Escolha()
         registrarPonte() // antes do primeiro loadUrl, para valer já na primeira página
 
         Lembretes.criarCanal(this)
@@ -161,6 +169,35 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PEDIDO_NOTIFICACAO) ultimaResposta?.let { responderPermissao(it) }
+    }
+
+    /** Abre o seletor do Android para o <input type="file"> do site (perfis: a foto no canto). */
+    private inner class Escolha : WebChromeClient() {
+        override fun onShowFileChooser(
+            view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams,
+        ): Boolean {
+            esperandoArquivo?.onReceiveValue(null)
+            esperandoArquivo = callback
+            return try {
+                startActivityForResult(params.createIntent(), PEDIDO_ARQUIVO)
+                true
+            } catch (e: ActivityNotFoundException) {
+                Log.w(TAG, "Sem app para escolher arquivo", e)
+                esperandoArquivo = null
+                false
+            }
+        }
+    }
+
+    @Deprecated("Activity simples, sem ActivityResult API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == PEDIDO_ARQUIVO) {
+            esperandoArquivo?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
+            esperandoArquivo = null
+            return
+        }
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private inner class Cliente : WebViewClient() {

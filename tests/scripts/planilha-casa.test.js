@@ -112,7 +112,8 @@ const resumo = (casa, m) => (mes(casa, m)?.compras ?? []).map((c) => [c.nome, c.
 
 test('cartão: o cartão é de quem tem a aba pessoal, ligado à conta do cartão, com as outras pessoas dos grupos', () => {
   const { casa, avisos } = importar();
-  assert.equal(casa.schemaVersion, 3);
+  assert.equal(casa.schemaVersion, 4);
+  assert.deepEqual(casa.perfis, [{ id: 'p1', nome: 'Ana', admin: true }, { id: 'p2', nome: 'Bia' }]);
   assert.equal(casa.cartoes.length, 1);
   assert.equal(casa.cartoes[0].donaId, 'p2');
   assert.equal(casa.cartoes[0].contaId, idDe(casa, 'Cartão Casa'));
@@ -173,7 +174,7 @@ test('meses em ordem e dentro do formato da casa', () => {
   const meses = casa.meses.map((m) => m.mes);
   assert.deepEqual(meses, [...meses].sort());
   assert.equal(meses[0], '2025-01');
-  assert.equal(casa.schemaVersion, 3);
+  assert.equal(casa.schemaVersion, 4);
   assert.ok(casa.meses.every((m) => m.salarios && m.valores && Array.isArray(m.compras)));
 });
 
@@ -190,7 +191,7 @@ test('revisão: aba pessoal de janeiro a dezembro lida em novembro fica no ano a
   meses.forEach((m, k) => { celulas[`${'CDEFGHIJKLMN'[k]}1`] = m; });
   const casa = {
     schemaVersion: 2, pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }],
-    contas: [{ id: 'c1', nome: 'Cartão', compraPorCompra: true, arquivada: false }], meses: [], cartoes: [], outrasPessoas: [],
+    contas: [{ id: 'c1', nome: 'Cartão', compraPorCompra: true, arquivada: false }], meses: [], cartoes: [], outrasPessoas: [], perfis: [], aparelhos: [],
   };
   const r = importarCartao(lerXlsx(criarXlsx([{ nome: 'BIA', celulas }])), { hoje: '2026-11-19', casa, novoId });
   assert.deepEqual(r.casa.meses.map((m) => [m.mes, m.compras.map((c) => c.nome)]), [['2026-01', ['Livro']], ['2026-12', ['Curso']]]);

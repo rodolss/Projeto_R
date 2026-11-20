@@ -2,7 +2,7 @@
 // Lê o .xlsx sem bibliotecas: zip (zlib) + XML por expressões regulares. Nenhum dado da planilha fica no repositório.
 import { inflateRawSync } from 'node:zlib';
 import { somarMeses, diffMeses } from '../js/core/meses.js';
-import { centavos, comMes, compraDaCasa, fixasNoMes, SCHEMA_CASA } from '../js/core/casa.js';
+import { centavos, comMes, compraDaCasa, fixasNoMes, SCHEMA_CASA, migrarCasa } from '../js/core/casa.js';
 import { adicionarPessoaDoCartao, acharCartao } from '../js/core/cartao.js';
 
 // ---------- zip + XML ----------
@@ -314,6 +314,6 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
     .filter((m) => Object.keys(m.salarios).length || Object.keys(m.valores).length || m.compras.length)
     .sort((x, y) => (x.mes < y.mes ? -1 : 1));
   // O cartão (compras da casa e a aba pessoal) entra por cima, conferindo com o valor do mês.
-  const cartao = importarCartao(abas, { hoje, casa: { schemaVersion: SCHEMA_CASA, pessoas, contas, meses: lista, cartoes: [], outrasPessoas: [] }, novoId });
+  const cartao = importarCartao(abas, { hoje, casa: migrarCasa({ schemaVersion: 3, pessoas, contas, meses: lista, cartoes: [], outrasPessoas: [] }), novoId });
   return { casa: cartao.casa, avisos: [...avisos, ...cartao.avisos] };
 }

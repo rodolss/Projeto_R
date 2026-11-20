@@ -111,7 +111,7 @@ test('revisão: base da versão 1 (antes do cartão) e cartão chegando do outro
   const local = salvarValor(migrarCasa(b), { mes: '2026-11', contaId: 'c2', valor: 210 }); // migrado aqui: sem cartões
   const remoto = anotarCompra(baseV3(), { cartaoId: K, data: '2026-11-19', nome: 'Mercado', valor: 50, para: 'casa', novoId: () => 'k1' });
   const r = mesclarCasa({ base: b, local, remoto });
-  assert.equal(r.schemaVersion, 3);
+  assert.equal(r.schemaVersion, 4);
   assert.deepEqual(r.cartoes.map((c) => c.contaId), ['c4']);
   assert.equal(mes(r, '2026-11').valores.c2, 210);
   assert.deepEqual(mes(r, '2026-12').compras.map((c) => c.id), ['k1']);
@@ -125,4 +125,13 @@ test('revisão: celular ainda na versão 2 e o outro já na 3 com um cartão nov
   remoto = adicionarCartao(remoto, { donaId: 'p1', viraNoDia: 24, venceNoDia: 1, novoId: () => 'c9' }).casa;
   const r = mesclarCasa({ base: v2, local, remoto });
   assert.deepEqual(r.cartoes.map((c) => [c.id, c.donaId, c.viraNoDia]), [['c4', 'p2', null], ['c9', 'p1', 24]]);
+});
+
+test('perfis: dois aparelhos ligando chaves ao mesmo tempo: as duas ligações ficam', async () => {
+  const { vincularAparelho } = await import('../../js/core/perfis.js');
+  const b = baseV3();
+  const local = vincularAparelho(b, { impressao: 'aaaa', perfilId: 'p1', hoje: '2026-11-20' });
+  const remoto = vincularAparelho(b, { impressao: 'bbbb', perfilId: 'p2', hoje: '2026-11-20' });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.aparelhos.map((a) => [a.id, a.perfilId]), [['aaaa', 'p1'], ['bbbb', 'p2']]);
 });

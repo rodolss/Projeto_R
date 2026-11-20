@@ -35,6 +35,9 @@ export function periodoDaFatura(fatura, { viraNoDia, venceNoDia }) {
   };
 }
 
+// A dona de um cartão é uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
+const quemE = (casa, id) => casa.pessoas.find((p) => p.id === id) ?? (casa.perfis ?? []).find((p) => p.id === id) ?? null;
+
 // ---------- os cartões ----------
 export const cartaoPronto = (cartao) => Boolean(cartao?.donaId && cartao.viraNoDia && cartao.venceNoDia);
 export const acharCartao = (casa, cartaoId) => (casa.cartoes ?? []).find((c) => c.id === cartaoId) ?? null;
@@ -54,7 +57,7 @@ export function adicionarCartao(casa, { donaId, viraNoDia, venceNoDia, nome, con
     contas = contas.map((c) => (c.id === conta && !c.compraPorCompra ? { ...c, compraPorCompra: true } : c));
   } else {
     conta = novoId();
-    const dona = casa.pessoas.find((p) => p.id === donaId);
+    const dona = quemE(casa, donaId);
     contas = [...contas, { id: conta, nome: nome?.trim() || `Cartão ${dona?.nome ?? ''}`.trim(), compraPorCompra: true, arquivada: false }];
   }
   const cartao = { id: conta, contaId: conta, donaId: donaId ?? null, viraNoDia: viraNoDia ?? null, venceNoDia: venceNoDia ?? null, fixas: [] };
@@ -81,7 +84,7 @@ export function tirarCartao(casa, cartaoId) {
 
 // Nos botões de troca: o nome de quem é; o nome da conta se a pessoa tiver mais de um cartão.
 export function rotuloDoCartao(casa, cartao) {
-  const dona = casa.pessoas.find((p) => p.id === cartao.donaId);
+  const dona = quemE(casa, cartao.donaId);
   const conta = casa.contas.find((c) => c.id === cartao.contaId);
   const daMesma = (casa.cartoes ?? []).filter((c) => c.donaId && c.donaId === cartao.donaId).length;
   return dona && daMesma === 1 ? dona.nome : conta?.nome ?? 'Cartão';
@@ -104,13 +107,16 @@ export function editarPessoaDoCartao(casa, id, { nome, arquivada }) {
   return comPessoas(casa, (lista) => lista.map((p) => (p.id === id ? { ...p, ...mudanca } : p)));
 }
 
-// Ordem das escolhas e das somas: Casa, a dona do cartão, a outra pessoa da casa, as outras pessoas.
+// Ordem das escolhas e das somas: Casa, a dona do cartão, as pessoas da casa, os outros perfis, as outras pessoas.
 function todasAsOpcoes(casa, cartaoId) {
-  const dona = casa.pessoas.find((p) => p.id === acharCartao(casa, cartaoId)?.donaId);
+  const dona = quemE(casa, acharCartao(casa, cartaoId)?.donaId);
+  const daCasa = casa.pessoas.filter((p) => p.id !== dona?.id);
+  const perfis = (casa.perfis ?? []).filter((p) => p.id !== dona?.id && !casa.pessoas.some((x) => x.id === p.id));
   return [
     { id: 'casa', nome: 'Casa' },
     ...(dona ? [dona] : []),
-    ...casa.pessoas.filter((p) => p !== dona),
+    ...daCasa,
+    ...perfis,
     ...(casa.outrasPessoas ?? []),
   ];
 }

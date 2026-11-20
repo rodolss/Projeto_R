@@ -15,9 +15,12 @@ import {
 } from '../core/cartao.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes } from './casa.js';
+import { cartoesVisiveis } from '../core/perfis.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+// A dona de um cartão: uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
+const quemE = (casa, id) => casa.pessoas.find((p) => p.id === id) ?? (casa.perfis ?? []).find((p) => p.id === id) ?? null;
 
 export function faturaDaTela(hash, padrao) {
   const fatura = parametroDoHash(hash, 'fatura');
@@ -114,10 +117,10 @@ function campoDia({ rotulo, dica, valor, aoMudar }) {
 
 // Configuração de um cartão (também usada nos Ajustes da casa). Sem `cartaoId`, cria um cartão novo; `aoSalvar(id)`.
 // `donaFixa`: o cartão já tem dona e aqui só faltam os dias (quem não é a dona cria o próprio, não troca a dela).
-export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar = null, textoDoBotao = 'Salvar', donaFixa = false }) {
+export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar = null, textoDoBotao = 'Salvar', donaFixa = false, donaPadrao = null }) {
   const { casa } = ctx;
   const atual = cartaoId ? acharCartao(casa, cartaoId) : null;
-  const escolha = { donaId: atual?.donaId ?? null, viraNoDia: atual?.viraNoDia ?? null, venceNoDia: atual?.venceNoDia ?? null, nome: '' };
+  const escolha = { donaId: atual?.donaId ?? donaPadrao, viraNoDia: atual?.viraNoDia ?? null, venceNoDia: atual?.venceNoDia ?? null, nome: '' };
   const cartoes = casa.cartoes ?? [];
   const ligadas = new Set(cartoes.map((c) => c.contaId));
   const livres = casa.contas.filter((c) => c.compraPorCompra && !c.arquivada && !ligadas.has(c.id));
@@ -127,7 +130,7 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
     rotulo: 'Nome do cartão', placeholder: 'Ex.: Cartão Leo', aoMudar: (v) => { escolha.nome = v.trim(); },
   });
   const sugerirNome = () => {
-    const dona = casa.pessoas.find((p) => p.id === escolha.donaId);
+    const dona = quemE(casa, escolha.donaId);
     if (nomeCampo && dona) nomeCampo.input.placeholder = `Cartão ${dona.nome}`;
   };
   sugerirNome();
@@ -199,7 +202,10 @@ function desenhar(container, ctx) {
     location.replace('#/casa');
     return;
   }
-  const cartoes = casa.cartoes ?? [];
+  const visto = ctx.perfil?.visto ?? null;
+  // Com perfis, cada um vê só os próprios cartões e cria cartão para si.
+  const cartoes = cartoesVisiveis(casa, visto);
+  const casaVisivel = { ...casa, cartoes };
   if (!cartoes.length || parametroDoHash(location.hash, 'novo')) {
     esconderFolha();
     const primeiro = !cartoes.length;
@@ -209,6 +215,7 @@ function desenhar(container, ctx) {
         primeiro && h('p', {}, 'Anote cada compra do cartão com a data e para quem é. O app descobre em qual fatura ela cai, mostra quanto é de cada pessoa e leva a parte da casa para as contas da casa.'),
         h('p', { class: 'suave' }, primeiro ? 'Antes, conte algumas coisas sobre o cartão:' : 'Cada um anota as compras no seu cartão. Conte sobre este:'),
         formularioDoCartao(ctx, {
+          donaPadrao: visto?.id ?? null, donaFixa: Boolean(visto),
           textoDoBotao: primeiro ? 'Começar a usar' : 'Criar cartão',
           aoSalvar: (id) => location.replace(`#/casa-cartao?cartao=${id}`),
           aoCancelar: primeiro ? null : () => location.replace('#/casa-cartao'),
@@ -216,17 +223,17 @@ function desenhar(container, ctx) {
     ].filter(Boolean));
     return;
   }
-  const atual = acharCartao(casa, cartaoDaTela(location.hash, casa, lerLembrado()));
+  const atual = acharCartao(casa, cartaoDaTela(location.hash, casaVisivel, lerLembrado()));
   lembrar(atual.id);
   if (!cartaoPronto(atual)) {
     // Cartão que veio da planilha (ou criado no outro celular) sem os dias: completa aqui.
     esconderFolha();
     // Com dona: só os dias; quem não é a dona cria o próprio cartão (o botão vem antes do formulário).
-    const dona = casa.pessoas.find((p) => p.id === atual.donaId);
+    const dona = quemE(casa, atual.donaId);
     container.replaceChildren(...[
-      trocaDeCartao(casa, atual.id),
+      trocaDeCartao(casaVisivel, atual.id),
       h('h1', {}, dona ? `Cartão de ${dona.nome}` : 'Cartão'),
-      dona && h('div', { class: 'botoes' }, botao(`Não sou ${dona.nome}: criar o meu cartão`, () => { location.hash = '#/casa-cartao?novo=1'; }, { secundario: true })),
+      dona && !visto && h('div', { class: 'botoes' }, botao(`Não sou ${dona.nome}: criar o meu cartão`, () => { location.hash = '#/casa-cartao?novo=1'; }, { secundario: true })),
       cartao(
         h('p', {}, dona
           ? `Falta pouco, ${dona.nome}: escolha os dois dias do seu cartão. Estão no app do banco.`
@@ -236,16 +243,16 @@ function desenhar(container, ctx) {
     ].filter(Boolean));
     return;
   }
-  desenharFatura(container, ctx, atual);
+  desenharFatura(container, ctx, atual, casaVisivel);
 }
 
-function desenharFatura(container, ctx, cfg) {
+function desenharFatura(container, ctx, cfg, casaVisivel) {
   const { casa, hoje } = ctx;
   const aberta = faturaDaCompra(hoje, cfg);
   const fatura = faturaDaTela(location.hash, aberta);
   const f = faturaDoCartao(casa, cfg.id, fatura);
   const periodo = periodoDaFatura(fatura, cfg);
-  const dona = casa.pessoas.find((p) => p.id === cfg.donaId);
+  const dona = quemE(casa, cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
 
   const endereco = (extra = '') => `#/casa-cartao?cartao=${cfg.id}&fatura=${fatura}${extra}`;
@@ -342,7 +349,7 @@ function desenharFatura(container, ctx, cfg) {
     }, { secundario: true })),
     h('p', { class: 'nota' }, 'Use quando a fatura fechar e o total bater com o app do banco.'));
 
-  container.replaceChildren(...[trocaDeCartao(casa, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir, outroCartao()].filter(Boolean));
+  container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, conferir, outroCartao()].filter(Boolean));
 
   // ---------- folhas ----------
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // digitado ainda não salvo: a atualização automática espera
@@ -385,7 +392,7 @@ function desenharFatura(container, ctx, cfg) {
   }
 
   function folhaAnotar(folha) {
-    const sugestoes = nomesUsados(casa, cfg.id);
+    const sugestoes = nomesUsados(casaVisivel, cfg.id); // só dos cartões que este perfil vê
     const nova = { nome: '', valor: null, data: ultimaData ?? hoje, para: null, paraNaMao: false, forma: 'vista', vezes: 2 };
     const faturaTexto = h('p', { class: 'suave pequeno cartao-vai' });
     const mostrarFatura = () => { faturaTexto.textContent = textoDaFatura(faturaDaCompra(nova.data, cfg)); };

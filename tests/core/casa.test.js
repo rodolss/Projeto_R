@@ -22,13 +22,16 @@ function casaBase() {
     meses: [],
     cartoes: [],
     outrasPessoas: [],
+    perfis: [{ id: 'p1', nome: 'Ana', admin: true }, { id: 'p2', nome: 'Bia' }],
+    aparelhos: [],
   };
 }
 
 test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por compra', () => {
   const casa = criarCasa({ nomes: ['Ana', 'Bia'], novoId: ids() });
-  assert.equal(casa.schemaVersion, 3);
-  assert.deepEqual([casa.cartoes, casa.outrasPessoas], [[], []]);
+  assert.equal(casa.schemaVersion, 4);
+  assert.deepEqual([casa.cartoes, casa.outrasPessoas, casa.aparelhos], [[], [], []]);
+  assert.deepEqual(casa.perfis, [{ id: 'p1', nome: 'Ana', admin: true }, { id: 'p2', nome: 'Bia' }]);
   assert.deepEqual(casa.pessoas, [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }]);
   assert.deepEqual(casa.contas.map((c) => c.nome), ['Condomínio', 'Água', 'Luz', 'Internet', 'Cartão da casa']);
   assert.deepEqual(casa.contas.filter((c) => c.compraPorCompra).map((c) => c.nome), ['Cartão da casa']);
@@ -36,20 +39,22 @@ test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por co
   assert.deepEqual(casa.meses, []);
 });
 
-test('migrarCasa aceita a versão 3, leva a 1 e a 2 para a 3 e recusa outras', () => {
+test('migrarCasa aceita a versão 4, leva a 1, a 2 e a 3 para a 4 e recusa outras', () => {
   const casa = casaBase();
   assert.equal(migrarCasa(casa), casa);
-  const { cartoes, outrasPessoas, ...resto } = casaBase();
+  const { cartoes, outrasPessoas, perfis, aparelhos, ...resto } = casaBase();
+  assert.deepEqual(migrarCasa({ ...resto, schemaVersion: 3, cartoes, outrasPessoas }), casa);
   assert.deepEqual(migrarCasa({ ...resto, schemaVersion: 1 }), casa);
   assert.deepEqual(migrarCasa({ ...resto, schemaVersion: 2, cartao: null }), casa);
   // O cartão da versão 2 vira o primeiro da lista (id = conta ligada) e as pessoas dele valem para todos.
   const v2 = { ...resto, schemaVersion: 2, cartao: { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'c4', pessoas: [{ id: 'q1', nome: 'Mãe' }], fixas: [{ id: 'f1' }] } };
   assert.deepEqual(migrarCasa(v2), {
-    ...resto, schemaVersion: 3,
+    ...resto, schemaVersion: 4,
     cartoes: [{ id: 'c4', contaId: 'c4', donaId: 'p2', viraNoDia: 3, venceNoDia: 10, fixas: [{ id: 'f1' }] }],
     outrasPessoas: [{ id: 'q1', nome: 'Mãe' }],
+    perfis, aparelhos,
   });
-  assert.throws(() => migrarCasa({ schemaVersion: 4 }), /versao-desconhecida/);
+  assert.throws(() => migrarCasa({ schemaVersion: 5 }), /versao-desconhecida/);
   assert.throws(() => migrarCasa(null), /versao-desconhecida/);
 });
 

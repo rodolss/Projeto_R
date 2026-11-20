@@ -10,6 +10,7 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
+import { parteDaCasaNoCartao, aoTocarConta } from '../core/perfis.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 export const nomeDoMes = (mes) => MESES[Number(mes.slice(5, 7)) - 1];
@@ -181,9 +182,12 @@ function desenharMes(container, ctx) {
     return compras;
   };
   // A conta ligada ao cartão abre a tela do Cartão naquela fatura (lá dá para ver e anotar compra por compra).
+  const visto = ctx.perfil?.visto ?? null;
+  // Conta ligada a um cartão: o dono abre o cartão; com perfis, quem não é dono só lê a parte da casa.
   const tocarConta = (conta) => () => {
-    const doCartao = (casa.cartoes ?? []).find((c) => c.contaId === conta.id);
-    if (doCartao) ctx.navegar(`#/casa-cartao?cartao=${doCartao.id}&fatura=${mes}`);
+    const acao = aoTocarConta(casa, conta.id, visto);
+    if (acao === 'parte') abrir(`parte-${conta.id}`);
+    else if (acao === 'cartao') ctx.navegar(`#/casa-cartao?cartao=${conta.id}&fatura=${mes}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
   const linhasContas = r.contas.map((c) => linha({
@@ -357,12 +361,43 @@ function desenharMes(container, ctx) {
     ];
   }
 
+  // Só leitura (perfis): a parte da casa no cartão de outra pessoa. Nada pessoal nem o que foi comprado para quem vê.
+  function folhaParte(conta) {
+    const doCartao = (casa.cartoes ?? []).find((c) => c.contaId === conta.id);
+    const dona = [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === doCartao?.donaId);
+    const r = parteDaCasaNoCartao(casa, doCartao.id, mes);
+    const linhaDoMes = valorDaConta(casa, mes, conta.id); // sem compras ainda: a previsão ou o valor digitado
+    const semItens = !r.compras.length && !r.fixas.length;
+    const valor = semItens ? linhaDoMes.valor : r.total;
+    const confirmado = semItens ? linhaDoMes.situacao === 'confirmado' : r.conferida;
+    const linhaItem = (x, detalhe) => h('div', { class: 'casa-compra' },
+      h('span', { class: 'texto' }, h('span', {}, x.nome), detalhe && h('small', {}, detalhe)),
+      h('span', { class: 'quanto' }, formatarBRL(x.valor)));
+    const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+    return [
+      titulo(`${conta.nome} · fatura de ${nome}`),
+      h('p', { class: 'suave pequeno', style: 'margin:0' }, `Do cartão de ${dona?.nome ?? 'outra pessoa'}: só o que é da casa. Quem anota é ${dona?.nome ?? 'a dona do cartão'}.`),
+      h('div', { class: 'casa-fatura' },
+        h('div', {}, h('div', { class: 'rotulo' }, 'Parte da casa'), h('div', { class: 'valor' }, formatarBRL(valor))),
+        confirmado ? h('span', { class: 'selo ok' }, 'conferida') : h('span', { class: 'selo' }, 'a confirmar')),
+      semItens && linhaDoMes.situacao === 'a-confirmar' && linhaDoMes.deOnde
+        && h('p', { class: 'suave pequeno', style: 'margin:0' }, `Previsão: igual a ${nomeDoMes(linhaDoMes.deOnde)}.`),
+      !semItens
+        ? h('div', { class: 'cartao casa-compras' },
+          ...r.compras.map((x) => linhaItem(x, [x.data && dataCurta(x.data), x.parcela && `${x.parcela.n} de ${x.parcela.de}`].filter(Boolean).join(' · '))),
+          ...r.fixas.map((x) => linhaItem(x, 'todo mês')))
+        : h('p', { class: 'suave' }, 'Nenhuma compra da casa anotada nesta fatura.'),
+      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true })),
+    ];
+  }
+
   // ---------- folha aberta (vem do hash) ----------
   const aberta = folhaAberta(location.hash);
   const [tipo, id] = aberta ? [aberta.split('-')[0], aberta.slice(aberta.indexOf('-') + 1)] : [];
   const conta = casa.contas.find((c) => c.id === id);
   const pessoa = casa.pessoas.find((p) => p.id === id);
-  const conteudo = tipo === 'conta' && conta ? folhaConta(conta, aberta)
+  const conteudo = tipo === 'parte' && conta && (casa.cartoes ?? []).some((c) => c.contaId === conta.id) ? folhaParte(conta)
+    : tipo === 'conta' && conta ? folhaConta(conta, aberta)
     : tipo === 'cartao' && conta ? folhaCartao(conta, aberta)
       : tipo === 'salario' && pessoa ? folhaSalario(pessoa, aberta) : null;
   if (!conteudo) {
@@ -372,6 +407,6 @@ function desenharMes(container, ctx) {
   }
   const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: conta?.nome ?? pessoa?.nome ?? 'Conta' });
   // Conta e salário: foco no campo, para digitar logo. Cartão: na folha, sem abrir o teclado por cima da lista.
-  const alvo = tipo === 'cartao' ? painel : painel.querySelector('input') ?? painel;
+  const alvo = tipo === 'cartao' || tipo === 'parte' ? painel : painel.querySelector('input') ?? painel;
   setTimeout(() => alvo.focus({ preventScroll: true }), 50);
 }

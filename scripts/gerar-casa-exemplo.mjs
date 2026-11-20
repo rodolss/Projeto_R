@@ -2,7 +2,7 @@
 // Uso: node scripts/gerar-casa-exemplo.mjs <saida.json>
 // A saída é um mapa { chave do localStorage: valor } para `capturar-telas.mjs --local <saida.json>`.
 import { writeFileSync } from 'node:fs';
-import { salvarValor, salvarSalario, conferirFatura } from '../js/core/casa.js';
+import { salvarValor, salvarSalario, conferirFatura, migrarCasa } from '../js/core/casa.js';
 import { adicionarCartao, adicionarPessoaDoCartao, anotarCompra, faturaDaCompra, acharCartao } from '../js/core/cartao.js';
 import { somarMeses } from '../js/core/meses.js';
 
@@ -34,6 +34,7 @@ let casa = {
   cartoes: [],
   outrasPessoas: [],
 };
+casa = migrarCasa(casa); // versão atual (perfis da Ana, que administra, e do Leo)
 
 // 14 meses para trás, com variação inventada; o mês atual fica com a luz e um salário a confirmar.
 for (let k = -14; k <= 0; k++) {
