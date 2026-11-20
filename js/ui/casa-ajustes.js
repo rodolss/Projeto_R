@@ -7,6 +7,7 @@ import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao } from '../core/carta
 import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
 import {
   cartoesVisiveis, veAposentadoria, adicionarPerfil, renomearPerfil, vincularAparelho, desvincularAparelho, donoDeOutroCartao,
+  codigoDoAparelho,
 } from '../core/perfis.js';
 import { avatar } from './topo.js';
 import { parametroDoHash } from './rotas.js';
@@ -205,7 +206,7 @@ function desenhar(container, ctx) {
       h('h3', { style: 'margin:0' }, 'Aparelhos'),
       ...(casa.aparelhos ?? []).map((a) => h('div', { class: 'casa-ajuste-linha' },
         h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho'
-          : !a.perfilId ? `Pedido de aparelho novo (${a.desde.split('-').reverse().join('/')})` : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
+          : !a.perfilId ? `Pedido de aparelho novo · código ${codigoDoAparelho(a.id)}` : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
         h('select', {
           class: 'entrada', 'aria-label': 'Perfil do aparelho', style: 'flex:0 1 150px',
           disabled: a.id === ctx.perfil.impressao, // este aparelho não sai do próprio perfil por engano

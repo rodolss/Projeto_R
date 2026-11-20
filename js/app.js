@@ -158,6 +158,7 @@ async function desconectar(voltarPara = null) {
 
 const navegar = (hash) => { location.hash = hash; };
 let telaDesenhada = null; // a última tela desenhada por inteiro
+let mostrandoEscolha = false; // "Quem usa este celular?" na tela: dados novos (a liberação) redesenham
 
 function contexto() {
   return {
@@ -220,6 +221,7 @@ async function renderizar() {
 
   const tela = document.getElementById('tela');
   const topo = document.getElementById('topo');
+  mostrandoEscolha = desvio === 'escolher';
   if (desvio === 'escolher') {
     // Chave nova neste aparelho: pergunta uma vez quem usa, antes de qualquer tela.
     document.body.classList.add('sem-abas');
@@ -279,7 +281,7 @@ function receberCasa(novo) {
   if (!novo || JSON.stringify(novo) === JSON.stringify(app.casa)) return;
   const tinha = Boolean(app.casa);
   app.casa = novo;
-  if (!naCasa()) return;
+  if (!naCasa() && !mostrandoEscolha) return;
   // Com folha aberta ou campo em foco, o que foi digitado (só na memória) não pode sumir.
   if (!tinha || podeAtualizarSozinho(location.hash, digitando())) renderizar();
   else mostrarAviso('Chegaram dados de outro aparelho. Feche e abra de novo para ver.', 'info');

@@ -41,7 +41,7 @@ O Leo não troca de perfil.
 
 ```
 perfis:    [{ id, nome, admin?: true, foto?: 'data:image/jpeg;base64,…' }]
-aparelhos: [{ id: '<impressão da chave>', perfilId, desde: 'AAAA-MM-DD' }]
+aparelhos: [{ id: '<impressão da chave>', perfilId, desde: 'AAAA-MM-DD' }]   // perfilId null: pedido esperando liberação
 ```
 
 Migração 3 → 4 (igual nos dois celulares): um perfil por pessoa, `p1` administradora; `aparelhos: []`.

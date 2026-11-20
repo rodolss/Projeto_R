@@ -137,3 +137,6 @@ export function perfisEscondidos(casa) {
   const oferecidos = new Set(perfisParaEscolher(casa).map((p) => p.id));
   return (casa.perfis ?? []).filter((p) => !oferecidos.has(p.id));
 }
+
+// Código curto do aparelho (4 primeiros caracteres da impressão), mostrado no pedido e nos Ajustes.
+export const codigoDoAparelho = (impressao) => String(impressao ?? '').slice(0, 4).toUpperCase();
