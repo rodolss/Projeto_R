@@ -6,7 +6,7 @@ import { h, cartao } from './dom.js';
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import { primeiroMes } from '../core/casa.js';
-import { balancoDoMes, compararComPlano } from '../core/balanco.js';
+import { balancoDoMes, compararComPlano, dadosCompletos } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash } from './rotas.js';
 import { nomeDoMes, mesDaTela } from './casa.js';
@@ -21,10 +21,13 @@ const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde
 export const enderecoDaFatura = (cartaoId, mes) => `#/casa-cartao?cartao=${cartaoId}&fatura=${mes}`;
 
 // Balanço e plano (desenho 2026-11-20-balanco-e-plano): a sobra do mês contra o que o plano pede.
-export function textoDoPlano({ situacao, falta = 0, livre = 0 }) {
+// Nunca "livre" nem "pode parar de investir": quem diz para onde vai cada real é o Dia de pagamento.
+export function textoDoPlano({ situacao, falta = 0 }) {
+  if (situacao === 'registrado') return 'Este mês você já investiu ✓';
+  if (situacao === 'incompleto') return 'Preencha os salários no Mês para comparar com o plano.';
   if (situacao === 'vermelho') return 'Neste mês não sobrou: o balanço fechou no vermelho.';
-  if (situacao === 'sem-aporte') return 'Você já está no caminho: o plano não pede mais aportes.';
-  if (situacao === 'cobre') return `A sobra cobre o que o plano pede ✓ e ainda ficam ${formatarBRL(livre)} livres.`;
+  if (situacao === 'sem-aporte') return 'No ritmo de hoje você chega no prazo. Siga o Dia de pagamento.';
+  if (situacao === 'cobre') return 'A sobra cobre o que o plano pede ✓. O Dia de pagamento diz onde pôr cada real.';
   if (situacao === 'falta') return `Faltam ${formatarBRL(falta)} para o que o plano pede.`;
   return null;
 }
@@ -39,15 +42,18 @@ function cartaoDoPlano(ctx, b) {
     console.warn('Sem o painel do plano', erro);
     return null;
   }
-  const prazo = painel.marcos?.rendaPlena?.atingido
-    ? 'Renda plena conquistada ✓'
-    : `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`;
-  const pede = Number.isFinite(painel.pmtNec) && painel.pmtNec > 0;
-  const texto = textoDoPlano(compararComPlano({ sobra: b.sobra, pmtNec: painel.pmtNec }));
+  const conquistada = Boolean(painel.marcos?.rendaPlena?.atingido);
+  // O mesmo "para chegar no alvo" da tela de detalhes do plano: conta a reserva que ainda falta formar.
+  const alvo = painel.necessarioAlvo;
+  const pede = Number.isFinite(alvo) && alvo > 0;
+  const registrado = (ctx.estado.meses ?? []).some((m) => m.mes === ctx.hoje.slice(0, 7));
+  const texto = textoDoPlano(compararComPlano({ sobra: b.sobra, pmtNec: alvo, completo: dadosCompletos(b), registrado }));
   return h('section', { class: 'cartao balanco-plano' },
     h('div', { class: 'rotulo' }, 'Seu plano'),
-    h('p', {}, h('b', {}, prazo), ' no ritmo de hoje.'),
-    pede && h('p', { class: 'suave' }, `Para chegar no prazo, o plano pede ${formatarBRL(painel.pmtNec)} por mês.`),
+    conquistada
+      ? h('p', {}, h('b', {}, 'Renda plena conquistada ✓'))
+      : h('p', {}, h('b', {}, `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`), ' no ritmo de hoje.'),
+    pede && !registrado && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
     texto && h('p', {}, texto),
     h('div', { class: 'botoes' },
       h('a', { class: 'botao', href: '#/mes' }, 'Dia de pagamento'),

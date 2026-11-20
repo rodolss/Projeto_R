@@ -22,3 +22,15 @@ Exemplos INVENTADOS (repositório público): Ana administra e tem o planejador.
 
 Funções puras em `js/core/balanco.js` (`compararComPlano`, `gastouMaisQueOOrcamento`) e um texto em
 `js/ui/casa-balanco.js`; o painel vem de `calcularPainel` (o mesmo do Início). Versão do site 18.
+
+## Correções da revisão
+
+- O número comparado é o **"para chegar no alvo"** do plano (`necessarioAlvo`, o mesmo da tela de detalhes: conta a
+  reserva que ainda falta formar), não `pmtNec`. Os textos nunca dizem "livre" nem "o plano não pede mais aportes":
+  "cobre ✓ — o Dia de pagamento diz onde pôr cada real" e "no ritmo de hoje você chega no prazo; siga o Dia de
+  pagamento". Mês já registrado: "Este mês você já investiu ✓".
+- Sem salário preenchido ou sem divisão das contas: "Preencha os salários no Mês para comparar com o plano".
+- Dia de pagamento: "devem sobrar (previsão)" quando o balanço ainda é previsão; sem a linha quando o plano diz para
+  não investir. O aviso do orçamento compara a **média dos últimos 3 meses já fechados** (sem previsão) com o custo
+  do orçamento, não o mês corrente.
+- "Tela inicial" quer dizer a primeira aba: o app abre na última tela usada.

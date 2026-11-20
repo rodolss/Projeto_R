@@ -50,9 +50,12 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
 }
 
 // ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------
-// A sobra do mês contra o que o plano pede por mês (o aporte que leva à renda plena no prazo). Só confere: o quanto
-// investir de verdade continua saindo do salário e do orçamento, no Dia de pagamento.
-export function compararComPlano({ sobra, pmtNec }) {
+// A sobra do mês contra o que o plano pede por mês (o necessário para chegar no alvo, contando a reserva que falta).
+// Só confere: o quanto investir de verdade continua saindo do salário e do orçamento, no Dia de pagamento. Mês já
+// registrado: já investiu. Sem salário ou sem divisão (`completo` falso): sem veredito.
+export function compararComPlano({ sobra, pmtNec, completo = true, registrado = false }) {
+  if (registrado) return { situacao: 'registrado', falta: 0, livre: 0 };
+  if (!completo) return { situacao: 'incompleto', falta: 0, livre: 0 };
   if (!Number.isFinite(pmtNec)) return { situacao: 'sem-plano', falta: 0, livre: 0 };
   if (sobra <= 0) return { situacao: 'vermelho', falta: centavos(Math.max(0, pmtNec)), livre: 0 };
   if (pmtNec <= 0) return { situacao: 'sem-aporte', falta: 0, livre: centavos(sobra) };
@@ -60,5 +63,19 @@ export function compararComPlano({ sobra, pmtNec }) {
   return { situacao: 'falta', falta: centavos(pmtNec - sobra), livre: 0 };
 }
 
-// O gasto real do mês (o "saiu" do balanço) passou 10% do custo mensal do orçamento do plano: hora de revisar.
-export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => custoMensal > 0 && saiu > custoMensal * 1.1;
+// O balanço tem o que precisa para um veredito: salário preenchido e as contas divididas.
+export const dadosCompletos = (b) => Boolean(b?.salario && b.salario.situacao !== 'vazio' && b.contas && b.contas.valor != null);
+
+// O gasto médio ("saiu") dos últimos `n` meses já fechados (sem previsão) antes de `mes`; null se não houver nenhum.
+// Meses fechados e a média diluem despesas anuais pagas de uma vez e a fatura ainda aberta do mês corrente.
+export function gastoMedioFechado(casa, pessoaId, mes, hoje, n = 3) {
+  const fechados = [];
+  for (let k = 1; k <= n; k++) {
+    const b = balancoDoMes(casa, somarMeses(mes, -k), pessoaId, hoje);
+    if (!b.previsao && dadosCompletos(b)) fechados.push(b.saiu);
+  }
+  return fechados.length ? centavos(fechados.reduce((s, x) => s + x, 0) / fechados.length) : null;
+}
+
+// O gasto real passou 10% do custo mensal do orçamento do plano: hora de revisar.
+export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => saiu != null && custoMensal > 0 && saiu > custoMensal * 1.1;
