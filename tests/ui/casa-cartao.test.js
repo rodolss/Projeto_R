@@ -46,8 +46,14 @@ test('cartão da tela: o do endereço, senão o último usado no aparelho, senã
 });
 
 test('sugestões do nome: começo do nome primeiro, depois no meio; sem acento; sem a que já está escrita; no máximo 4', () => {
-  const nomes = ['Farmácia', 'Mercado', 'Feira', 'Farofa', 'Pão de forma', 'Gasolina', 'Faxina', 'Fast food'].map((nome) => ({ nome, para: 'casa' }));
-  assert.deepEqual(sugestoesDoNome(nomes, 'fa'), ['Farmácia', 'Farofa', 'Faxina', 'Fast food']);
+  const nomes = ['Café', 'Farmácia', 'Sofá', 'Faxina', 'Fast food', 'Farofa', 'Fatura', 'Pão de forma'].map((nome) => ({ nome, para: 'casa' }));
+  // Cinco começam com "fa" (só cabem 4) e "Sofá" tem "fa" no meio, antes na lista: os do começo vêm primeiro.
+  assert.deepEqual(sugestoesDoNome(nomes, 'fa'), ['Farmácia', 'Faxina', 'Fast food', 'Farofa']);
+  // Poucas do começo: as do meio vêm depois delas.
+  assert.deepEqual(sugestoesDoNome(nomes, 'fat'), ['Fatura']);
+  assert.deepEqual(sugestoesDoNome(nomes, 'ofa'), ['Sofá', 'Farofa']);
+  assert.deepEqual(sugestoesDoNome([...nomes, { nome: 'Fofa', para: 'casa' }], 'fa'), ['Farmácia', 'Faxina', 'Fast food', 'Farofa']);
+  assert.deepEqual(sugestoesDoNome(nomes.slice(0, 4), 'fa'), ['Farmácia', 'Faxina', 'Sofá']);
   assert.deepEqual(sugestoesDoNome(nomes, 'FOR'), ['Pão de forma']);
   assert.deepEqual(sugestoesDoNome(nomes, 'farmacia'), []);
   assert.deepEqual(sugestoesDoNome(nomes, ''), []);

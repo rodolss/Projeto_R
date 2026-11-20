@@ -392,19 +392,20 @@ function desenharFatura(container, ctx, cfg) {
     mostrarFatura();
 
     const para = escolhaPara(null, (id) => { nova.para = id; nova.paraNaMao = true; });
-    const caixaSugestoes = h('div', { class: 'cartao-sugestoes' });
+    const caixaSugestoes = h('div', { class: 'cartao-sugestoes', role: 'group', 'aria-label': 'Sugestões' });
     const mudarNome = (v) => {
       nova.nome = v.trim();
       const sugerido = paraSugerido(sugestoes, nova.nome);
       if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); }
       caixaSugestoes.replaceChildren(...sugestoesDoNome(sugestoes, v).map((nome) => h('button', {
         type: 'button', class: 'chip pequeno',
-        onclick: () => { nomeCampo.input.value = nome; mudarNome(nome); },
+        // Depois de escolher, o próximo é o valor: o teclado de números já abre.
+        onclick: () => { nomeCampo.input.value = nome; mudarNome(nome); valorCampo.input.focus(); },
       }, nome)));
     };
     const nomeCampo = campoTexto({ rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', aoMudar: mudarNome });
     nomeCampo.input.classList.add('cartao-nome');
-    nomeCampo.append(caixaSugestoes);
+    const blocoDoNome = h('div', { class: 'campo' }, nomeCampo, caixaSugestoes); // as sugestões fora do <label>
     const totalTexto = h('span', { class: 'campo-dica' });
     const mostrarTotal = () => {
       totalTexto.textContent = nova.valor ? `Total: ${formatarBRL(nova.valor * nova.vezes)} em ${nova.vezes} vezes.` : '';
@@ -457,7 +458,7 @@ function desenharFatura(container, ctx, cfg) {
 
     return [
       titulo('Anotar compra'),
-      nomeCampo, valorCampo, dataCampo, para, forma,
+      blocoDoNome, valorCampo, dataCampo, para, forma,
       h('div', { class: 'botoes' }, anotarBotao, botao('Fechar', fechar, { secundario: true })),
     ];
   }
