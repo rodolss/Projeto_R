@@ -236,16 +236,25 @@ export function pararFixa(casa, { cartaoId, fixaId, fatura }) {
 
 // ---------- sugestões e limites ----------
 // Para sugerir no "O que foi": nomes já usados em qualquer cartão, o mais recente primeiro, com para quem foi.
-export function nomesUsados(casa) {
-  const vistos = new Map();
-  const ver = (item) => {
-    const chave = semAcento(item.nome);
-    if (chave && !vistos.has(chave)) vistos.set(chave, { nome: item.nome, para: item.para ?? 'casa' });
-  };
-  const contas = new Set((casa.cartoes ?? []).map((c) => c.contaId));
+// As do cartão `cartaoId` vêm antes; de outro cartão, "para a dona dele" vira "para a dona deste" (a farmácia
+// que a Ana comprou para ela mesma, no cartão do Leo, é do Leo).
+export function nomesUsados(casa, cartaoId = null) {
+  const cartoes = casa.cartoes ?? [];
+  const deste = acharCartao(casa, cartaoId);
+  const grupos = deste ? [[deste], cartoes.filter((c) => c !== deste)] : [cartoes];
   const meses = [...casa.meses].sort((a, b) => (a.mes < b.mes ? 1 : -1));
-  for (const reg of meses) ordenarCompras((reg.compras ?? []).filter((c) => contas.has(c.contaId))).forEach(ver);
-  for (const cartao of casa.cartoes ?? []) [...cartao.fixas].reverse().forEach(ver);
+  const vistos = new Map();
+  for (const grupo of grupos) {
+    const daConta = new Map(grupo.map((c) => [c.contaId, c]));
+    const ver = (item, cartao) => {
+      const chave = semAcento(item.nome);
+      if (!chave || vistos.has(chave)) return;
+      const para = item.para ?? 'casa';
+      vistos.set(chave, { nome: item.nome, para: deste && cartao !== deste && para === cartao.donaId ? deste.donaId : para });
+    };
+    for (const reg of meses) ordenarCompras((reg.compras ?? []).filter((c) => daConta.has(c.contaId))).forEach((c) => ver(c, daConta.get(c.contaId)));
+    for (const cartao of grupo) [...cartao.fixas].reverse().forEach((f) => ver(f, cartao));
+  }
   return [...vistos.values()];
 }
 

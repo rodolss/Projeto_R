@@ -288,3 +288,18 @@ test('a conta de um cartão com só compras pessoais no mês segue a previsão',
   const v = valorDaConta(casa, '2026-12', K);
   assert.deepEqual([v.valor, v.situacao, v.deOnde], [700, 'a-confirmar', '2026-11']);
 });
+
+test('revisão: sugestão vinda de outro cartão — "para a dona" vira a dona deste cartão; as do mesmo cartão valem mais', () => {
+  let casa = adicionarCartao(casaBase(), { donaId: 'p1', viraNoDia: 3, venceNoDia: 10, novoId: () => 'c9' }).casa;
+  const novoId = ids();
+  casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-18', nome: 'Farmácia', valor: 20, para: 'p1', novoId }); // a Ana, no cartão dela, para ela mesma
+  casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-18', nome: 'Presente', valor: 50, para: 'q1', novoId }); // para a Mãe
+  assert.deepEqual(nomesUsados(casa, K).filter((s) => ['Farmácia', 'Presente'].includes(s.nome)), [
+    { nome: 'Presente', para: 'q1' }, { nome: 'Farmácia', para: 'p2' },
+  ]);
+  // No mesmo cartão, o que foi anotado nele vale mais que o mais recente de outro cartão.
+  casa = anotar(casa, { data: '2026-10-01', nome: 'Gasolina', valor: 90, para: 'casa', novoId });
+  casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-19', nome: 'Gasolina', valor: 90, para: 'p1', novoId });
+  assert.equal(nomesUsados(casa, K).find((s) => s.nome === 'Gasolina').para, 'casa');
+  assert.equal(nomesUsados(casa, 'c9').find((s) => s.nome === 'Gasolina').para, 'p1');
+});

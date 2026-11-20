@@ -102,7 +102,8 @@ function campoDia({ rotulo, dica, valor, aoMudar }) {
 }
 
 // Configuração de um cartão (também usada nos Ajustes da casa). Sem `cartaoId`, cria um cartão novo; `aoSalvar(id)`.
-export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar = null, textoDoBotao = 'Salvar' }) {
+// `donaFixa`: o cartão já tem dona e aqui só faltam os dias (quem não é a dona cria o próprio, não troca a dela).
+export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar = null, textoDoBotao = 'Salvar', donaFixa = false }) {
   const { casa } = ctx;
   const atual = cartaoId ? acharCartao(casa, cartaoId) : null;
   const escolha = { donaId: atual?.donaId ?? null, viraNoDia: atual?.viraNoDia ?? null, venceNoDia: atual?.venceNoDia ?? null, nome: '' };
@@ -137,7 +138,7 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
   });
 
   return h('div', { class: 'cartao-config', 'data-sem-recarregar': '' },
-    h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'De quem é o cartão?'),
+    !donaFixa && h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'De quem é o cartão?'),
       chips(casa.pessoas, escolha.donaId, (id) => { escolha.donaId = id; sugerirNome(); }, 'De quem é o cartão')),
     nomeCampo,
     campoDia({
@@ -209,15 +210,18 @@ function desenhar(container, ctx) {
   if (!cartaoPronto(atual)) {
     // Cartão que veio da planilha (ou criado no outro celular) sem os dias: completa aqui.
     esconderFolha();
+    // Com dona: só os dias; quem não é a dona cria o próprio cartão (o botão vem antes do formulário).
     const dona = casa.pessoas.find((p) => p.id === atual.donaId);
     container.replaceChildren(...[
       trocaDeCartao(casa, atual.id),
       h('h1', {}, dona ? `Cartão de ${dona.nome}` : 'Cartão'),
+      dona && h('div', { class: 'botoes' }, botao(`Não sou ${dona.nome}: criar o meu cartão`, () => { location.hash = '#/casa-cartao?novo=1'; }, { secundario: true })),
       cartao(
-        h('p', {}, 'Falta pouco: conte de quem é este cartão e os dois dias dele. Estão no app do banco.'),
-        formularioDoCartao(ctx, { cartaoId: atual.id, textoDoBotao: 'Começar a usar', aoSalvar: () => ctx.rerender() })),
-      h('p', { class: 'suave pequeno', style: 'text-align:center;margin:0' }, 'Não é o seu cartão?'),
-      outroCartao(),
+        h('p', {}, dona
+          ? `Falta pouco, ${dona.nome}: escolha os dois dias do seu cartão. Estão no app do banco.`
+          : 'Falta pouco: conte de quem é este cartão e os dois dias dele. Estão no app do banco.'),
+        formularioDoCartao(ctx, { cartaoId: atual.id, donaFixa: Boolean(dona), textoDoBotao: 'Começar a usar', aoSalvar: () => ctx.rerender() })),
+      !dona && outroCartao(),
     ].filter(Boolean));
     return;
   }
@@ -370,7 +374,7 @@ function desenharFatura(container, ctx, cfg) {
   }
 
   function folhaAnotar(folha) {
-    const sugestoes = nomesUsados(casa);
+    const sugestoes = nomesUsados(casa, cfg.id);
     const nova = { nome: '', valor: null, data: ultimaData ?? hoje, para: null, paraNaMao: false, forma: 'vista', vezes: 2 };
     const faturaTexto = h('p', { class: 'suave pequeno cartao-vai' });
     const mostrarFatura = () => { faturaTexto.textContent = textoDaFatura(faturaDaCompra(nova.data, cfg)); };
