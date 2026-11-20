@@ -1,6 +1,7 @@
 // Mescla em 3 vias das contas da casa, campo a campo (base = última versão sincronizada): duas pessoas
 // mexendo em contas diferentes do mesmo mês não perdem nada. Listas de objetos com `id` ou `mes` são
 // mescladas item a item. Quando os dois lados mudam o mesmo campo, vale o local.
+import { migrarCasa } from '../core/casa.js';
 
 const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const ehObjeto = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -50,8 +51,14 @@ function mesclar3(b, l, r) {
   return l;
 }
 
+// Versões antigas sobem antes de juntar: base da versão 1 (sem "cartao") e local migrado (cartao: null)
+// fariam o cartão vindo do outro celular sumir.
+const atualizada = (casa) => {
+  try { return casa ? migrarCasa(casa) : casa; } catch { return casa; }
+};
+
 export function mesclarCasa({ base, local, remoto }) {
-  const resultado = mesclar3(base ?? null, local, remoto);
+  const resultado = mesclar3(atualizada(base) ?? null, atualizada(local), atualizada(remoto));
   if (Array.isArray(resultado?.meses)) resultado.meses = [...resultado.meses].sort((a, b) => (a.mes < b.mes ? -1 : 1));
   return resultado;
 }

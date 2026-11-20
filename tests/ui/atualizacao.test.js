@@ -128,3 +128,9 @@ test('contas da casa: o Mês e o Ano são telas seguras; os Ajustes da casa não
   await ajustes.novaVersao();
   assert.equal(ajustes.recargas, 0);
 });
+
+test('cartão: a tela do Cartão é segura (as folhas com campo marcam data-sem-recarregar)', async () => {
+  const cartao = cenario({ hash: '#/casa-cartao?fatura=2026-12' });
+  await cartao.novaVersao();
+  assert.equal(cartao.recargas, 1);
+});

@@ -1,8 +1,9 @@
 // Importação (uma vez) da planilha de contas da casa para o formato do casa.json (desenho de 2026-11-19, §Importação).
 // Lê o .xlsx sem bibliotecas: zip (zlib) + XML por expressões regulares. Nenhum dado da planilha fica no repositório.
 import { inflateRawSync } from 'node:zlib';
-import { somarMeses } from '../js/core/meses.js';
-import { centavos } from '../js/core/casa.js';
+import { somarMeses, diffMeses } from '../js/core/meses.js';
+import { centavos, comMes, compraDaCasa, fixasNoMes, SCHEMA_CASA } from '../js/core/casa.js';
+import { adicionarPessoaDoCartao } from '../js/core/cartao.js';
 
 // ---------- zip + XML ----------
 function arquivosDoZip(buf) {
@@ -105,8 +106,11 @@ function lerAbaDeAno(aba) {
   return { ano: Number(aba.nome), contas, pessoas, linhas, aba };
 }
 
-// Aba de compras do cartão: meses na linha 1 (a partir da coluna C), itens na coluna B, linha "TOTAL".
-function lerAbaDeCompras(aba, hoje) {
+// Aba de compras de cartão: meses na linha 1 (a partir da coluna C), itens na coluna B, grupos na coluna A.
+// `porFatura`: as colunas já são o mês da fatura (aba pessoal); senão, o mês da compra (fatura no mês seguinte).
+// Valores de uma linha: só a sequência a partir do primeiro mês com valor; número com texto logo à esquerda é
+// de um quadro ao lado, não da linha.
+function lerAbaDeCompras(aba, hoje, { porFatura = false } = {}) {
   const colunas = [];
   for (let k = 2; k < 40; k++) {
     const m = MESES_LONGOS.indexOf(semAcento(aba.celula(`${letra(k)}1`)));
@@ -114,17 +118,137 @@ function lerAbaDeCompras(aba, hoje) {
     colunas.push({ col: letra(k), m: m + 1 });
   }
   if (!colunas.length) return null;
-  const [anoHoje, mesHoje] = hoje.split('-').map(Number);
-  const primeiro = `${colunas[0].m <= mesHoje ? anoHoje : anoHoje - 1}-${doisDigitos(colunas[0].m)}`;
+  // Ano da primeira coluna: o que deixa o mês mais perto de hoje.
+  const mesHoje = hoje.slice(0, 7);
+  const anoHoje = Number(hoje.slice(0, 4));
+  // O ano em que as colunas contêm o mês atual (ou o seguinte: a aba por fatura começa na fatura aberta).
+  const candidatos = [anoHoje - 1, anoHoje, anoHoje + 1].map((a) => `${a}-${doisDigitos(colunas[0].m)}`);
+  const contem = (inicio, mes) => { const d = diffMeses(inicio, mes); return d >= 0 && d < colunas.length; };
+  const primeiro = candidatos.find((c) => contem(c, mesHoje)) ?? candidatos.find((c) => contem(c, somarMeses(mesHoje, 1)))
+    ?? [...candidatos].sort((x, y) => Math.abs(diffMeses(mesHoje, x)) - Math.abs(diffMeses(mesHoje, y)))[0];
+  const faturaDa = (j) => somarMeses(primeiro, j + (porFatura ? 0 : 1));
   const itens = [];
+  let grupo = '';
   for (let r = 2; r < 300; r++) {
+    const rotulo = aba.celula(`A${r}`);
+    if (typeof rotulo === 'string' && rotulo.trim()) grupo = rotulo.trim();
     const nome = aba.celula(`B${r}`);
     if (typeof nome !== 'string' || !nome.trim() || semAcento(nome) === 'total') continue;
-    const valores = colunas.map((c, j) => ({ fatura: somarMeses(primeiro, j + 1), valor: numero(aba.celula(`${c.col}${r}`)) }))
-      .filter((x) => x.valor != null && x.valor > 0);
-    if (valores.length) itens.push({ nome: nome.trim(), valores });
+    const celula = (j) => aba.celula(`${colunas[j].col}${r}`);
+    const valorEm = (j) => { const v = numero(celula(j)); return v != null && v > 0 ? v : null; };
+    const textoAntes = (j) => j > 0 && typeof celula(j - 1) === 'string' && celula(j - 1).trim() !== '';
+    const inicio = colunas.findIndex((_, j) => valorEm(j) != null && !textoAntes(j));
+    if (inicio < 0) continue;
+    const valores = [];
+    for (let j = inicio; j < colunas.length && valorEm(j) != null; j++) valores.push({ fatura: faturaDa(j), valor: valorEm(j) });
+    itens.push({ nome: nome.trim(), grupo, valores, ateOFim: inicio + valores.length === colunas.length });
   }
-  return { itens };
+  return { primeiraFatura: faturaDa(0), itens };
+}
+
+// Grupos da coluna A que são da dona do cartão (os outros rótulos são pessoas) e os que repetem todo mês.
+const GRUPOS_DA_DONA = /^(fixas?|assinaturas?|parcelas?|parcelad[ao]s?|gastos?( conjuntos?)?|compras?|outros?|diversos?)$/;
+const GRUPOS_TODO_MES = /^(fixas?|assinaturas?)$/;
+const MARCA_PARCELAS = /\[\s*(\d+)\s*x\s*\]/i;
+const nomeDePessoa = (t) => t.trim().toLowerCase().replace(/(^|\s)(\S)/g, (_, e, c) => e + c.toUpperCase());
+const tem = (obj, chave) => Object.prototype.hasOwnProperty.call(obj ?? {}, chave);
+
+// Cartão (desenho 2026-11-19-cartao): a aba com o nome da conta do cartão (compras da casa, por mês da compra)
+// e a aba com o nome de uma das pessoas (a dona do cartão; por mês da fatura, com grupos). Sobre uma casa que
+// já existe: substitui as compras importadas (sem data) do cartão desde a primeira fatura; não repete as de
+// todo mês nem as pessoas; confere o valor digitado do mês e o tira dos meses ainda previstos.
+export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.crypto.randomUUID() }) {
+  const avisos = [];
+  const abaCasa = abas.find((a) => casa.contas.some((c) => semAcento(c.nome) === semAcento(a.nome)) && lerAbaDeCompras(a, hoje));
+  const dona = casa.pessoas.find((p) => abas.some((a) => semAcento(a.nome) === semAcento(p.nome)));
+  const abaPessoal = dona && abas.find((a) => semAcento(a.nome) === semAcento(dona.nome) && lerAbaDeCompras(a, hoje, { porFatura: true }));
+  if (!abaCasa && !abaPessoal) return { casa, avisos };
+  const conta = abaCasa
+    ? casa.contas.find((c) => semAcento(c.nome) === semAcento(abaCasa.nome))
+    : casa.cartao?.contaId ? casa.contas.find((c) => c.id === casa.cartao.contaId) : casa.contas.find((c) => c.compraPorCompra && !c.arquivada);
+  if (!conta) {
+    avisos.push('Nenhuma conta do cartão nas contas da casa: o cartão não foi importado.');
+    return { casa, avisos };
+  }
+  const lidas = [
+    abaCasa && { ...lerAbaDeCompras(abaCasa, hoje), daCasa: true },
+    abaPessoal && { ...lerAbaDeCompras(abaPessoal, hoje, { porFatura: true }), daCasa: false },
+  ].filter(Boolean);
+  const inicio = lidas.map((l) => l.primeiraFatura).sort()[0];
+
+  const atual = casa.cartao ?? { donaId: null, viraNoDia: null, venceNoDia: null, pessoas: [], fixas: [] };
+  let c = {
+    ...casa,
+    schemaVersion: SCHEMA_CASA,
+    contas: casa.contas.map((x) => (x.id === conta.id ? { ...x, compraPorCompra: true } : x)),
+    cartao: { ...atual, donaId: atual.donaId ?? dona?.id ?? null, contaId: conta.id },
+  };
+  for (const reg of [...c.meses]) {
+    if (reg.mes < inicio || !reg.compras.some((x) => x.contaId === conta.id && !x.data)) continue;
+    c = comMes(c, reg.mes, (r) => { r.compras = r.compras.filter((x) => x.contaId !== conta.id || x.data); });
+  }
+
+  const paraDoGrupo = (grupo) => {
+    const chave = semAcento(grupo);
+    if (chave === 'casa') return 'casa';
+    if (!chave || GRUPOS_DA_DONA.test(chave)) return dona?.id ?? 'casa';
+    const r = adicionarPessoaDoCartao(c, { nome: nomeDePessoa(grupo), novoId });
+    c = r.casa;
+    return r.id;
+  };
+  const acrescentarFixa = (fixa) => {
+    const igual = c.cartao.fixas.some((f) => semAcento(f.nome) === semAcento(fixa.nome) && f.para === fixa.para && f.desde === fixa.desde && f.valor === fixa.valor);
+    if (!igual) c = { ...c, cartao: { ...c.cartao, fixas: [...c.cartao.fixas, fixa] } };
+  };
+
+  for (const lida of lidas) {
+    for (const item of lida.itens) {
+      const para = lida.daCasa ? 'casa' : paraDoGrupo(item.grupo);
+      const marca = item.nome.match(MARCA_PARCELAS);
+      const nome = item.nome.replace(MARCA_PARCELAS, ' ').replace(/\s+/g, ' ').trim();
+      const todoMes = !marca && (GRUPOS_TODO_MES.test(semAcento(item.grupo)) && !lida.daCasa || (item.valores.length >= 2 && item.ateOFim));
+      if (todoMes) {
+        // Um trecho por valor: valor que muda fecha o trecho anterior; o último continua.
+        const trechos = [];
+        for (const v of item.valores) {
+          const ultimo = trechos.at(-1);
+          if (ultimo && Math.abs(ultimo.valor - v.valor) < 0.005) ultimo.ate = v.fatura;
+          else trechos.push({ valor: v.valor, desde: v.fatura, ate: v.fatura });
+        }
+        let serie = null;
+        trechos.forEach((t, k) => {
+          const id = novoId();
+          serie ??= id;
+          acrescentarFixa({
+            id, nome, valor: centavos(t.valor), para, desde: t.desde,
+            ...(k > 0 ? { serie } : {}), ...(k < trechos.length - 1 ? { ate: t.ate } : {}),
+          });
+        });
+        continue;
+      }
+      // "[Nx]": a última coluna com valor é a parcela N. Sem marca, a sequência é de 1 até o fim.
+      const n = item.valores.length;
+      const de = marca ? Math.max(Number(marca[1]), n) : n;
+      const grupo = de > 1 ? novoId() : null;
+      item.valores.forEach((v, j) => {
+        const compra = { id: novoId(), contaId: conta.id, nome, valor: centavos(v.valor), para };
+        if (grupo) Object.assign(compra, { grupo, parcela: { n: de - n + 1 + j, de } });
+        c = comMes(c, v.fatura, (r) => { r.compras.push(compra); });
+      });
+    }
+  }
+
+  for (const reg of [...c.meses]) {
+    if (reg.mes < inicio || !tem(reg.valores, conta.id)) continue;
+    const itens = [...reg.compras.filter((x) => x.contaId === conta.id && compraDaCasa(x)), ...fixasNoMes(c, reg.mes).filter(compraDaCasa)];
+    const soma = centavos(itens.reduce((s, x) => s + x.valor, 0));
+    const digitado = reg.valores[conta.id];
+    if (digitado !== 0 && Math.abs(soma - digitado) > 0.005) {
+      avisos.push(`${conta.nome} ${reg.mes}: as compras da casa somam ${soma.toFixed(2)}, mas o valor do mês é ${digitado.toFixed(2)}.`);
+    }
+    if (!Object.keys(reg.salarios).length) c = comMes(c, reg.mes, (r) => { delete r.valores[conta.id]; });
+  }
+  return { casa: c, avisos };
 }
 
 export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.randomUUID() }) {
@@ -160,19 +284,6 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
     return meses.get(mes);
   };
 
-  // Compras do cartão primeiro: o mês com compras não leva o valor digitado do cartão.
-  if (abaDeCompras) {
-    const contaId = idDaConta.get(chaveCartao);
-    for (const item of lerAbaDeCompras(abaDeCompras, hoje).itens) {
-      const grupo = item.valores.length > 1 ? novoId() : null;
-      for (const { fatura, valor } of item.valores) {
-        const compra = { id: novoId(), contaId, nome: item.nome, valor: centavos(valor) };
-        if (grupo) compra.grupo = grupo;
-        registro(fatura).compras.push(compra);
-      }
-    }
-  }
-
   for (const a of anos) {
     for (const { r, mes } of a.linhas) {
       const salarios = a.pessoas.map((p, k) => ({ id: idDaPessoa(p.nome, k), valor: numero(a.aba.celula(`${p.col}${r}`)) }));
@@ -182,14 +293,6 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
       for (const c of a.contas) {
         const id = idDaConta.get(chave(c.nome));
         const valor = numero(a.aba.celula(`${c.col}${r}`));
-        const comCompras = reg.compras.some((x) => x.contaId === id);
-        if (chave(c.nome) === chaveCartao && comCompras) {
-          const soma = centavos(reg.compras.filter((x) => x.contaId === id).reduce((s, x) => s + x.valor, 0));
-          if (valor != null && valor !== 0 && Math.abs(soma - valor) > 0.005) {
-            avisos.push(`${c.nome} ${mes}: as compras somam ${soma.toFixed(2)}, mas a aba ${a.ano} tem ${valor.toFixed(2)}.`);
-          }
-          if (!real) continue;
-        }
         if (real) reg.valores[id] = centavos(valor ?? 0);
         else if (valor) reg.valores[id] = centavos(valor);
       }
@@ -206,5 +309,7 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
   const lista = [...meses.values()]
     .filter((m) => Object.keys(m.salarios).length || Object.keys(m.valores).length || m.compras.length)
     .sort((x, y) => (x.mes < y.mes ? -1 : 1));
-  return { casa: { schemaVersion: 1, pessoas, contas, meses: lista }, avisos };
+  // O cartão (compras da casa e a aba pessoal) entra por cima, conferindo com o valor do mês.
+  const cartao = importarCartao(abas, { hoje, casa: { schemaVersion: SCHEMA_CASA, pessoas, contas, meses: lista, cartao: null }, novoId });
+  return { casa: cartao.casa, avisos: [...avisos, ...cartao.avisos] };
 }

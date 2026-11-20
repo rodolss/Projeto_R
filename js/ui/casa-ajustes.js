@@ -1,8 +1,10 @@
-// Contas da casa · Ajustes (desenho de 2026-11-19): nomes, contas, sincronização e a volta para a aposentadoria.
+// Contas da casa · Ajustes (desenho de 2026-11-19): nomes, contas, cartão, sincronização e a volta para a aposentadoria.
 // Cada mudança salva na hora (nome ao sair do campo; o resto ao tocar), sem botão "Salvar" para esquecer.
 import { h, cartao, botao } from './dom.js';
 import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core/casa.js';
 import { cartaoConectar } from './conectar.js';
+import { cartaoPronto, editarPessoaDoCartao } from '../core/cartao.js';
+import { formularioDoCartao } from './casa-cartao.js';
 
 export function render(container, ctx) {
   desenhar(container, ctx);
@@ -86,6 +88,43 @@ function desenhar(container, ctx) {
           onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: false, ativadaEm: ctx.hoje.slice(0, 7) }), `${conta.nome} voltou para a lista.`),
         }, 'Voltar a usar')))));
 
+  // ---------- cartão (desenho 2026-11-19-cartao) ----------
+  const outrasPessoas = casa.cartao?.pessoas ?? [];
+  const usadas = outrasPessoas.filter((p) => !p.arquivada);
+  const paradas = outrasPessoas.filter((p) => p.arquivada);
+  const secaoCartao = cartaoPronto(casa)
+    ? cartao(
+      h('h2', {}, 'Cartão'),
+      formularioDoCartao(ctx, { aoSalvar: () => ctx.rerender() }),
+      h('div', { class: 'casa-ajuste' },
+        h('h3', { style: 'margin:0' }, 'Outras pessoas'),
+        h('p', { class: 'suave pequeno', style: 'margin:0' }, usadas.length
+          ? 'Para quem também se compra no cartão. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'
+          : 'Ninguém ainda. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'),
+        ...usadas.map((p) => h('div', { class: 'casa-ajuste-linha' },
+          h('input', {
+            class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome de ${p.nome}`,
+            onchange: (e) => {
+              const nome = e.target.value.trim();
+              if (!nome) { e.target.value = p.nome; return; }
+              if (nome !== p.nome) salvar((c) => editarPessoaDoCartao(c, p.id, { nome }), 'Nome salvo.');
+            },
+          }),
+          h('button', {
+            type: 'button', class: 'botao-link', style: 'padding:6px 0',
+            onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: true }), `${p.nome} saiu da lista de "Para quem".`),
+          }, 'Não uso mais'))),
+        ...paradas.map((p) => h('div', { class: 'linha' },
+          h('div', { class: 'nome' }, h('span', {}, p.nome), h('small', {}, 'não aparece em "Para quem"')),
+          h('button', {
+            type: 'button', class: 'botao-link', style: 'padding:4px 0',
+            onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: false }), `${p.nome} voltou para a lista.`),
+          }, 'Voltar a usar')))))
+    : cartao(
+      h('h2', {}, 'Cartão'),
+      h('p', { class: 'suave' }, 'Anote compra por compra do cartão de um de vocês: o que é da casa, de cada um e de outras pessoas.'),
+      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao' }, 'Configurar o cartão')));
+
   // ---------- sincronização ----------
   const outra = casa.pessoas[1]?.nome ?? 'a outra pessoa';
   const sincronizacao = ctx.conexao
@@ -110,6 +149,7 @@ function desenhar(container, ctx) {
     h('h1', {}, 'Ajustes da casa'),
     pessoas,
     contas,
+    secaoCartao,
     ...[sincronizacao].flat(),
     comoFunciona,
     h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),

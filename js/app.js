@@ -7,7 +7,7 @@ import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
-import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho } from './ui/rotas.js';
+import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
@@ -15,7 +15,7 @@ import { VERSAO } from './versao.js';
 
 const CHAVE_TOKEN = 'projetoR.token';
 const CHAVE_DONO = 'projetoR.dono';
-const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'aposentadoria': o app abre no último espaço usado
+const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'casa-cartao' | 'aposentadoria': o app abre no último espaço usado
 const CHAVE_USOU_APOSENTADORIA = 'projetoR.usouAposentadoria';
 const app = {
   estado: null, armazem: null, conexao: null, sincronizado: false,
@@ -37,7 +37,10 @@ function lerLocal(chave) {
 function gravarLocal(chave, valor) {
   try { localStorage.setItem(chave, valor); } catch { /* sem armazenamento: só não lembra */ }
 }
-const lerEspaco = () => (lerLocal(CHAVE_ESPACO) === 'casa' ? 'casa' : 'aposentadoria');
+const lerEspaco = () => {
+  const espaco = lerLocal(CHAVE_ESPACO);
+  return espaco === 'casa' || espaco === 'casa-cartao' ? espaco : 'aposentadoria';
+};
 
 function lerConexao() {
   const token = localStorage.getItem(CHAVE_TOKEN);
@@ -138,7 +141,7 @@ async function renderizar() {
   const nome = resolverRota(location.hash, Boolean(app.estado), lerEspaco());
   if (location.hash.replace(/^#\/?/, '').split('?')[0] !== nome) { navegar(`#/${nome}`); return; }
   const daCasa = ehDaCasa(nome);
-  if (nome !== 'boas-vindas') gravarLocal(CHAVE_ESPACO, daCasa ? 'casa' : 'aposentadoria');
+  if (nome !== 'boas-vindas') gravarLocal(CHAVE_ESPACO, espacoParaLembrar(nome, lerEspaco()));
   if (nome !== 'boas-vindas' && !daCasa && !lerLocal(CHAVE_USOU_APOSENTADORIA)) {
     gravarLocal(CHAVE_USOU_APOSENTADORIA, '1');
     reagendarLembretes();

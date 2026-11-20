@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   SCHEMA_CASA, criarCasa, migrarCasa, primeiroMes, valorDaConta, salarioNoMes, resumoDoMes,
   salvarValor, salvarSalario, adicionarCompra, apagarCompra, conferirFatura,
-  adicionarConta, editarConta, moverConta, renomearPessoa,
+  adicionarConta, editarConta, moverConta, renomearPessoa, compraDaCasa, fixasNoMes,
 } from '../../js/core/casa.js';
 
 const ids = () => { let n = 0; return () => `id${++n}`; };
@@ -20,12 +20,14 @@ function casaBase() {
       { id: 'c4', nome: 'Cartão', compraPorCompra: true, arquivada: false },
     ],
     meses: [],
+    cartao: null,
   };
 }
 
 test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por compra', () => {
   const casa = criarCasa({ nomes: ['Ana', 'Bia'], novoId: ids() });
-  assert.equal(casa.schemaVersion, 1);
+  assert.equal(casa.schemaVersion, 2);
+  assert.equal(casa.cartao, null);
   assert.deepEqual(casa.pessoas, [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }]);
   assert.deepEqual(casa.contas.map((c) => c.nome), ['Condomínio', 'Água', 'Luz', 'Internet', 'Cartão da casa']);
   assert.deepEqual(casa.contas.filter((c) => c.compraPorCompra).map((c) => c.nome), ['Cartão da casa']);
@@ -33,10 +35,12 @@ test('criarCasa: duas pessoas e as contas sugeridas, só o cartão compra por co
   assert.deepEqual(casa.meses, []);
 });
 
-test('migrarCasa aceita a versão 1 e recusa outras', () => {
+test('migrarCasa aceita a versão 2, leva a 1 para a 2 (sem cartão) e recusa outras', () => {
   const casa = casaBase();
   assert.equal(migrarCasa(casa), casa);
-  assert.throws(() => migrarCasa({ schemaVersion: 2 }), /versao-desconhecida/);
+  const { cartao, ...v1 } = { ...casaBase(), schemaVersion: 1 };
+  assert.deepEqual(migrarCasa(v1), { ...v1, schemaVersion: 2, cartao: null });
+  assert.throws(() => migrarCasa({ schemaVersion: 3 }), /versao-desconhecida/);
   assert.throws(() => migrarCasa(null), /versao-desconhecida/);
 });
 
@@ -231,4 +235,68 @@ test('revisão: quantas parcelas seguintes uma compra leva junto ao ser apagada'
   assert.equal(parcelasSeguintes(casa, { mes: '2026-11', compraId: pao.id }), 0);
   const ultima = casa.meses.find((m) => m.mes === '2027-01').compras[0];
   assert.equal(parcelasSeguintes(casa, { mes: '2027-01', compraId: ultima.id }), 0);
+});
+
+// ---------- cartão de uma das pessoas (desenho 2026-11-19-cartao) ----------
+const comCartao = (fixas = []) => ({
+  ...casaBase(),
+  cartao: { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'c4', pessoas: [{ id: 'q1', nome: 'Mãe' }], fixas },
+});
+
+test('cartão: a conta da casa soma só as compras da casa (e as antigas, sem "para")', () => {
+  let casa = comCartao();
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Mercado', valor: 100, novoId: ids(), extra: { data: '2026-11-19', para: 'casa' } });
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Antiga', valor: 30, novoId: ids() });
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Blusa', valor: 80, novoId: () => 'b1', extra: { data: '2026-11-20', para: 'p2' } });
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Remédio', valor: 45, novoId: () => 'r1', extra: { data: '2026-11-21', para: 'q1' } });
+  const v = valorDaConta(casa, '2026-12', 'c4');
+  assert.equal(v.valor, 130);
+  assert.deepEqual(v.compras.map((c) => c.nome), ['Mercado', 'Antiga']);
+  assert.equal(v.situacao, 'a-confirmar');
+  const blusa = casa.meses[0].compras.find((c) => c.id === 'b1');
+  assert.deepEqual([blusa.data, blusa.para], ['2026-11-20', 'p2']);
+});
+
+test('cartão: as de todo mês da casa entram na conta nos meses em que valem', () => {
+  const casa = comCartao([
+    { id: 'f1', nome: 'Streaming', valor: 40, para: 'casa', desde: '2026-12' },
+    { id: 'f2', nome: 'Academia', valor: 90, para: 'p2', desde: '2026-12' },
+    { id: 'f3', nome: 'Jornal', valor: 10, para: 'casa', desde: '2026-12', ate: '2027-01' },
+  ]);
+  assert.deepEqual(fixasNoMes(casa, '2027-01').map((f) => f.id), ['f1', 'f2', 'f3']);
+  assert.deepEqual(fixasNoMes(casa, '2027-02').map((f) => f.id), ['f1', 'f2']);
+  assert.deepEqual(fixasNoMes(casa, '2026-11'), []);
+  assert.equal(valorDaConta(casa, '2027-01', 'c4').valor, 50);
+  assert.equal(valorDaConta(casa, '2027-03', 'c4').valor, 40);
+  assert.equal(valorDaConta(casa, '2027-03', 'c4').situacao, 'a-confirmar');
+  // Outras contas compra por compra não recebem as de todo mês do cartão.
+  const outra = { ...casa, contas: [...casa.contas, { id: 'c5', nome: 'Outro cartão', compraPorCompra: true, arquivada: false }] };
+  assert.equal(valorDaConta(outra, '2027-03', 'c5').valor, 0);
+});
+
+test('cartão: mês com só compras pessoais segue a previsão da conta da casa', () => {
+  let casa = salvarValor(comCartao(), { mes: '2026-11', contaId: 'c4', valor: 700 });
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Blusa', valor: 80, novoId: ids(), extra: { data: '2026-11-20', para: 'p2' } });
+  const v = valorDaConta(casa, '2026-12', 'c4');
+  assert.deepEqual([v.valor, v.situacao, v.deOnde], [700, 'a-confirmar', '2026-11']);
+  assert.equal(compraDaCasa({ para: 'p2' }), false);
+  assert.equal(compraDaCasa({ para: 'casa' }), true);
+  assert.equal(compraDaCasa({}), true);
+});
+
+test('cartão: conferir a fatura grava a parte da casa, com as de todo mês', () => {
+  let casa = comCartao([{ id: 'f1', nome: 'Streaming', valor: 40, para: 'casa', desde: '2026-12' }]);
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Mercado', valor: 100, novoId: ids(), extra: { data: '2026-11-19', para: 'casa' } });
+  casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Blusa', valor: 80, novoId: ids(), extra: { data: '2026-11-20', para: 'p2' } });
+  casa = conferirFatura(casa, { mes: '2026-12', contaId: 'c4' });
+  assert.equal(casa.meses[0].valores.c4, 140);
+  const v = valorDaConta(casa, '2026-12', 'c4');
+  assert.deepEqual([v.valor, v.situacao], [140, 'confirmado']);
+});
+
+test('cartão: compra parcelada leva data e para quem a todas as parcelas', () => {
+  const casa = adicionarCompra(comCartao(), { mes: '2026-12', contaId: 'c4', nome: 'Sofá', valor: 100, vezes: 3, novoId: ids(), extra: { data: '2026-11-19', para: 'casa' } });
+  assert.deepEqual(casa.meses.map((m) => [m.mes, m.compras[0].data, m.compras[0].para, m.compras[0].parcela.n]), [
+    ['2026-12', '2026-11-19', 'casa', 1], ['2027-01', '2026-11-19', 'casa', 2], ['2027-02', '2026-11-19', 'casa', 3],
+  ]);
 });
