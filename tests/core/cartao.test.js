@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
   adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao,
-  editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
+  editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
 import { somarMeses } from '../../js/core/meses.js';
@@ -178,7 +178,9 @@ test('fatura do cartão: compras (mais nova primeiro), de todo mês, total e qua
   assert.deepEqual(f.fixas.map((x) => x.nome), ['Streaming', 'Academia']);
   assert.equal(f.total, 350);
   assert.deepEqual(f.porPessoa, [
-    { para: 'casa', nome: 'Casa', valor: 150 }, { para: 'p2', nome: 'Leo', valor: 170 }, { para: 'q1', nome: 'Mãe', valor: 30 },
+    { para: 'casa', nome: 'Casa', valor: 150, jaTenho: null, falta: null },
+    { para: 'p2', nome: 'Leo', valor: 170, jaTenho: 0, falta: 170 },
+    { para: 'q1', nome: 'Mãe', valor: 30, jaTenho: 0, falta: 30 },
   ]);
   assert.equal(f.conferida, false);
   assert.equal(valorDaConta(casa, '2026-12', 'c2').valor, 150);
@@ -302,4 +304,109 @@ test('revisão: sugestão vinda de outro cartão — "para a dona" vira a dona d
   casa = anotarCompra(casa, { cartaoId: 'c9', data: '2026-11-19', nome: 'Gasolina', valor: 90, para: 'p1', novoId });
   assert.equal(nomesUsados(casa, K).find((s) => s.nome === 'Gasolina').para, 'casa');
   assert.equal(nomesUsados(casa, 'c9').find((s) => s.nome === 'Gasolina').para, 'p1');
+});
+
+// ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ----------
+
+test('já tenho: anotar à vista, parcelada (só a 1ª) e de todo mês (só a primeira fatura); para a Casa não marca', () => {
+  const novoId = ids();
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Farmácia', valor: 30, para: 'q1', jaTenho: true, novoId });
+  assert.equal(faturaDoCartao(casa, K, '2026-12').compras[0].jaTenho, true);
+  casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Sofá', valor: 100, vezes: 3, para: 'q1', jaTenho: true, novoId });
+  assert.deepEqual(['2026-12', '2027-01', '2027-02'].map((m) => faturaDoCartao(casa, K, m).compras[0].jaTenho), [true, false, false]);
+  assert.deepEqual(casa.meses.map((m) => 'jaTenho' in m.compras[0]), [true, false, false]);
+  casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'q1', jaTenho: true, novoId: () => 'f1' });
+  assert.deepEqual(casa.cartoes[0].fixas[0].jaTenhoEm, { '2026-12': true });
+  assert.deepEqual(['2026-12', '2027-01'].map((m) => faturaDoCartao(casa, K, m).fixas[0].jaTenho), [true, false]);
+  casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Mercado', valor: 100, para: 'casa', jaTenho: true, novoId });
+  assert.equal('jaTenho' in casa.meses[0].compras[0], false);
+  assert.equal(faturaDoCartao(casa, K, '2026-12').compras[0].jaTenho, false);
+  casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Internet', valor: 99.9, todoMes: true, para: 'casa', jaTenho: true, novoId: () => 'f2' });
+  assert.equal('jaTenhoEm' in casa.cartoes[0].fixas[0], false);
+});
+
+test('já tenho: marcar e desmarcar compra e de todo mês; Casa e item que não existe não mudam', () => {
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Farmácia', valor: 30, para: 'q1', novoId: () => 'k1' });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Mercado', valor: 100, para: 'casa', novoId: () => 'k2' });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'q1', novoId: () => 'f1' });
+  const compra = (c, id) => c.meses[0].compras.find((x) => x.id === id);
+  const marcada = marcarJaTenho(casa, { cartaoId: K, fatura: '2026-12', compraId: 'k1', jaTenho: true });
+  assert.equal(compra(marcada, 'k1').jaTenho, true);
+  const desmarcada = marcarJaTenho(marcada, { cartaoId: K, fatura: '2026-12', compraId: 'k1', jaTenho: false });
+  assert.equal('jaTenho' in compra(desmarcada, 'k1'), false);
+  let fixa = marcarJaTenho(casa, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
+  fixa = marcarJaTenho(fixa, { cartaoId: K, fatura: '2027-02', fixaId: 'f1', jaTenho: true });
+  assert.deepEqual(fixa.cartoes[0].fixas[0].jaTenhoEm, { '2027-01': true, '2027-02': true });
+  fixa = marcarJaTenho(fixa, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: false });
+  assert.deepEqual(fixa.cartoes[0].fixas[0].jaTenhoEm, { '2027-02': true });
+  fixa = marcarJaTenho(fixa, { cartaoId: K, fatura: '2027-02', fixaId: 'f1', jaTenho: false });
+  assert.equal('jaTenhoEm' in fixa.cartoes[0].fixas[0], false);
+  assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2026-12', compraId: 'k2', jaTenho: true }), casa);
+  assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2026-12', compraId: 'nada', jaTenho: true }), casa);
+  assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2027-01', compraId: 'k1', jaTenho: true }), casa);
+  assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2026-11', fixaId: 'f1', jaTenho: true }), casa);
+  assert.equal(marcarJaTenho(casa, { cartaoId: 'sumiu', fatura: '2027-01', fixaId: 'f1', jaTenho: true }), casa);
+  assert.equal(podeTerJaTenho({ para: 'q1' }), true);
+  assert.equal(podeTerJaTenho({ para: 'casa' }), false);
+  assert.equal(podeTerJaTenho({}), false);
+  assert.equal(JA_TENHO_DESDE, '2026-12');
+});
+
+test('já tenho: de quem é soma já tenho e falta por pessoa; Casa sem números', () => {
+  const novoId = ids('k');
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Farmácia', valor: 100, para: 'q1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Mercado da Mãe', valor: 50, para: 'q1', novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Celular', valor: 20.1, todoMes: true, para: 'q1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Livro', valor: 30, para: 'p2', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Mercado', valor: 80, para: 'casa', novoId });
+  const f = faturaDoCartao(casa, K, '2026-12');
+  assert.equal(f.total, 280.1);
+  assert.deepEqual(f.porPessoa, [
+    { para: 'casa', nome: 'Casa', valor: 80, jaTenho: null, falta: null },
+    { para: 'p2', nome: 'Leo', valor: 30, jaTenho: 30, falta: 0 },
+    { para: 'q1', nome: 'Mãe', valor: 170.1, jaTenho: 120.1, falta: 50 },
+  ]);
+});
+
+test('já tenho: marca velha numa compra da Casa não aparece nem soma', () => {
+  const casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Mercado', valor: 80, para: 'casa', novoId: () => 'k1' });
+  casa.meses[0].compras[0].jaTenho = true;
+  casa.meses[0].compras.push({ id: 'velha', contaId: K, nome: 'Antiga', valor: 10, jaTenho: true });
+  casa.cartoes[0].fixas.push({ id: 'f1', nome: 'Internet', valor: 99.9, para: 'casa', desde: '2026-12', jaTenhoEm: { '2026-12': true } });
+  const f = faturaDoCartao(casa, K, '2026-12');
+  assert.deepEqual([...f.compras, ...f.fixas].map((x) => x.jaTenho), [false, false, false]);
+  assert.deepEqual(f.porPessoa, [{ para: 'casa', nome: 'Casa', valor: 189.9, jaTenho: null, falta: null }]);
+});
+
+test('já tenho: editar nome e valor mantém a marca; mudar de fatura mantém; mudar para Casa tira (parcelas desta em diante)', () => {
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Farmácia', valor: 30, para: 'q1', jaTenho: true, novoId: () => 'k1' });
+  casa = editarCompraDoCartao(casa, { fatura: '2026-12', compraId: 'k1', nome: 'Farmácia da Mãe', valor: 35, para: 'q1', data: '2026-11-19' });
+  assert.equal(casa.meses[0].compras[0].jaTenho, true);
+  const movida = editarCompraDoCartao(casa, { fatura: '2026-12', compraId: 'k1', novaFatura: '2027-01' });
+  assert.equal(faturaDoCartao(movida, K, '2027-01').compras[0].jaTenho, true);
+  const daCasa = editarCompraDoCartao(casa, { fatura: '2026-12', compraId: 'k1', para: 'casa' });
+  assert.equal('jaTenho' in daCasa.meses[0].compras[0], false);
+  let p = anotar(casaBase(), { data: '2026-11-19', nome: 'Sofá', valor: 100, vezes: 3, para: 'q1', novoId: ids() });
+  for (const m of p.meses) p = marcarJaTenho(p, { cartaoId: K, fatura: m.mes, compraId: m.compras[0].id, jaTenho: true });
+  const renomeada = editarCompraDoCartao(p, { fatura: '2027-01', compraId: p.meses[1].compras[0].id, nome: 'Sofá novo' });
+  assert.deepEqual(renomeada.meses.map((m) => m.compras[0].jaTenho), [true, true, true]);
+  p = editarCompraDoCartao(p, { fatura: '2027-01', compraId: p.meses[1].compras[0].id, para: 'casa' });
+  assert.deepEqual(p.meses.map((m) => 'jaTenho' in m.compras[0]), [true, false, false]);
+});
+
+test('já tenho: de todo mês que muda de valor mantém a marca de cada fatura no trecho certo; para Casa tira', () => {
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'q1', novoId: () => 'f1' });
+  casa = marcarJaTenho(casa, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
+  casa = editarFixa(casa, { cartaoId: K, fixaId: 'f1', fatura: '2027-02', valor: 40, novoId: () => 'f2' });
+  const marcas = (c) => ['2026-12', '2027-01', '2027-02', '2027-03'].map((m) => faturaDoCartao(c, K, m).fixas[0].jaTenho);
+  assert.deepEqual(marcas(casa), [false, true, false, false]);
+  casa = marcarJaTenho(casa, { cartaoId: K, fatura: '2027-03', fixaId: 'f2', jaTenho: true });
+  assert.deepEqual(marcas(casa), [false, true, false, true]);
+  const daCasa = editarFixa(casa, { cartaoId: K, fixaId: 'f2', fatura: '2027-03', para: 'casa', novoId: () => 'f3' });
+  const f3 = daCasa.cartoes[0].fixas.find((f) => f.id === 'f3');
+  assert.equal(f3.para, 'casa');
+  assert.equal('jaTenhoEm' in f3, false);
+  assert.deepEqual(marcas(daCasa), [false, true, false, false]);
+  const tudoCasa = editarFixa(casa, { cartaoId: K, fixaId: 'f1', fatura: '2026-12', para: 'casa', novoId: () => 'nao' });
+  assert.deepEqual(tudoCasa.cartoes[0].fixas.map((f) => 'jaTenhoEm' in f), [false, false]);
 });

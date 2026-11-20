@@ -3,8 +3,16 @@
 // melhor dia de compra (o dia em que o cartão vira). As compras ficam no mês da fatura, junto da conta da casa
 // ligada ao cartão (id do cartão = id dessa conta), que soma só a parte da casa. As de todo mês (assinaturas,
 // contas fixas) ficam no próprio cartão e valem em toda fatura até parar. As outras pessoas valem para todos.
+// "Já tenho" (desenho 2026-11-20-ja-tenho): a compra cujo dinheiro já está guardado no cofrinho leva `jaTenho: true`;
+// a de todo mês leva `jaTenhoEm: { 'AAAA-MM': true }` (cada fatura marcada à parte). Nunca nas da Casa.
 import { somarMeses } from './meses.js';
-import { centavos, comMes, adicionarCompra, acompanharFatura, fixasNoMes } from './casa.js';
+import { centavos, comMes, adicionarCompra, acompanharFatura, fixasNoMes, compraDaCasa } from './casa.js';
+
+// "Quem ainda te deve" começa nesta fatura: antes dela nada foi marcado, e o histórico não é dívida.
+export const JA_TENHO_DESDE = '2026-12';
+export const podeTerJaTenho = (item) => Boolean(item?.para) && !compraDaCasa(item);
+const semMarca = ({ jaTenho: _marca, ...resto }) => resto;
+const semMarcas = ({ jaTenhoEm: _marcas, ...resto }) => resto;
 
 const idPadrao = () => globalThis.crypto.randomUUID();
 const dois = (n) => String(n).padStart(2, '0');
@@ -128,14 +136,44 @@ export function nomeDoPara(casa, para) {
 }
 
 // ---------- compras ----------
-export function anotarCompra(casa, { cartaoId, data, fatura, nome, valor, vezes = 1, todoMes = false, para, novoId = idPadrao }) {
+// `jaTenho`: à vista marca a compra; parcelada, só a 1ª parcela; de todo mês, só a primeira fatura.
+export function anotarCompra(casa, { cartaoId, data, fatura, nome, valor, vezes = 1, todoMes = false, para, jaTenho = false, novoId = idPadrao }) {
   const cartao = acharCartao(casa, cartaoId);
   const mes = fatura ?? faturaDaCompra(data, cartao);
+  const marcar = jaTenho && podeTerJaTenho({ para });
   if (todoMes) {
-    const fixa = { id: novoId(), nome: nome.trim(), valor: centavos(valor), para, desde: mes };
+    const fixa = { id: novoId(), nome: nome.trim(), valor: centavos(valor), para, desde: mes, ...(marcar ? { jaTenhoEm: { [mes]: true } } : {}) };
     return comCartao(casa, cartaoId, (c) => ({ ...c, fixas: [...c.fixas, fixa] }));
   }
-  return adicionarCompra(casa, { mes, contaId: cartao.contaId, nome, valor, vezes, novoId, extra: definidos({ data, para }) });
+  return adicionarCompra(casa, {
+    mes, contaId: cartao.contaId, nome, valor, vezes, novoId, extra: definidos({ data, para }), extraDaPrimeira: marcar ? { jaTenho: true } : {},
+  });
+}
+
+// Liga ou desliga o "já tenho" de uma compra (`compraId`, só nesta fatura) ou de uma de todo mês (`fixaId`: o
+// trecho que vale na fatura). Da Casa, ou que não existe nesta fatura: nada muda.
+export function marcarJaTenho(casa, { cartaoId, fatura, compraId, fixaId, jaTenho }) {
+  const cartao = acharCartao(casa, cartaoId);
+  if (!cartao) return casa;
+  const ligar = Boolean(jaTenho);
+  if (fixaId) {
+    const fixa = fixasNoMes(cartao, fatura).find((f) => f.id === fixaId);
+    if (!fixa || !podeTerJaTenho(fixa) || Boolean(fixa.jaTenhoEm?.[fatura]) === ligar) return casa;
+    return comCartao(casa, cartaoId, (c) => ({
+      ...c,
+      fixas: c.fixas.map((f) => {
+        if (f.id !== fixaId) return f;
+        const { [fatura]: _antes, ...outras } = f.jaTenhoEm ?? {};
+        const marcas = ligar ? { ...outras, [fatura]: true } : outras;
+        return Object.keys(marcas).length ? { ...f, jaTenhoEm: marcas } : semMarcas(f);
+      }),
+    }));
+  }
+  const alvo = comprasDoCartao(cartao, casa.meses.find((m) => m.mes === fatura)).find((c) => c.id === compraId);
+  if (!alvo || !podeTerJaTenho(alvo) || (alvo.jaTenho === true) === ligar) return casa;
+  return comMes(casa, fatura, (r) => {
+    r.compras = r.compras.map((c) => (c.id !== compraId ? c : ligar ? { ...c, jaTenho: true } : semMarca(c)));
+  });
 }
 
 const comprasDoCartao = (cartao, reg) => (reg?.compras ?? []).filter((c) => c.contaId === cartao?.contaId);
@@ -152,15 +190,26 @@ function ordenarCompras(compras) {
 export function faturaDoCartao(casa, cartaoId, fatura) {
   const cartao = acharCartao(casa, cartaoId);
   const reg = casa.meses.find((m) => m.mes === fatura);
-  const compras = ordenarCompras(comprasDoCartao(cartao, reg).map((c) => ({ ...c, para: c.para ?? 'casa' })));
-  const fixas = fixasNoMes(cartao, fatura).map((f) => ({ ...f, para: f.para ?? 'casa' }));
+  // A marca só vale fora da Casa (uma marca velha numa compra que virou da Casa não aparece nem soma).
+  const compras = ordenarCompras(comprasDoCartao(cartao, reg).map((c) => ({ ...c, para: c.para ?? 'casa' })))
+    .map((c) => ({ ...c, jaTenho: podeTerJaTenho(c) && c.jaTenho === true }));
+  const fixas = fixasNoMes(cartao, fatura).map((f) => ({ ...f, para: f.para ?? 'casa' }))
+    .map((f) => ({ ...f, jaTenho: podeTerJaTenho(f) && Boolean(f.jaTenhoEm?.[fatura]) }));
   const itens = [...compras, ...fixas];
-  const total = centavos(itens.reduce((s, x) => s + x.valor, 0));
+  const somar = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
+  const total = somar(itens);
   const ordem = todasAsOpcoes(casa, cartaoId).map((p) => p.id);
   const posicao = (para) => (ordem.indexOf(para) === -1 ? 99 : ordem.indexOf(para));
   const paras = [...new Set(itens.map((x) => x.para))].sort((a, b) => posicao(a) - posicao(b));
+  // Quanto é de cada um; fora da Casa, quanto já tem (guardado ou pago) e quanto falta.
   const porPessoa = paras
-    .map((para) => ({ para, nome: nomeDoPara(casa, para), valor: centavos(itens.filter((x) => x.para === para).reduce((s, x) => s + x.valor, 0)) }))
+    .map((para) => {
+      const deste = itens.filter((x) => x.para === para);
+      const valor = somar(deste);
+      if (para === 'casa') return { para, nome: nomeDoPara(casa, para), valor, jaTenho: null, falta: null };
+      const jaTenho = somar(deste.filter((x) => x.jaTenho));
+      return { para, nome: nomeDoPara(casa, para), valor, jaTenho, falta: centavos(valor - jaTenho) };
+    })
     .filter((p) => p.valor !== 0);
   const conferida = Boolean(cartao) && Object.prototype.hasOwnProperty.call(reg?.valores ?? {}, cartao.contaId);
   return { fatura, compras, fixas, total, porPessoa, conferida };
@@ -171,18 +220,20 @@ export function editarCompraDoCartao(casa, { fatura, compraId, nome, valor, para
   const alvo = casa.meses.find((m) => m.mes === fatura)?.compras?.find((c) => c.id === compraId);
   if (!alvo) return casa;
   const mudanca = definidos({ nome: nome?.trim(), valor: valor == null ? undefined : centavos(valor), para });
+  // Virou da Casa: perde o "já tenho". As outras mudanças (e mudar de fatura) não mexem na marca.
+  const aplicar = (c) => (mudanca.para === 'casa' ? semMarca({ ...c, ...mudanca }) : { ...c, ...mudanca });
   if (alvo.grupo) {
     let resultado = casa;
     for (const reg of casa.meses) {
       if (reg.mes < fatura || !(reg.compras ?? []).some((c) => c.grupo === alvo.grupo)) continue;
       resultado = comMes(resultado, reg.mes, (r) => {
-        r.compras = r.compras.map((c) => (c.grupo === alvo.grupo ? { ...c, ...mudanca } : c));
+        r.compras = r.compras.map((c) => (c.grupo === alvo.grupo ? aplicar(c) : c));
         acompanharFatura(r, alvo.contaId);
       });
     }
     return resultado;
   }
-  const nova = { ...alvo, ...mudanca, ...definidos({ data }) };
+  const nova = { ...aplicar(alvo), ...definidos({ data }) };
   const destino = novaFatura ?? fatura;
   if (destino === fatura) {
     return comMes(casa, fatura, (r) => {
@@ -214,13 +265,15 @@ export function editarFixa(casa, { cartaoId, fixaId, fatura, nome, valor, para, 
   if (!Object.keys(mudanca).length) return casa;
   const serie = serieDe(fixa);
   const seguinte = (f) => f.id !== fixa.id && serieDe(f) === serie && f.desde > fixa.desde;
+  // Trecho que fica da Casa perde as marcas de "já tenho"; os outros as levam (vale a do trecho da fatura).
+  const limpar = (f) => (f.para === 'casa' ? semMarcas(f) : f);
   return comCartao(casa, cartaoId, (c) => ({
     ...c,
     fixas: c.fixas.flatMap((f) => {
-      if (seguinte(f)) return [{ ...f, ...mudanca }];
+      if (seguinte(f)) return [limpar({ ...f, ...mudanca })];
       if (f.id !== fixaId) return [f];
-      if (fatura <= f.desde) return [{ ...f, ...mudanca }];
-      return [{ ...f, ate: somarMeses(fatura, -1) }, { ...f, ...mudanca, id: novoId(), serie, desde: fatura }];
+      if (fatura <= f.desde) return [limpar({ ...f, ...mudanca })];
+      return [{ ...f, ate: somarMeses(fatura, -1) }, limpar({ ...f, ...mudanca, id: novoId(), serie, desde: fatura })];
     }),
   }));
 }
