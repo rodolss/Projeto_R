@@ -1,9 +1,9 @@
 // Rotas por hash (#/inicio, #/mes, ...) e qual botão do menu fica aceso em cada uma (spec v2 §5.1).
 // Dois espaços: a aposentadoria e as contas da casa (desenho de 2026-11-19), cada um com o seu menu.
-export const TELAS = ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-cartao', 'casa-ano', 'casa-ajustes'];
+export const TELAS = ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-balanco', 'casa-cartao', 'casa-ano', 'casa-ajustes'];
 const ABAS = {
   inicio: 'inicio', mes: 'mes', simular: 'simular', mais: 'mais', orcamento: 'mais', historico: 'mais', config: 'mais',
-  casa: 'casa', 'casa-cartao': 'casa-cartao', 'casa-ano': 'casa-ano', 'casa-ajustes': 'casa-ajustes',
+  casa: 'casa', 'casa-balanco': 'casa-balanco', 'casa-cartao': 'casa-cartao', 'casa-ano': 'casa-ano', 'casa-ajustes': 'casa-ajustes',
 };
 
 export const ehDaCasa = (rota) => String(rota ?? '').startsWith('casa');

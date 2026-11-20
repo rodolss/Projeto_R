@@ -80,7 +80,7 @@ p { margin: 6px 0; }
 @keyframes menu-pilula { from { transform: scaleX(0.4); } }
 /* Contas da casa: menu próprio de 3 botões; aparece o menu do espaço atual. */
 .menu-casa { display: none; }
-.menu-casa .menu-dentro { grid-template-columns: repeat(4, 1fr); }
+.menu-casa .menu-dentro { grid-template-columns: repeat(5, 1fr); }
 body.espaco-casa .menu-aposentadoria { display: none; }
 body.espaco-casa .menu-casa { display: block; }
 body.sem-abas .menu { display: none; }
@@ -436,6 +436,13 @@ a.barra-item:active { background: var(--cartao-2); }
 .casa-lista > div + .cofrinho-nota { padding-top: 10px; border-top: 1px solid var(--borda); }
 .cofrinho-item { padding-left: 28px; border-top: 0; }
 .cofrinho-item .texto b { font-weight: 500; }
+
+/* ---------- Balanço do mês (desenho 2026-11-20-balanco-do-mes) ---------- */
+.balanco-quem { justify-content: center; }
+.balanco-positivo { color: var(--ok); }
+.balanco-negativo { color: var(--alerta); }
+.balanco-nota { margin: 0; padding: 0 16px 12px; }
+.balanco-rodape { padding-top: 10px; border-top: 1px solid var(--borda); }
 
 /* ---------- Perfis (desenho 2026-11-20-perfis) ---------- */
 .topo { position: relative; display: flex; justify-content: flex-end; max-width: 560px; margin: 0 auto; padding: 10px 16px 0; }
