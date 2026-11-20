@@ -78,11 +78,17 @@ p { margin: 6px 0; }
 .menu a[aria-current="page"] { color: var(--destaque); font-weight: 600; }
 .menu a[aria-current="page"] svg { background: var(--destaque-suave); animation: menu-pilula 350ms cubic-bezier(.2, 1.3, .4, 1) both; }
 @keyframes menu-pilula { from { transform: scaleX(0.4); } }
-/* Contas da casa: menu próprio de 3 botões; aparece o menu do espaço atual. */
+/* Contas da casa: menu próprio de 5 botões; aparece o menu do espaço atual. */
 .menu-casa { display: none; }
 .menu-casa .menu-dentro { grid-template-columns: repeat(5, 1fr); }
 body.espaco-casa .menu-aposentadoria { display: none; }
 body.espaco-casa .menu-casa { display: block; }
+/* Visão única (desenho 2026-11-20-visao-unica): para quem administra, um menu só no lugar dos dois.
+   Antes do sem-abas, que continua escondendo tudo (assistente, casa carregando). */
+.menu-unico { display: none; }
+.menu-unico .menu-dentro { grid-template-columns: repeat(5, 1fr); }
+body.espaco-unico .menu-aposentadoria, body.espaco-unico .menu-casa { display: none; }
+body.espaco-unico .menu-unico { display: block; }
 body.sem-abas .menu { display: none; }
 body.sem-abas { padding-bottom: 24px; }
 

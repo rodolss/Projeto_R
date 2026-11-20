@@ -7,7 +7,7 @@ import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
-import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS } from './ui/rotas.js';
+import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS, visaoUnica } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
@@ -177,6 +177,8 @@ function contexto() {
     sincronizado: app.sincronizado,
     quandoSincronizado,
     casa: app.casa,
+    // Visão única (desenho 2026-11-20-visao-unica): o Mais e os Ajustes da casa mudam um pouco nela.
+    unica: visaoUnica({ visto: perfilDoMomento().visto, temEstado: Boolean(app.estado) }),
     salvarCasa,
     casaSincronizada: app.casaSincronizada,
     erroCasa: app.erroCasa,
@@ -213,9 +215,12 @@ async function renderizar() {
       reagendarLembretes();
     }
   }
+  // Visão única: quem administra, vendo o próprio perfil e com o planejador, usa um menu só (os outros, como antes).
+  const unica = visaoUnica({ visto: perfil.visto, temEstado: Boolean(app.estado) });
   document.body.classList.toggle('espaco-casa', daCasa);
+  document.body.classList.toggle('espaco-unico', unica);
   document.body.classList.toggle('sem-abas', nome === 'boas-vindas' || (daCasa && !app.casa));
-  const aba = abaDoMenu(nome);
+  const aba = abaDoMenu(nome, unica);
   for (const a of document.querySelectorAll('.menu a')) {
     if (a.dataset.rota === aba) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -233,7 +238,8 @@ async function renderizar() {
     telaDesenhada = null;
     return;
   }
-  if (daCasa) desenharTopo(topo, contexto());
+  // A foto do perfil: nas telas da casa e, na visão única, em todas (trocar de perfil de qualquer lugar).
+  if (daCasa || unica) desenharTopo(topo, contexto());
   else topo.hidden = true;
   try {
     const modulo = await import(`./ui/${nome}.js`);
