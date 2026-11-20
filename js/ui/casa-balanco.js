@@ -14,6 +14,10 @@ const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
 const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde) : `${nomeDoMes(deOnde)} de ${deOnde.slice(0, 4)}`);
 
+// A fatura do mês no Cartão: o "De quem é" dela mostra o mesmo "Já tenho / falta" da linha tocada (o Cofrinho
+// soma outras faturas e não bateria).
+export const enderecoDaFatura = (cartaoId, mes) => `#/casa-cartao?cartao=${cartaoId}&fatura=${mes}`;
+
 // De quem é o balanço: o perfil visto; sem perfis, a pessoa do endereço (se for da casa), senão a primeira.
 export function pessoaDoBalanco({ hash, casa, visto }) {
   if (visto) return visto.id;
@@ -80,7 +84,7 @@ function desenhar(container, ctx) {
   aoTocar && h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
   const selo = (texto) => h('span', { class: 'selo' }, texto);
   const irAoMes = () => ctx.navegar(`#/casa?mes=${mes}`);
-  const irAoCartao = (c, extra = '') => () => ctx.navegar(`#/casa-cartao?cartao=${c.cartaoId}&fatura=${mes}${extra}`);
+  const irAoCartao = (c) => () => ctx.navegar(enderecoDaFatura(c.cartaoId, mes));
 
   const s = b.salario;
   const entrou = h('section', { class: 'cartao casa-lista' },
@@ -124,7 +128,7 @@ function desenhar(container, ctx) {
       titulo: b.cartoes.length > 1 ? `No ${k.nome}` : 'No seu cartão',
       detalhe: k.outras.falta <= 0 ? 'Já tenho tudo ✓' : `Já tenho ${formatarBRL(k.outras.jaTenho)} · falta ${formatarBRL(k.outras.falta)}`,
       valor: formatarBRL(k.outras.valor),
-      aoTocar: irAoCartao(k, '&tela=cofrinho'),
+      aoTocar: irAoCartao(k),
     }))),
     h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Você paga no cartão e recebe de volta: não entra na sobra.'));
 

@@ -72,3 +72,13 @@ test('balanço: salário a confirmar, sem divisão e perfil que não divide a ca
   const bia = balancoDoMes(comPerfil, '2026-12', 'x9', '2026-12-20');
   assert.deepEqual([bia.salario, bia.contas, bia.cartoes.map((c) => c.seu), bia.entrou, bia.saiu, bia.sobra], [null, null, [40], 0, 40, -40]);
 });
+
+test('revisão: o salário da outra pessoa ainda a confirmar muda a sua parte das contas: é previsão', () => {
+  let casa = salvarSalario(casaBase(), { mes: '2026-12', pessoaId: 'p1', valor: null });
+  casa = salvarSalario(casa, { mes: '2026-11', pessoaId: 'p1', valor: 6000 }); // o da Ana vem de novembro
+  casa = conferirFatura(casa, { mes: '2026-12', contaId: 'c2' });
+  const leo = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20'); // o do Leo está confirmado e a fatura fechou
+  assert.equal(leo.salario.situacao, 'confirmado');
+  assert.equal(leo.contas.aConfirmar, true);
+  assert.equal(leo.previsao, true);
+});

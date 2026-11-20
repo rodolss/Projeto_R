@@ -17,7 +17,8 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
     valor: daCasa.paga, // null sem divisão (salários vazios)
     total: r.total,
     fatia: r.fatiaDaRenda,
-    aConfirmar: r.contas.some((c) => c.situacao === 'a-confirmar'),
+    // A parte de cada um depende dos dois salários: um salário ainda a confirmar também pode mudá-la.
+    aConfirmar: r.contas.some((c) => c.situacao === 'a-confirmar') || r.pessoas.some((p) => p.situacaoSalario !== 'confirmado'),
   };
   const cartoes = (casa.cartoes ?? []).filter((c) => c.donaId === pessoaId).map((cartao) => {
     const f = faturaDoCartao(casa, cartao.id, mes);

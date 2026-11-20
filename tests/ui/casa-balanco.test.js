@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pessoaDoBalanco } from '../../js/ui/casa-balanco.js';
+import { pessoaDoBalanco, enderecoDaFatura } from '../../js/ui/casa-balanco.js';
 
 const casa = { pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }] };
 
@@ -11,4 +11,8 @@ test('pessoa do balanço: a do perfil visto; sem perfil, a do endereço (se for 
   assert.equal(pessoaDoBalanco({ hash: '#/casa-balanco?pessoa=sumiu', casa, visto: null }), 'p1');
   assert.equal(pessoaDoBalanco({ hash: '#/casa-balanco', casa, visto: null }), 'p1');
   assert.equal(pessoaDoBalanco({ hash: '#/casa-balanco', casa: { pessoas: [] }, visto: null }), null);
+});
+
+test('revisão: as linhas do cartão (e a de outras pessoas) levam à fatura do mês no Cartão, não ao Cofrinho', () => {
+  assert.equal(enderecoDaFatura('c2', '2026-12'), '#/casa-cartao?cartao=c2&fatura=2026-12');
 });
