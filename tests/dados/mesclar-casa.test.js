@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
-import { salvarValor, adicionarCompra, apagarCompra, editarConta } from '../../js/core/casa.js';
+import { salvarValor, adicionarCompra, apagarCompra, editarConta, migrarCasa } from '../../js/core/casa.js';
+import { anotarCompra, configurarCartao, adicionarPessoaDoCartao, editarFixa } from '../../js/core/cartao.js';
 
 function base() {
   return {
@@ -78,4 +79,39 @@ test('mês novo dos dois lados vem em ordem', () => {
   const local = salvarValor(b, { mes: '2026-09', contaId: 'c1', valor: 1 });
   const remoto = salvarValor(b, { mes: '2026-12', contaId: 'c1', valor: 2 });
   assert.deepEqual(mesclarCasa({ base: b, local, remoto }).meses.map((m) => m.mes), ['2026-09', '2026-11', '2026-12']);
+});
+
+// ---------- cartão (desenho 2026-11-19-cartao) ----------
+
+const baseV2 = () => configurarCartao(migrarCasa(base()), { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, novoId: () => 'nao' });
+
+test('cartão: um celular configura os dias enquanto o outro anota compra: os dois ficam', () => {
+  const b = baseV2();
+  const local = configurarCartao(b, { viraNoDia: 5, venceNoDia: 12 });
+  const remoto = anotarCompra(b, { data: '2026-11-19', nome: 'Mercado', valor: 50, para: 'casa', novoId: () => 'k1' });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual([r.cartao.viraNoDia, r.cartao.venceNoDia], [5, 12]);
+  assert.deepEqual(mes(r, '2026-12').compras.map((c) => c.id), ['k1']);
+});
+
+test('cartão: os dois acrescentam de todo mês e pessoas, e um muda o valor de uma: tudo fica', () => {
+  const b = anotarCompra(baseV2(), { data: '2026-11-19', nome: 'Streaming', valor: 40, todoMes: true, para: 'casa', novoId: () => 'f1' });
+  let local = anotarCompra(b, { data: '2026-11-19', nome: 'Academia', valor: 90, todoMes: true, para: 'p2', novoId: () => 'f2' });
+  local = adicionarPessoaDoCartao(local, { nome: 'Mãe', novoId: () => 'q1' }).casa;
+  let remoto = editarFixa(b, { fixaId: 'f1', fatura: '2027-03', valor: 45, novoId: () => 'f3' });
+  remoto = adicionarPessoaDoCartao(remoto, { nome: 'Tio', novoId: () => 'q2' }).casa;
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.cartao.fixas.map((f) => [f.id, f.valor, f.ate ?? null]), [['f1', 40, '2027-02'], ['f2', 90, null], ['f3', 45, null]]);
+  assert.deepEqual(r.cartao.pessoas.map((p) => p.nome), ['Mãe', 'Tio']);
+});
+
+test('revisão: base da versão 1 (antes do cartão) e cartão chegando do outro celular: o cartão não some', () => {
+  const b = base(); // versão 1, sem a chave "cartao"
+  const local = salvarValor(migrarCasa(b), { mes: '2026-11', contaId: 'c2', valor: 210 }); // migrado aqui: cartao null
+  const remoto = anotarCompra(baseV2(), { data: '2026-11-19', nome: 'Mercado', valor: 50, para: 'casa', novoId: () => 'k1' });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.equal(r.schemaVersion, 2);
+  assert.equal(r.cartao?.contaId, 'c4');
+  assert.equal(mes(r, '2026-11').valores.c2, 210);
+  assert.deepEqual(mes(r, '2026-12').compras.map((c) => c.id), ['k1']);
 });
