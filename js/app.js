@@ -7,7 +7,7 @@ import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
-import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar } from './ui/rotas.js';
+import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
@@ -46,7 +46,7 @@ function gravarLocal(chave, valor) {
 }
 const lerEspaco = () => {
   const espaco = lerLocal(CHAVE_ESPACO);
-  return espaco === 'casa' || espaco === 'casa-cartao' ? espaco : 'aposentadoria';
+  return LEMBRADAS.includes(espaco) ? espaco : 'aposentadoria';
 };
 
 function lerConexao() {

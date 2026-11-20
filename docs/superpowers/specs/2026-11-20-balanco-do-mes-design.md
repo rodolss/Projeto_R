@@ -30,3 +30,15 @@ a casa; o cartão c2 é do Leo; a Mãe é outra pessoa.
 
 Núcleo `balancoDoMes(casa, mes, pessoaId, hoje)` em `js/core/balanco.js` (reaproveita `resumoDoMes` e
 `faturaDoCartao`); tela `js/ui/casa-balanco.js` só desenha. Versão do site 15.
+
+## Adendo (versão 16): a fatura que fecha no mês; Balanço em primeiro
+
+- **Problema relatado:** "não adicionou a conta do meu cartão". Os cartões da casa viram no dia 24 e vencem no
+  dia 1. O balanço usava a fatura que *vence* no mês: em novembro entrava a fatura que venceu em 01/11 (compras de
+  24/09 a 23/10, quase nada anotado no app), e a fatura das compras de novembro (vence em 01/12) só em dezembro.
+- **Decisão:** no balanço, cada cartão entra com a fatura que **fecha** no mês (as compras do mês). Com o vencimento
+  antes do melhor dia, é a fatura que vence no começo do mês seguinte — paga com o dinheiro deste mês, antes do
+  próximo salário. Com o vencimento depois do melhor dia (vira 3, vence 10), nada muda. Sem os dias: a do próprio
+  mês. A linha diz "o que é seu na fatura que vence em dd/mm" e leva a essa fatura. As contas da casa não mudam.
+- **Menu:** Balanço · Mês · Cartão · Ano · Ajustes. O aparelho também lembra o Balanço como tela de abertura da
+  casa (como já lembrava Mês e Cartão).
