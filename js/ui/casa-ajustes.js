@@ -5,6 +5,11 @@ import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core
 import { cartaoConectar } from './conectar.js';
 import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao } from '../core/cartao.js';
 import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
+import {
+  cartoesDoPerfil, veAposentadoria, adicionarPerfil, renomearPerfil, vincularAparelho, desvincularAparelho,
+} from '../core/perfis.js';
+import { avatar } from './topo.js';
+import { parametroDoHash } from './rotas.js';
 
 export function render(container, ctx) {
   desenhar(container, ctx);
@@ -17,7 +22,42 @@ export function atualizar(container, ctx) {
 function desenhar(container, ctx) {
   const { casa } = ctx;
   if (!casa) {
-    container.replaceChildren(cartao(h('p', {}, 'Ainda não há contas da casa. '), h('a', { href: '#/casa' }, 'Começar')));
+    // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
+  const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
+  const novoPerfil = { nome: '' };
+  const perfisEAparelhos = administra && h('section', { class: 'cartao', id: 'perfis' },
+    h('h2', {}, 'Perfis e aparelhos'),
+    h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Cada um vê só os próprios cartões. O perfil de cada celular vem da chave do GitHub dele: uma chave nova pergunta "Quem usa este celular?".'),
+    ...(casa.perfis ?? []).map((p) => h('div', { class: 'casa-ajuste-linha', style: 'margin-top:10px' },
+      avatar(p),
+      h('input', {
+        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome do perfil ${p.nome}`,
+        onchange: (e) => {
+          const nome = e.target.value.trim();
+          if (!nome) { e.target.value = p.nome; return; }
+          if (nome !== p.nome) salvar((c) => renomearPerfil(c, p.id, nome), 'Nome salvo.');
+        },
+      }),
+      p.admin && h('span', { class: 'selo ok' }, 'administra'))),
+    h('div', { class: 'casa-ajuste', 'data-sem-recarregar': '' },
+      h('h3', { style: 'margin:0' }, 'Novo perfil'),
+      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Tem cartões próprios e não entra na divisão das contas.'),
+      h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Nome', 'aria-label': 'Nome do novo perfil', oninput: (e) => { novoPerfil.nome = e.target.value.trim(); } }),
+      h('div', { class: 'botoes' }, botao('Criar perfil', () => {
+        if (!novoPerfil.nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        salvar((c) => adicionarPerfil(c, { nome: novoPerfil.nome }).casa, 'Perfil criado.');
+      }, { secundario: true }))),
+    h('div', { class: 'casa-ajuste' },
+      h('h3', { style: 'margin:0' }, 'Aparelhos'),
+      ...(casa.aparelhos ?? []).map((a) => h('div', { class: 'casa-ajuste-linha' },
+        h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho' : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
+        h('select', {
+          class: 'entrada', 'aria-label': 'Perfil do aparelho', style: 'flex:0 1 150px',
+          onchange: (e) => salvar((c) => vincularAparelho(c, { impressao: a.id, perfilId: e.target.value, hoje: a.desde }), 'Aparelho atualizado.'),
+        }, ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
+        a.id !== ctx.perfil.impressao && botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.'))))));
+
+  container.replaceChildren(cartao(h('p', {}, 'Ainda não há contas da casa. '), h('a', { href: '#/casa' }, 'Começar')));
     return;
   }
   const salvar = async (mutacao, texto) => {
@@ -43,7 +83,24 @@ function desenhar(container, ctx) {
   // ---------- contas ----------
   const ativas = casa.contas.filter((c) => !c.arquivada);
   const arquivadas = casa.contas.filter((c) => c.arquivada);
-  const linhaConta = (conta, k) => h('div', { class: 'casa-ajuste' },
+  // Perfis: conta ligada ao cartão de outra pessoa não muda aqui (nome, compra por compra, não uso mais).
+  const visto = ctx.perfil?.visto ?? null;
+  const pessoaOuPerfil = (id) => [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === id);
+  const donoDeOutro = (conta) => {
+    const k = visto && (casa.cartoes ?? []).find((c) => c.contaId === conta.id && c.donaId !== visto.id);
+    return k ? pessoaOuPerfil(k.donaId) ?? { nome: 'outra pessoa' } : null;
+  };
+  const linhaConta = (conta, k) => (donoDeOutro(conta) ? linhaTravada(conta, k) : linhaLivre(conta, k));
+  const setas = (conta, k) => [
+    h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Subir ${conta.nome}`, disabled: k === 0, onclick: () => salvar((c) => moverConta(c, conta.id, -1)) }, '↑'),
+    h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Descer ${conta.nome}`, disabled: k === ativas.length - 1, onclick: () => salvar((c) => moverConta(c, conta.id, 1)) }, '↓'),
+  ];
+  const linhaTravada = (conta, k) => h('div', { class: 'casa-ajuste' },
+    h('div', { class: 'casa-ajuste-linha' },
+      h('input', { class: 'entrada', type: 'text', value: conta.nome, disabled: true, 'aria-label': `Nome da conta ${conta.nome}` }),
+      ...setas(conta, k)),
+    h('p', { class: 'suave pequeno', style: 'margin:0' }, `Do cartão de ${donoDeOutro(conta).nome}: só ${donoDeOutro(conta).nome} muda esta conta.`));
+  const linhaLivre = (conta, k) => h('div', { class: 'casa-ajuste' },
     h('div', { class: 'casa-ajuste-linha' },
       h('input', {
         class: 'entrada', type: 'text', value: conta.nome, autocomplete: 'off', 'aria-label': `Nome da conta ${conta.nome}`,
@@ -89,7 +146,7 @@ function desenhar(container, ctx) {
         }, 'Voltar a usar')))));
 
   // ---------- cartões (desenho 2026-11-19-cartao, vários cartões) ----------
-  const cartoes = casa.cartoes ?? [];
+  const cartoes = visto ? cartoesDoPerfil(casa, visto.id) : (casa.cartoes ?? []); // cada um, os próprios
   const usado = (k) => k.fixas.length > 0 || casa.meses.some((m) => (m.compras ?? []).some((c) => c.contaId === k.contaId));
   const blocoDoCartao = (k) => {
     const rotulo = rotuloDoCartao(casa, k);
@@ -157,13 +214,50 @@ function desenhar(container, ctx) {
     h('p', {}, 'Todo mês o app soma as contas da casa e divide pela renda: quem ganha mais paga mais, e cada um paga a mesma fatia do que ganha.'),
     h('p', { class: 'suave' }, 'Um valor "a confirmar" é uma previsão feita com o último valor conhecido. Ele vira valor certo quando alguém salva.'));
 
-  container.replaceChildren(
+  // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
+  const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
+  const novoPerfil = { nome: '' };
+  const perfisEAparelhos = administra && h('section', { class: 'cartao', id: 'perfis' },
+    h('h2', {}, 'Perfis e aparelhos'),
+    h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Cada um vê só os próprios cartões. O perfil de cada celular vem da chave do GitHub dele: uma chave nova pergunta "Quem usa este celular?".'),
+    ...(casa.perfis ?? []).map((p) => h('div', { class: 'casa-ajuste-linha', style: 'margin-top:10px' },
+      avatar(p),
+      h('input', {
+        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome do perfil ${p.nome}`,
+        onchange: (e) => {
+          const nome = e.target.value.trim();
+          if (!nome) { e.target.value = p.nome; return; }
+          if (nome !== p.nome) salvar((c) => renomearPerfil(c, p.id, nome), 'Nome salvo.');
+        },
+      }),
+      p.admin && h('span', { class: 'selo ok' }, 'administra'))),
+    h('div', { class: 'casa-ajuste', 'data-sem-recarregar': '' },
+      h('h3', { style: 'margin:0' }, 'Novo perfil'),
+      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Tem cartões próprios e não entra na divisão das contas.'),
+      h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Nome', 'aria-label': 'Nome do novo perfil', oninput: (e) => { novoPerfil.nome = e.target.value.trim(); } }),
+      h('div', { class: 'botoes' }, botao('Criar perfil', () => {
+        if (!novoPerfil.nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        salvar((c) => adicionarPerfil(c, { nome: novoPerfil.nome }).casa, 'Perfil criado.');
+      }, { secundario: true }))),
+    h('div', { class: 'casa-ajuste' },
+      h('h3', { style: 'margin:0' }, 'Aparelhos'),
+      ...(casa.aparelhos ?? []).map((a) => h('div', { class: 'casa-ajuste-linha' },
+        h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho' : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
+        h('select', {
+          class: 'entrada', 'aria-label': 'Perfil do aparelho', style: 'flex:0 1 150px',
+          onchange: (e) => salvar((c) => vincularAparelho(c, { impressao: a.id, perfilId: e.target.value, hoje: a.desde }), 'Aparelho atualizado.'),
+        }, ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
+        a.id !== ctx.perfil.impressao && botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.'))))));
+
+  container.replaceChildren(...[
     h('h1', {}, 'Ajustes da casa'),
     pessoas,
     contas,
     ...secaoCartoes,
     ...[sincronizacao].flat(),
     comoFunciona,
-    h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
-  );
+    perfisEAparelhos,
+    veAposentadoria(visto) && h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
+  ].filter(Boolean));
+  if (parametroDoHash(location.hash, 'secao') === 'perfis') document.getElementById('perfis')?.scrollIntoView({ block: 'start' });
 }
