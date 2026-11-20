@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { balancoDoMes } from '../../js/core/balanco.js';
+import { balancoDoMes, compararComPlano, gastouMaisQueOOrcamento, dadosCompletos, gastoMedioFechado } from '../../js/core/balanco.js';
 import { migrarCasa, salvarValor, salvarSalario, conferirFatura } from '../../js/core/casa.js';
 import { anotarCompra, adicionarCartao } from '../../js/core/cartao.js';
 import { adicionarPerfil } from '../../js/core/perfis.js';
@@ -101,4 +101,38 @@ test('revisão: cartão que vence no começo do mês seguinte entra no mês em q
   // Cartão sem os dias: a fatura do próprio mês, sem vencimento.
   const semDias = { ...casa, cartoes: [{ ...casa.cartoes[0], viraNoDia: null, venceNoDia: null }] };
   assert.deepEqual([balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].fatura, balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].vence], ['2026-12', null]);
+});
+
+// ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------
+test('balanço e plano: a sobra do mês contra o que o plano pede', () => {
+  assert.deepEqual(compararComPlano({ sobra: -50, pmtNec: 1000 }), { situacao: 'vermelho', falta: 1000, livre: 0 });
+  assert.deepEqual(compararComPlano({ sobra: 0, pmtNec: 1000 }), { situacao: 'vermelho', falta: 1000, livre: 0 });
+  assert.deepEqual(compararComPlano({ sobra: 3000, pmtNec: 0 }), { situacao: 'sem-aporte', falta: 0, livre: 3000 });
+  assert.deepEqual(compararComPlano({ sobra: 3000, pmtNec: 1200.5 }), { situacao: 'cobre', falta: 0, livre: 1799.5 });
+  assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: 1200 }), { situacao: 'falta', falta: 400, livre: 0 });
+  assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: Number.NaN }), { situacao: 'sem-plano', falta: 0, livre: 0 });
+  assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: Infinity }), { situacao: 'sem-plano', falta: 0, livre: 0 });
+});
+
+test('balanço e plano: gastou bem mais que o orçamento do plano (mais de 10%)', () => {
+  assert.equal(gastouMaisQueOOrcamento({ saiu: 3301, custoMensal: 3000 }), true);
+  assert.equal(gastouMaisQueOOrcamento({ saiu: 3300, custoMensal: 3000 }), false);
+  assert.equal(gastouMaisQueOOrcamento({ saiu: 500, custoMensal: 0 }), false);
+});
+
+test('revisão: sem salário ou sem divisão não dá veredito; mês já registrado diz que já investiu', () => {
+  assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: 1200, completo: false }), { situacao: 'incompleto', falta: 0, livre: 0 });
+  assert.deepEqual(compararComPlano({ sobra: -50, pmtNec: 1200, registrado: true }), { situacao: 'registrado', falta: 0, livre: 0 });
+  assert.equal(dadosCompletos(balancoDoMes(casaBase(), '2026-12', 'p2', '2026-12-20')), true);
+  let semSalario = salvarSalario(casaBase(), { mes: '2026-12', pessoaId: 'p2', valor: null });
+  assert.equal(dadosCompletos(balancoDoMes(semSalario, '2026-12', 'p2', '2026-12-20')), false); // salário vazio
+  semSalario = salvarSalario(semSalario, { mes: '2026-12', pessoaId: 'p1', valor: null });
+  assert.equal(dadosCompletos(balancoDoMes(semSalario, '2026-12', 'p2', '2026-12-20')), false); // sem divisão
+});
+
+test('revisão: o gasto médio dos últimos meses já fechados (sem previsão), para conferir o orçamento', () => {
+  const casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
+  // Em março, janeiro e fevereiro ainda são previsão (salários a confirmar): só dezembro, fechado, entra.
+  assert.equal(gastoMedioFechado(casa, 'p2', '2027-03', '2027-03-15'), 290);
+  assert.equal(gastoMedioFechado(casaBase(), 'p2', '2026-12', '2026-12-20'), null); // nenhum mês fechado antes
 });

@@ -3,10 +3,11 @@
 // cartão para outras pessoas aparece à parte (volta para ela). Com perfis, o balanço é o do perfil visto; sem
 // perfis, botões para escolher a pessoa. Endereço: #/casa-balanco?mes=AAAA-MM[&pessoa=pX].
 import { h, cartao } from './dom.js';
-import { formatarBRL, formatarPct } from '../core/formato.js';
+import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import { primeiroMes } from '../core/casa.js';
-import { balancoDoMes } from '../core/balanco.js';
+import { balancoDoMes, compararComPlano, dadosCompletos } from '../core/balanco.js';
+import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash } from './rotas.js';
 import { nomeDoMes, mesDaTela } from './casa.js';
 
@@ -18,6 +19,46 @@ const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde
 // A fatura do mês no Cartão: o "De quem é" dela mostra o mesmo "Já tenho / falta" da linha tocada (o Cofrinho
 // soma outras faturas e não bateria).
 export const enderecoDaFatura = (cartaoId, mes) => `#/casa-cartao?cartao=${cartaoId}&fatura=${mes}`;
+
+// Balanço e plano (desenho 2026-11-20-balanco-e-plano): a sobra do mês contra o que o plano pede.
+// Nunca "livre" nem "pode parar de investir": quem diz para onde vai cada real é o Dia de pagamento.
+export function textoDoPlano({ situacao, falta = 0 }) {
+  if (situacao === 'registrado') return 'Este mês você já investiu ✓';
+  if (situacao === 'incompleto') return 'Preencha os salários no Mês para comparar com o plano.';
+  if (situacao === 'vermelho') return 'Neste mês não sobrou: o balanço fechou no vermelho.';
+  if (situacao === 'sem-aporte') return 'No ritmo de hoje você chega no prazo. Siga o Dia de pagamento.';
+  if (situacao === 'cobre') return 'A sobra cobre o que o plano pede ✓. O Dia de pagamento diz onde pôr cada real.';
+  if (situacao === 'falta') return `Faltam ${formatarBRL(falta)} para o que o plano pede.`;
+  return null;
+}
+
+// Na visão única (quem administra, com o planejador), o Balanço é a tela inicial: no mês atual, o plano junto.
+// Só confere — o quanto investir sai do Dia de pagamento, pelo salário e pelo orçamento.
+function cartaoDoPlano(ctx, b) {
+  let painel;
+  try {
+    painel = calcularPainel({ estado: ctx.estado, hoje: ctx.hoje });
+  } catch (erro) {
+    console.warn('Sem o painel do plano', erro);
+    return null;
+  }
+  const conquistada = Boolean(painel.marcos?.rendaPlena?.atingido);
+  // O mesmo "para chegar no alvo" da tela de detalhes do plano: conta a reserva que ainda falta formar.
+  const alvo = painel.necessarioAlvo;
+  const pede = Number.isFinite(alvo) && alvo > 0;
+  const registrado = (ctx.estado.meses ?? []).some((m) => m.mes === ctx.hoje.slice(0, 7));
+  const texto = textoDoPlano(compararComPlano({ sobra: b.sobra, pmtNec: alvo, completo: dadosCompletos(b), registrado }));
+  return h('section', { class: 'cartao balanco-plano' },
+    h('div', { class: 'rotulo' }, 'Seu plano'),
+    conquistada
+      ? h('p', {}, h('b', {}, 'Renda plena conquistada ✓'))
+      : h('p', {}, h('b', {}, `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`), ' no ritmo de hoje.'),
+    pede && !registrado && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
+    texto && h('p', {}, texto),
+    h('div', { class: 'botoes' },
+      h('a', { class: 'botao', href: '#/mes' }, 'Dia de pagamento'),
+      h('a', { class: 'botao secundario', href: '#/inicio' }, 'Ver o plano')));
+}
 
 // De quem é o balanço: o perfil visto; sem perfis, a pessoa do endereço (se for da casa), senão a primeira.
 export function pessoaDoBalanco({ hash, casa, visto }) {
@@ -135,5 +176,7 @@ function desenhar(container, ctx) {
     }))),
     h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Você paga no cartão e recebe de volta: não entra na sobra.'));
 
-  container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, entrou, saiu, outras].filter(Boolean));
+  // O plano só no mês atual, na visão única e no balanço de quem administra.
+  const plano = ctx.unica && ctx.estado && mes === mesAtual && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
+  container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, plano, entrou, saiu, outras].filter(Boolean));
 }

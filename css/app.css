@@ -472,3 +472,7 @@ a.barra-item:active { background: var(--cartao-2); }
 .quem-usa-perfil { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px; border: 1px solid var(--borda);
   border-radius: 16px; background: var(--cartao); color: var(--texto); font: inherit; font-weight: 600; cursor: pointer; }
 .quem-usa-perfil.escolhido { border-color: var(--destaque); }
+
+/* ---------- Balanço e plano (desenho 2026-11-20-balanco-e-plano) ---------- */
+.balanco-plano { display: flex; flex-direction: column; gap: 8px; border-color: var(--destaque-suave); }
+.balanco-plano p { margin: 0; }
