@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome, textoDaFalta, dicaDoJaTenho, telaDoCartao } from '../../js/ui/casa-cartao.js';
+import { faturaDaTela, dataCurta, situacaoDaFatura, paraSugerido, ehParcelada, cartaoDaTela, sugestoesDoNome, textoDaFalta, dicaDoJaTenho, telaDoCartao, depoisDeMarcar } from '../../js/ui/casa-cartao.js';
 import { textoQuemDeve } from '../../js/ui/casa-cofrinho.js';
 
 test('fatura da tela: a do endereço, ou a aberta', () => {
@@ -89,4 +89,12 @@ test('quem deve: ninguém, uma pessoa, várias', () => {
   assert.equal(textoQuemDeve(0), 'Ninguém te deve');
   assert.equal(textoQuemDeve(1), '1 pessoa te deve');
   assert.equal(textoQuemDeve(3), '3 pessoas te devem');
+});
+
+test('revisão: depois de salvar o "já tenho", com a folha aberta não mexe; fechada na tela do cartão (ou no Cofrinho) redesenha; em outra tela não mexe', () => {
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2027-01&folha=compra-k1'), 'nada');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&folha=anotar'), 'nada');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2027-01'), 'redesenhar');
+  assert.equal(depoisDeMarcar('#/casa-cartao?cartao=c2&fatura=2026-12&tela=cofrinho'), 'redesenhar');
+  assert.equal(depoisDeMarcar('#/casa'), 'nada');
 });

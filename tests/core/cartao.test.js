@@ -340,7 +340,7 @@ test('já tenho: marcar e desmarcar compra e de todo mês; Casa e item que não 
   fixa = marcarJaTenho(fixa, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: false });
   assert.deepEqual(fixa.cartoes[0].fixas[0].jaTenhoEm, { '2027-02': true });
   fixa = marcarJaTenho(fixa, { cartaoId: K, fatura: '2027-02', fixaId: 'f1', jaTenho: false });
-  assert.equal('jaTenhoEm' in fixa.cartoes[0].fixas[0], false);
+  assert.deepEqual(fixa.cartoes[0].fixas[0].jaTenhoEm, {}); // fica vazio (não some): a mescla junta chave a chave
   assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2026-12', compraId: 'k2', jaTenho: true }), casa);
   assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2026-12', compraId: 'nada', jaTenho: true }), casa);
   assert.equal(marcarJaTenho(casa, { cartaoId: K, fatura: '2027-01', compraId: 'k1', jaTenho: true }), casa);

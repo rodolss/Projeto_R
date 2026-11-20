@@ -164,8 +164,9 @@ export function marcarJaTenho(casa, { cartaoId, fatura, compraId, fixaId, jaTenh
       fixas: c.fixas.map((f) => {
         if (f.id !== fixaId) return f;
         const { [fatura]: _antes, ...outras } = f.jaTenhoEm ?? {};
-        const marcas = ligar ? { ...outras, [fatura]: true } : outras;
-        return Object.keys(marcas).length ? { ...f, jaTenhoEm: marcas } : semMarcas(f);
+        // Sem marcas fica `{}` (não some): a mescla junta chave a chave, e um campo apagado num celular perderia
+        // para o objeto inteiro do outro, que acabou de marcar outra fatura (a desmarcada voltaria).
+        return { ...f, jaTenhoEm: ligar ? { ...outras, [fatura]: true } : outras };
       }),
     }));
   }

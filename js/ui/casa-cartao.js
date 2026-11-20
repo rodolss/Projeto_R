@@ -14,7 +14,7 @@ import {
   acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
 import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
-import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
+import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './rotas.js';
 import { nomeDoMes } from './casa.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 
@@ -75,6 +75,10 @@ export function dicaDoJaTenho({ forma, nomeDaFatura = '', parcela = null }) {
   if (forma === 'parcela') return parcela ? `Vale só para esta parcela (${parcela.n} de ${parcela.de}).` : 'Vale só para esta parcela.';
   return 'Já guardou no cofrinho, ou a pessoa já te pagou.';
 }
+
+// Depois de salvar o "já tenho" (o envio pode demorar): com uma folha aberta, nada (redesenhar apagaria o digitado);
+// sem folha, na tela do cartão ou no Cofrinho, redesenha (a pessoa fechou antes de terminar e a tela ficou velha).
+export const depoisDeMarcar = (hash) => (!folhaAberta(hash) && resolverRota(hash, true) === 'casa-cartao' ? 'redesenhar' : 'nada');
 
 // Interruptor "Já tenho o dinheiro". Muda na hora; `aoMudar(novo)` pode salvar (fica desabilitado enquanto isso
 // e volta ao estado de antes se der erro). `mudarDica(texto)` troca a dica de fora.
@@ -571,6 +575,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const salvarMarca = async (alvo, ligar) => {
     await ctx.salvarCasa((c) => marcarJaTenho(c, { cartaoId: cfg.id, fatura, ...alvo, jaTenho: ligar }));
     ctx.aviso(ligar ? 'Marcado: já tenho.' : 'Desmarcado.', 'ok', 2500);
+    if (depoisDeMarcar(location.hash) === 'redesenhar') ctx.rerender();
   };
   // Some se a pessoa escolhida na folha passar a ser a Casa (ao salvar, a marca sai).
   const jaTenhoDaFolha = (item, dica, alvo) => {
