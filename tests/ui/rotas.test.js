@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
+  resolverRota, abaDoMenu, visaoUnica, mostraTopo, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
   espacoParaLembrar,
 } from '../../js/ui/rotas.js';
 
@@ -107,4 +107,31 @@ test('balanço: também é lembrado como a tela de abertura da casa', () => {
   assert.equal(resolverRota('#/xyz', false, 'casa-balanco'), 'casa-balanco');
   assert.equal(espacoParaLembrar('casa-balanco', 'casa'), 'casa-balanco');
   assert.equal(espacoParaLembrar('casa-ano', 'casa-balanco'), 'casa-balanco');
+});
+
+// ---------- visão única (desenho 2026-11-20-visao-unica) ----------
+test('visão única: só para quem administra, vendo o próprio perfil, com o planejador', () => {
+  const ana = { id: 'p1', nome: 'Ana', admin: true };
+  const leo = { id: 'p2', nome: 'Leo' };
+  assert.equal(visaoUnica({ visto: ana, temEstado: true }), true);
+  assert.equal(visaoUnica({ visto: ana, temEstado: false }), false); // sem planejador
+  assert.equal(visaoUnica({ visto: leo, temEstado: true }), false); // a outra pessoa (ou a Ana vendo o perfil dele)
+  assert.equal(visaoUnica({ visto: null, temEstado: true }), false); // aparelho sem perfil: como antes
+});
+
+test('visão única: cada tela acende uma das 5 abas; fora dela, como antes', () => {
+  const unica = (rota) => abaDoMenu(rota, true);
+  assert.deepEqual(['casa-balanco', 'casa', 'casa-cartao'].map(unica), ['casa-balanco', 'casa', 'casa-cartao']);
+  assert.deepEqual(['inicio', 'mes'].map(unica), ['inicio', 'inicio']); // o lembrete abre #/mes: acende o Plano
+  assert.deepEqual(['simular', 'mais', 'orcamento', 'historico', 'config', 'casa-ano', 'casa-ajustes'].map(unica), Array(7).fill('mais'));
+  assert.equal(abaDoMenu('casa-ano'), 'casa-ano');
+  assert.equal(abaDoMenu('simular'), 'simular');
+  assert.equal(abaDoMenu('config'), 'mais');
+});
+
+test('revisão: a foto do perfil aparece na casa e, na visão única, em todas as telas — nunca no assistente', () => {
+  assert.equal(mostraTopo({ nome: 'casa', daCasa: true, unica: false }), true);
+  assert.equal(mostraTopo({ nome: 'inicio', daCasa: false, unica: true }), true);
+  assert.equal(mostraTopo({ nome: 'inicio', daCasa: false, unica: false }), false);
+  assert.equal(mostraTopo({ nome: 'boas-vindas', daCasa: false, unica: true }), false); // "Refazer mesmo assim"
 });

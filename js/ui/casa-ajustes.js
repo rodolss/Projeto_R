@@ -223,7 +223,7 @@ function desenhar(container, ctx) {
     ...[sincronizacao].flat(),
     comoFunciona,
     perfisEAparelhos,
-    veAposentadoria(visto) && h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
+    veAposentadoria(visto) && !ctx.unica && h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
   ].filter(Boolean));
   if (parametroDoHash(location.hash, 'secao') === 'perfis') document.getElementById('perfis')?.scrollIntoView({ block: 'start' });
 }
