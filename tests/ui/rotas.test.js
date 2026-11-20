@@ -37,7 +37,7 @@ test('contas da casa: depois de salvar numa folha da casa', () => {
 });
 
 test('telas conhecidas', () => {
-  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-cartao', 'casa-ano', 'casa-ajustes']);
+  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-balanco', 'casa-cartao', 'casa-ano', 'casa-ajustes']);
 });
 test('rotas', () => {
   assert.equal(resolverRota('', true), 'inicio');
@@ -93,4 +93,11 @@ test('cartão: o app abre na última tela usada entre Mês e Cartão', () => {
   assert.equal(espacoParaLembrar('casa-ajustes', 'aposentadoria'), 'casa');
   assert.equal(espacoParaLembrar('casa-ano', null), 'casa');
   assert.equal(espacoParaLembrar('inicio', 'casa-cartao'), 'aposentadoria');
+});
+
+test('balanço do mês: rota da casa, com o próprio botão no menu (desenho 2026-11-20-balanco-do-mes)', () => {
+  assert.equal(resolverRota('#/casa-balanco', false), 'casa-balanco');
+  assert.equal(resolverRota('#/casa-balanco?mes=2026-12&pessoa=p2', true), 'casa-balanco');
+  assert.equal(abaDoMenu('casa-balanco'), 'casa-balanco');
+  assert.equal(ehDaCasa('casa-balanco'), true);
 });
