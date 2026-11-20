@@ -387,3 +387,6 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-fatura-nome { min-width: 150px; }
 .cartao-conferir { display: flex; flex-direction: column; gap: 8px; }
 .folha .campo + .campo, .folha .campo + .botoes { margin-top: 12px; }
+.cartao-troca { display: flex; justify-content: center; }
+.cartao-troca .chips { justify-content: center; }
+.cartao-outro { align-self: center; padding: 8px 4px; }

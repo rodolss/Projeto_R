@@ -3,9 +3,10 @@
 // valor conhecido ("a confirmar"). No cartão compra por compra, o valor é a soma das compras do mês.
 // Versão 2 (desenho 2026-11-19-cartao): o cartão de uma das pessoas guarda também compras dela e de outras
 // pessoas (`para`); a conta da casa ligada ao cartão soma só a parte da casa e as de todo mês da casa.
+// Versão 3: vários cartões (`cartoes`, um por conta da casa, id = contaId) e `outrasPessoas` para todos.
 import { somarMeses } from './meses.js';
 
-export const SCHEMA_CASA = 2;
+export const SCHEMA_CASA = 3;
 
 export const centavos = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const soma = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
@@ -22,12 +23,21 @@ export function criarCasa({ nomes, novoId = idPadrao }) {
     pessoas: [{ id: 'p1', nome: nomes[0] }, { id: 'p2', nome: nomes[1] }],
     contas: CONTAS_SUGERIDAS.map(([nome, compraPorCompra]) => ({ id: novoId(), nome, compraPorCompra, arquivada: false })),
     meses: [],
-    cartao: null,
+    cartoes: [],
+    outrasPessoas: [],
   };
 }
 
+// Determinística (os dois celulares migram sozinhos e depois juntam): o cartão da versão 2 ganha id = conta ligada.
 export function migrarCasa(estado) {
-  if (estado?.schemaVersion === 1) return { ...estado, schemaVersion: SCHEMA_CASA, cartao: null };
+  if (estado?.schemaVersion === 1) return migrarCasa({ ...estado, schemaVersion: 2, cartao: null });
+  if (estado?.schemaVersion === 2) {
+    const { cartao, ...resto } = estado;
+    const cartoes = cartao?.contaId
+      ? [{ id: cartao.contaId, contaId: cartao.contaId, donaId: cartao.donaId ?? null, viraNoDia: cartao.viraNoDia ?? null, venceNoDia: cartao.venceNoDia ?? null, fixas: cartao.fixas ?? [] }]
+      : [];
+    return { ...resto, schemaVersion: SCHEMA_CASA, cartoes, outrasPessoas: cartao?.pessoas ?? [] };
+  }
   if (estado?.schemaVersion !== SCHEMA_CASA) throw new Error('versao-desconhecida');
   return estado;
 }
@@ -39,15 +49,16 @@ const comprasDa = (reg, contaId) => (reg?.compras ?? []).filter((c) => c.contaId
 // Compra sem `para` é da casa (as anotadas antes do cartão).
 export const compraDaCasa = (item) => !item.para || item.para === 'casa';
 
-// As de todo mês do cartão que valem no mês (fatura).
-export const fixasNoMes = (casa, mes) => (casa.cartao?.fixas ?? [])
+// As de todo mês de um cartão que valem no mês (fatura).
+export const fixasNoMes = (cartao, mes) => (cartao?.fixas ?? [])
   .filter((f) => f.desde <= mes && (!f.ate || mes <= f.ate));
 
 // O que a conta da casa soma no mês: compras da casa e, na conta ligada ao cartão, as de todo mês da casa.
 function itensDaCasa(casa, reg, mes, conta) {
   if (!conta.compraPorCompra) return [];
   const compras = comprasDa(reg, conta.id).filter(compraDaCasa);
-  const fixas = conta.id === casa.cartao?.contaId ? fixasNoMes(casa, mes).filter(compraDaCasa) : [];
+  const cartao = (casa.cartoes ?? []).find((c) => c.contaId === conta.id);
+  const fixas = cartao ? fixasNoMes(cartao, mes).filter(compraDaCasa) : [];
   return [...compras, ...fixas];
 }
 

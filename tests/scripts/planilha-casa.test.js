@@ -112,17 +112,19 @@ const resumo = (casa, m) => (mes(casa, m)?.compras ?? []).map((c) => [c.nome, c.
 
 test('cartão: o cartão é de quem tem a aba pessoal, ligado à conta do cartão, com as outras pessoas dos grupos', () => {
   const { casa, avisos } = importar();
-  assert.equal(casa.schemaVersion, 2);
-  assert.equal(casa.cartao.donaId, 'p2');
-  assert.equal(casa.cartao.contaId, idDe(casa, 'Cartão Casa'));
-  assert.deepEqual([casa.cartao.viraNoDia, casa.cartao.venceNoDia], [null, null]); // não estão na planilha: o app pede
-  assert.deepEqual(casa.cartao.pessoas.map((p) => p.nome), ['Mãe']);
+  assert.equal(casa.schemaVersion, 3);
+  assert.equal(casa.cartoes.length, 1);
+  assert.equal(casa.cartoes[0].donaId, 'p2');
+  assert.equal(casa.cartoes[0].contaId, idDe(casa, 'Cartão Casa'));
+  assert.equal(casa.cartoes[0].id, casa.cartoes[0].contaId);
+  assert.deepEqual([casa.cartoes[0].viraNoDia, casa.cartoes[0].venceNoDia], [null, null]); // não estão na planilha: o app pede
+  assert.deepEqual(casa.outrasPessoas.map((p) => p.nome), ['Mãe']);
   assert.deepEqual(avisos, []);
 });
 
 test('cartão: aba da casa vai para a fatura do mês seguinte; aba pessoal já está por fatura; parcelas contadas do fim', () => {
   const { casa } = importar();
-  const mae = casa.cartao.pessoas[0].id;
+  const mae = casa.outrasPessoas[0].id;
   assert.deepEqual(resumo(casa, '2026-12'), [
     ['Mercado', 280, 'casa', null], ['Sofá', 100, 'casa', '3/4'],
     ['Celular', 150, 'p2', '9/10'], ['Livro', 45, 'p2', null], ['Curso', 60, 'p2', '1/2'], ['Remédio', 30, mae, '3/3'],
@@ -136,8 +138,8 @@ test('cartão: aba da casa vai para a fatura do mês seguinte; aba pessoal já e
 
 test('cartão: fixas e linhas até a última coluna viram "todo mês"; valor que muda abre um trecho novo', () => {
   const { casa } = importar();
-  const mae = casa.cartao.pessoas[0].id;
-  assert.deepEqual(casa.cartao.fixas.map((f) => [f.nome, f.valor, f.para, f.desde, f.ate ?? null]), [
+  const mae = casa.outrasPessoas[0].id;
+  assert.deepEqual(casa.cartoes[0].fixas.map((f) => [f.nome, f.valor, f.para, f.desde, f.ate ?? null]), [
     ['Streaming', 20, 'casa', '2026-12', null],
     ['Academia', 90, 'p2', '2026-12', '2027-01'], ['Academia', 95, 'p2', '2027-02', null],
     ['Plano do celular', 40, mae, '2026-12', null],
@@ -152,8 +154,9 @@ test('cartão: importar de novo sobre a casa substitui as compras do cartão des
   const comAntiga = { ...casa, meses: casa.meses.map((m) => (m.mes === '2026-11' ? { ...m, compras: [{ id: 'velha', contaId, nome: 'Antes', valor: 5 }] } : m)) };
   const r = importarCartao(lerXlsx(planilha()), { hoje: '2026-11-19', casa: comAntiga, novoId });
   assert.deepEqual(resumo(r.casa, '2026-12'), resumo(casa, '2026-12'));
-  assert.equal(r.casa.cartao.fixas.length, 4);
-  assert.deepEqual(r.casa.cartao.pessoas.map((p) => p.nome), ['Mãe']);
+  assert.equal(r.casa.cartoes.length, 1);
+  assert.equal(r.casa.cartoes[0].fixas.length, 4);
+  assert.deepEqual(r.casa.outrasPessoas.map((p) => p.nome), ['Mãe']);
   assert.deepEqual(mes(r.casa, '2026-11').compras.map((c) => c.id), ['velha']);
   assert.deepEqual(r.avisos, []);
 });
@@ -170,7 +173,7 @@ test('meses em ordem e dentro do formato da casa', () => {
   const meses = casa.meses.map((m) => m.mes);
   assert.deepEqual(meses, [...meses].sort());
   assert.equal(meses[0], '2025-01');
-  assert.equal(casa.schemaVersion, 2);
+  assert.equal(casa.schemaVersion, 3);
   assert.ok(casa.meses.every((m) => m.salarios && m.valores && Array.isArray(m.compras)));
 });
 
@@ -187,7 +190,7 @@ test('revisão: aba pessoal de janeiro a dezembro lida em novembro fica no ano a
   meses.forEach((m, k) => { celulas[`${'CDEFGHIJKLMN'[k]}1`] = m; });
   const casa = {
     schemaVersion: 2, pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Bia' }],
-    contas: [{ id: 'c1', nome: 'Cartão', compraPorCompra: true, arquivada: false }], meses: [], cartao: null,
+    contas: [{ id: 'c1', nome: 'Cartão', compraPorCompra: true, arquivada: false }], meses: [], cartoes: [], outrasPessoas: [],
   };
   const r = importarCartao(lerXlsx(criarXlsx([{ nome: 'BIA', celulas }])), { hoje: '2026-11-19', casa, novoId });
   assert.deepEqual(r.casa.meses.map((m) => [m.mes, m.compras.map((c) => c.nome)]), [['2026-01', ['Livro']], ['2026-12', ['Curso']]]);

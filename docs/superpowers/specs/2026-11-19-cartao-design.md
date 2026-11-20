@@ -119,3 +119,23 @@ compra (em meses[fatura].compras): { id, contaId, nome, valor, grupo?, parcela?,
 ## Deixado para quem implementa
 
 Nomes de funções, estilo dos chips e da lista, textos de ajuda curtos no mesmo tom das telas da casa.
+
+## Vários cartões (adendo, versão 8)
+
+Cada pessoa da casa tem o seu cartão (a Ana anota o dela com o que veio da planilha; o Leo começa o dele do
+zero). O usuário escolheu "de quem é o cartão" esperando criar o próprio e caiu no cartão da outra pessoa.
+
+- **Modelo (schemaVersion 3):** `cartoes: [{ id, contaId, donaId, viraNoDia, venceNoDia, fixas }]`, com
+  `id === contaId` (um cartão por conta da casa; a migração fica igual nos dois celulares, e a mescla junta
+  cartão por cartão) e `outrasPessoas: [{ id, nome, arquivada? }]`, valendo para todos os cartões.
+  Migração 2 → 3: o `cartao` vira o primeiro da lista e as `pessoas` dele viram `outrasPessoas`.
+- **Cartão novo:** de quem é, nome (como aparece nas contas da casa; padrão "Cartão Leo"), os dois dias. Cria a
+  conta compra por compra com esse nome. O primeiro cartão de uma casa sem cartões continua ligado à conta
+  compra por compra que já existe (se houver só uma).
+- **Tela do Cartão (#/casa-cartao?cartao=<id>&fatura=…):** com dois ou mais cartões, botões no topo para
+  trocar (o nome de quem é o cartão; o nome da conta se a pessoa tiver mais de um). Cada aparelho lembra o
+  último cartão aberto. "Adicionar outro cartão" no fim da tela e nos Ajustes.
+- **Ajustes:** um bloco por cartão (de quem é, dias) e "Tirar este cartão" só para cartão sem compras.
+- **Mês da casa:** cada conta ligada a um cartão abre aquele cartão.
+- **Correção dos dados reais (uma vez):** o cartão importado volta a ser da dona da aba pessoal, sem os dias
+  (que eram do outro cartão); o outro cartão é criado no app.

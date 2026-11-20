@@ -3,8 +3,8 @@
 import { h, cartao, botao } from './dom.js';
 import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core/casa.js';
 import { cartaoConectar } from './conectar.js';
-import { cartaoPronto, editarPessoaDoCartao } from '../core/cartao.js';
-import { formularioDoCartao } from './casa-cartao.js';
+import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao } from '../core/cartao.js';
+import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
 
 export function render(container, ctx) {
   desenhar(container, ctx);
@@ -88,42 +88,54 @@ function desenhar(container, ctx) {
           onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: false, ativadaEm: ctx.hoje.slice(0, 7) }), `${conta.nome} voltou para a lista.`),
         }, 'Voltar a usar')))));
 
-  // ---------- cartão (desenho 2026-11-19-cartao) ----------
-  const outrasPessoas = casa.cartao?.pessoas ?? [];
+  // ---------- cartões (desenho 2026-11-19-cartao, vários cartões) ----------
+  const cartoes = casa.cartoes ?? [];
+  const usado = (k) => k.fixas.length > 0 || casa.meses.some((m) => (m.compras ?? []).some((c) => c.contaId === k.contaId));
+  const blocoDoCartao = (k) => {
+    const rotulo = rotuloDoCartao(casa, k);
+    const titulo = casa.pessoas.some((p) => p.nome === rotulo) ? `Cartão de ${rotulo}` : rotulo;
+    return cartao(
+      h('h2', {}, titulo),
+      formularioDoCartao(ctx, { cartaoId: k.id, aoSalvar: () => ctx.rerender() }),
+      !usado(k) && botaoDoisToques('Tirar este cartão', 'Toque de novo para tirar', () => salvar((c) => tirarCartao(c, k.id), 'Cartão tirado.')));
+  };
+  const outrasPessoas = casa.outrasPessoas ?? [];
   const usadas = outrasPessoas.filter((p) => !p.arquivada);
   const paradas = outrasPessoas.filter((p) => p.arquivada);
-  const secaoCartao = cartaoPronto(casa)
-    ? cartao(
+  const pessoasDosCartoes = cartoes.length > 0 && cartao(
+    h('h2', {}, 'Outras pessoas'),
+    h('p', { class: 'suave pequeno', style: 'margin:0' }, usadas.length
+      ? 'Para quem também se compra nos cartões. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'
+      : 'Ninguém ainda. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'),
+    ...usadas.map((p) => h('div', { class: 'casa-ajuste-linha', style: 'margin-top:8px' },
+      h('input', {
+        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome de ${p.nome}`,
+        onchange: (e) => {
+          const nome = e.target.value.trim();
+          if (!nome) { e.target.value = p.nome; return; }
+          if (nome !== p.nome) salvar((c) => editarPessoaDoCartao(c, p.id, { nome }), 'Nome salvo.');
+        },
+      }),
+      h('button', {
+        type: 'button', class: 'botao-link', style: 'padding:6px 0',
+        onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: true }), `${p.nome} saiu da lista de "Para quem".`),
+      }, 'Não uso mais'))),
+    ...paradas.map((p) => h('div', { class: 'linha' },
+      h('div', { class: 'nome' }, h('span', {}, p.nome), h('small', {}, 'não aparece em "Para quem"')),
+      h('button', {
+        type: 'button', class: 'botao-link', style: 'padding:4px 0',
+        onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: false }), `${p.nome} voltou para a lista.`),
+      }, 'Voltar a usar'))));
+  const secaoCartoes = cartoes.length
+    ? [
+      ...cartoes.map(blocoDoCartao),
+      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao?novo=1' }, 'Adicionar outro cartão')),
+      pessoasDosCartoes,
+    ]
+    : [cartao(
       h('h2', {}, 'Cartão'),
-      formularioDoCartao(ctx, { aoSalvar: () => ctx.rerender() }),
-      h('div', { class: 'casa-ajuste' },
-        h('h3', { style: 'margin:0' }, 'Outras pessoas'),
-        h('p', { class: 'suave pequeno', style: 'margin:0' }, usadas.length
-          ? 'Para quem também se compra no cartão. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'
-          : 'Ninguém ainda. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'),
-        ...usadas.map((p) => h('div', { class: 'casa-ajuste-linha' },
-          h('input', {
-            class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome de ${p.nome}`,
-            onchange: (e) => {
-              const nome = e.target.value.trim();
-              if (!nome) { e.target.value = p.nome; return; }
-              if (nome !== p.nome) salvar((c) => editarPessoaDoCartao(c, p.id, { nome }), 'Nome salvo.');
-            },
-          }),
-          h('button', {
-            type: 'button', class: 'botao-link', style: 'padding:6px 0',
-            onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: true }), `${p.nome} saiu da lista de "Para quem".`),
-          }, 'Não uso mais'))),
-        ...paradas.map((p) => h('div', { class: 'linha' },
-          h('div', { class: 'nome' }, h('span', {}, p.nome), h('small', {}, 'não aparece em "Para quem"')),
-          h('button', {
-            type: 'button', class: 'botao-link', style: 'padding:4px 0',
-            onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: false }), `${p.nome} voltou para a lista.`),
-          }, 'Voltar a usar')))))
-    : cartao(
-      h('h2', {}, 'Cartão'),
-      h('p', { class: 'suave' }, 'Anote compra por compra do cartão de um de vocês: o que é da casa, de cada um e de outras pessoas.'),
-      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao' }, 'Configurar o cartão')));
+      h('p', { class: 'suave' }, 'Anote compra por compra do cartão de cada um: o que é da casa, de cada um e de outras pessoas.'),
+      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao' }, 'Configurar o cartão')))];
 
   // ---------- sincronização ----------
   const outra = casa.pessoas[1]?.nome ?? 'a outra pessoa';
@@ -149,7 +161,7 @@ function desenhar(container, ctx) {
     h('h1', {}, 'Ajustes da casa'),
     pessoas,
     contas,
-    secaoCartao,
+    ...secaoCartoes,
     ...[sincronizacao].flat(),
     comoFunciona,
     h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),

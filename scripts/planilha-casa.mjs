@@ -3,7 +3,7 @@
 import { inflateRawSync } from 'node:zlib';
 import { somarMeses, diffMeses } from '../js/core/meses.js';
 import { centavos, comMes, compraDaCasa, fixasNoMes, SCHEMA_CASA } from '../js/core/casa.js';
-import { adicionarPessoaDoCartao } from '../js/core/cartao.js';
+import { adicionarPessoaDoCartao, acharCartao } from '../js/core/cartao.js';
 
 // ---------- zip + XML ----------
 function arquivosDoZip(buf) {
@@ -163,9 +163,10 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
   const dona = casa.pessoas.find((p) => abas.some((a) => semAcento(a.nome) === semAcento(p.nome)));
   const abaPessoal = dona && abas.find((a) => semAcento(a.nome) === semAcento(dona.nome) && lerAbaDeCompras(a, hoje, { porFatura: true }));
   if (!abaCasa && !abaPessoal) return { casa, avisos };
+  const cartaoDaDona = (casa.cartoes ?? []).find((c) => dona && c.donaId === dona.id);
   const conta = abaCasa
     ? casa.contas.find((c) => semAcento(c.nome) === semAcento(abaCasa.nome))
-    : casa.cartao?.contaId ? casa.contas.find((c) => c.id === casa.cartao.contaId) : casa.contas.find((c) => c.compraPorCompra && !c.arquivada);
+    : cartaoDaDona ? casa.contas.find((c) => c.id === cartaoDaDona.contaId) : casa.contas.find((c) => c.compraPorCompra && !c.arquivada);
   if (!conta) {
     avisos.push('Nenhuma conta do cartão nas contas da casa: o cartão não foi importado.');
     return { casa, avisos };
@@ -176,13 +177,16 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
   ].filter(Boolean);
   const inicio = lidas.map((l) => l.primeiraFatura).sort()[0];
 
-  const atual = casa.cartao ?? { donaId: null, viraNoDia: null, venceNoDia: null, pessoas: [], fixas: [] };
+  const atual = acharCartao(casa, conta.id) ?? { id: conta.id, contaId: conta.id, donaId: null, viraNoDia: null, venceNoDia: null, fixas: [] };
+  const cartao = { ...atual, donaId: atual.donaId ?? dona?.id ?? null };
   let c = {
     ...casa,
     schemaVersion: SCHEMA_CASA,
     contas: casa.contas.map((x) => (x.id === conta.id ? { ...x, compraPorCompra: true } : x)),
-    cartao: { ...atual, donaId: atual.donaId ?? dona?.id ?? null, contaId: conta.id },
+    cartoes: [...(casa.cartoes ?? []).filter((x) => x.id !== conta.id), cartao],
+    outrasPessoas: casa.outrasPessoas ?? [],
   };
+  const comFixas = (mudar) => { c = { ...c, cartoes: c.cartoes.map((x) => (x.id === conta.id ? { ...x, fixas: mudar(x.fixas) } : x)) }; };
   for (const reg of [...c.meses]) {
     if (reg.mes < inicio || !reg.compras.some((x) => x.contaId === conta.id && !x.data)) continue;
     c = comMes(c, reg.mes, (r) => { r.compras = r.compras.filter((x) => x.contaId !== conta.id || x.data); });
@@ -197,8 +201,8 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
     return r.id;
   };
   const acrescentarFixa = (fixa) => {
-    const igual = c.cartao.fixas.some((f) => semAcento(f.nome) === semAcento(fixa.nome) && f.para === fixa.para && f.desde === fixa.desde && f.valor === fixa.valor);
-    if (!igual) c = { ...c, cartao: { ...c.cartao, fixas: [...c.cartao.fixas, fixa] } };
+    const igual = acharCartao(c, conta.id).fixas.some((f) => semAcento(f.nome) === semAcento(fixa.nome) && f.para === fixa.para && f.desde === fixa.desde && f.valor === fixa.valor);
+    if (!igual) comFixas((fixas) => [...fixas, fixa]);
   };
 
   for (const lida of lidas) {
@@ -240,7 +244,7 @@ export function importarCartao(abas, { hoje, casa, novoId = () => globalThis.cry
 
   for (const reg of [...c.meses]) {
     if (reg.mes < inicio || !tem(reg.valores, conta.id)) continue;
-    const itens = [...reg.compras.filter((x) => x.contaId === conta.id && compraDaCasa(x)), ...fixasNoMes(c, reg.mes).filter(compraDaCasa)];
+    const itens = [...reg.compras.filter((x) => x.contaId === conta.id && compraDaCasa(x)), ...fixasNoMes(acharCartao(c, conta.id), reg.mes).filter(compraDaCasa)];
     const soma = centavos(itens.reduce((s, x) => s + x.valor, 0));
     const digitado = reg.valores[conta.id];
     if (digitado !== 0 && Math.abs(soma - digitado) > 0.005) {
@@ -310,6 +314,6 @@ export function importarPlanilha(abas, { hoje, novoId = () => globalThis.crypto.
     .filter((m) => Object.keys(m.salarios).length || Object.keys(m.valores).length || m.compras.length)
     .sort((x, y) => (x.mes < y.mes ? -1 : 1));
   // O cartão (compras da casa e a aba pessoal) entra por cima, conferindo com o valor do mês.
-  const cartao = importarCartao(abas, { hoje, casa: { schemaVersion: SCHEMA_CASA, pessoas, contas, meses: lista, cartao: null }, novoId });
+  const cartao = importarCartao(abas, { hoje, casa: { schemaVersion: SCHEMA_CASA, pessoas, contas, meses: lista, cartoes: [], outrasPessoas: [] }, novoId });
   return { casa: cartao.casa, avisos: [...avisos, ...cartao.avisos] };
 }

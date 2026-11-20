@@ -3,7 +3,7 @@
 // A saída é um mapa { chave do localStorage: valor } para `capturar-telas.mjs --local <saida.json>`.
 import { writeFileSync } from 'node:fs';
 import { salvarValor, salvarSalario, conferirFatura } from '../js/core/casa.js';
-import { configurarCartao, adicionarPessoaDoCartao, anotarCompra, faturaDaCompra } from '../js/core/cartao.js';
+import { adicionarCartao, adicionarPessoaDoCartao, anotarCompra, faturaDaCompra, acharCartao } from '../js/core/cartao.js';
 import { somarMeses } from '../js/core/meses.js';
 
 const saida = process.argv[2];
@@ -18,7 +18,7 @@ let n = 0;
 const novoId = () => `ex${++n}`;
 
 let casa = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }],
   contas: [
     { id: 'condominio', nome: 'Condomínio', compraPorCompra: false, arquivada: false },
@@ -31,7 +31,8 @@ let casa = {
     { id: 'aluguel', nome: 'Aluguel antigo', compraPorCompra: false, arquivada: true },
   ],
   meses: [],
-  cartao: null,
+  cartoes: [],
+  outrasPessoas: [],
 };
 
 // 14 meses para trás, com variação inventada; o mês atual fica com a luz e um salário a confirmar.
@@ -51,16 +52,17 @@ for (let k = -14; k <= 0; k++) {
   casa = salvarSalario(casa, { mes, pessoaId: 'p2', valor: k < -6 ? 3100 : 3400 });
 }
 
-// O cartão é do Leo: melhor dia 3, vence dia 10. Compras dele, da casa e da Mãe na fatura aberta,
-// duas de todo mês e a fatura anterior conferida.
-casa = configurarCartao(casa, { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'cartao', novoId });
+// Dois cartões. O do Leo (melhor dia 3, vence dia 10): compras dele, da casa e da Mãe na fatura aberta, duas de
+// todo mês e a fatura anterior conferida. O da Ana (melhor dia 24, vence dia 1): começando, com duas compras.
+casa = adicionarCartao(casa, { donaId: 'p2', viraNoDia: 3, venceNoDia: 10, contaId: 'cartao', novoId }).casa;
+casa = adicionarCartao(casa, { donaId: 'p1', viraNoDia: 24, venceNoDia: 1, novoId: () => 'cartao-ana' }).casa;
 casa = adicionarPessoaDoCartao(casa, { nome: 'Mãe', novoId: () => 'mae' }).casa;
 const dia = (menos) => {
   const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - menos);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-const comprar = (data, nome, valor, para, extra = {}) => { casa = anotarCompra(casa, { data, nome, valor, para, novoId, ...extra }); };
-const aberta = faturaDaCompra(dia(0), casa.cartao);
+const comprar = (data, nome, valor, para, extra = {}) => { casa = anotarCompra(casa, { cartaoId: 'cartao', data, nome, valor, para, novoId, ...extra }); };
+const aberta = faturaDaCompra(dia(0), acharCartao(casa, 'cartao'));
 const anterior = somarMeses(aberta, -1);
 comprar(dia(0), 'Mercado', 412.35, 'casa');
 comprar(dia(1), 'Farmácia', 86.9, 'mae');
@@ -71,6 +73,8 @@ comprar(dia(30), 'Mercado', 530.1, 'casa', { fatura: anterior });
 comprar(dia(30), 'Streaming', 39.9, 'casa', { todoMes: true, fatura: anterior });
 comprar(dia(30), 'Academia', 99, 'p2', { todoMes: true, fatura: anterior });
 casa = conferirFatura(casa, { mes: anterior, contaId: 'cartao' });
+casa = anotarCompra(casa, { cartaoId: 'cartao-ana', data: dia(2), nome: 'Padaria', valor: 32.5, para: 'casa', novoId });
+casa = anotarCompra(casa, { cartaoId: 'cartao-ana', data: dia(2), nome: 'Livro', valor: 54.9, para: 'p1', novoId });
 
 writeFileSync(saida, JSON.stringify({ 'projetoR.casa.estado': casa, 'projetoR.espaco': 'casa-cartao' }, null, 2));
 console.log(`ok  ${saida} (${casa.meses.length} meses, de ${casa.meses[0].mes} a ${casa.meses.at(-1).mes})`);
