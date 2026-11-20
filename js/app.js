@@ -158,6 +158,7 @@ async function desconectar(voltarPara = null) {
 
 const navegar = (hash) => { location.hash = hash; };
 let telaDesenhada = null; // a última tela desenhada por inteiro
+let geracaoDoDesenho = 0; // cada desenho ganha um número: um desenho velho que termina depois de um novo é descartado
 let mostrandoEscolha = false; // "Quem usa este celular?" na tela: dados novos (a liberação) redesenham
 
 function contexto() {
@@ -197,6 +198,7 @@ function contexto() {
 }
 
 async function renderizar() {
+  const geracao = ++geracaoDoDesenho;
   const nome = resolverRota(location.hash, Boolean(app.estado), lerEspaco());
   if (location.hash.replace(/^#\/?/, '').split('?')[0] !== nome) { navegar(`#/${nome}`); return; }
   const daCasa = ehDaCasa(nome);
@@ -235,6 +237,8 @@ async function renderizar() {
   else topo.hidden = true;
   try {
     const modulo = await import(`./ui/${nome}.js`);
+    // Outro desenho começou enquanto este carregava (ex.: tocou noutra aba durante a sincronização): ele vale.
+    if (geracao !== geracaoDoDesenho) return;
     // Mesma tela (abrir ou fechar uma folha, dados de outro aparelho): só atualiza, sem animar nem rolar para o topo.
     if (nome === telaDesenhada && modulo.atualizar) {
       tela.classList.add('sem-entrada');
