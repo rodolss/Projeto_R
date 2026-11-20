@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pessoaDoBalanco, enderecoDaFatura } from '../../js/ui/casa-balanco.js';
+import { pessoaDoBalanco, enderecoDaFatura, textoDoPlano } from '../../js/ui/casa-balanco.js';
 
 const casa = { pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }] };
 
@@ -15,4 +15,12 @@ test('pessoa do balanço: a do perfil visto; sem perfil, a do endereço (se for 
 
 test('revisão: as linhas do cartão (e a de outras pessoas) levam à fatura do mês no Cartão, não ao Cofrinho', () => {
   assert.equal(enderecoDaFatura('c2', '2026-12'), '#/casa-cartao?cartao=c2&fatura=2026-12');
+});
+
+test('texto do plano no balanço: cada situação', () => {
+  assert.equal(textoDoPlano({ situacao: 'vermelho' }), 'Neste mês não sobrou: o balanço fechou no vermelho.');
+  assert.equal(textoDoPlano({ situacao: 'sem-aporte' }), 'Você já está no caminho: o plano não pede mais aportes.');
+  assert.match(textoDoPlano({ situacao: 'cobre', livre: 1799.5 }), /^A sobra cobre o que o plano pede ✓ e ainda ficam R\$\s1\.799,50 livres\.$/);
+  assert.match(textoDoPlano({ situacao: 'falta', falta: 400 }), /^Faltam R\$\s400,00 para o que o plano pede\.$/);
+  assert.equal(textoDoPlano({ situacao: 'sem-plano' }), null);
 });

@@ -48,3 +48,17 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
   const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
   return { mes, pessoaId, salario, contas, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
 }
+
+// ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------
+// A sobra do mês contra o que o plano pede por mês (o aporte que leva à renda plena no prazo). Só confere: o quanto
+// investir de verdade continua saindo do salário e do orçamento, no Dia de pagamento.
+export function compararComPlano({ sobra, pmtNec }) {
+  if (!Number.isFinite(pmtNec)) return { situacao: 'sem-plano', falta: 0, livre: 0 };
+  if (sobra <= 0) return { situacao: 'vermelho', falta: centavos(Math.max(0, pmtNec)), livre: 0 };
+  if (pmtNec <= 0) return { situacao: 'sem-aporte', falta: 0, livre: centavos(sobra) };
+  if (sobra >= pmtNec) return { situacao: 'cobre', falta: 0, livre: centavos(sobra - pmtNec) };
+  return { situacao: 'falta', falta: centavos(pmtNec - sobra), livre: 0 };
+}
+
+// O gasto real do mês (o "saiu" do balanço) passou 10% do custo mensal do orçamento do plano: hora de revisar.
+export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => custoMensal > 0 && saiu > custoMensal * 1.1;

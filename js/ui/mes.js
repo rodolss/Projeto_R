@@ -9,6 +9,7 @@ import { formatarMes } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
+import { balancoDoMes, gastouMaisQueOOrcamento } from '../core/balanco.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
   saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
@@ -198,6 +199,20 @@ function desenhar(container, ctx) {
     ];
   }
 
+  // Visão única (desenho 2026-11-20-balanco-e-plano): a sobra do Balanço do mês, para conferir. O quanto investir
+  // continua saindo do salário e do orçamento; se o gasto real passou do orçamento, um aviso para revisá-lo.
+  function conferenciaDoBalanco() {
+    if (!ctx.unica || !ctx.casa || !ctx.perfil?.visto) return [];
+    const b = balancoDoMes(ctx.casa, mes, ctx.perfil.visto.id, hoje);
+    let custoMensal = 0;
+    try { custoMensal = calcularPainel({ estado, hoje }).custoTotal; } catch { /* sem painel: sem o aviso */ }
+    return [
+      h('p', { class: 'suave' }, `Pelo Balanço, sobraram ${formatarBRL(b.sobra)} este mês. `, h('a', { href: '#/casa-balanco' }, 'Ver o balanço')),
+      gastouMaisQueOOrcamento({ saiu: b.saiu, custoMensal })
+        && aviso('atencao', 'Seu gasto real no mês (contas da casa e cartão) passou do orçamento do plano. ', h('a', { href: '#/orcamento' }, 'Revise o orçamento'), '.'),
+    ].filter(Boolean);
+  }
+
   function folhaInvestir() {
     if (!sit.podeInvestir) {
       return [h('h2', {}, 'Investir'), aviso('info', 'Faça as tarefas 1 a 3 antes.'), h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }))];
@@ -214,6 +229,7 @@ function desenhar(container, ctx) {
         h('div', { class: 'valor-grande' }, formatarBRL(rr.excedente)),
         h('div', { class: 'suave' }, `${formatarBRL(rr.paraDiaADia)} ficam para o seu dia a dia.`)));
     }
+    blocos.push(...conferenciaDoBalanco());
     blocos.push(...[
       rr.paraAnuais > 0 && aviso('info', `Separe ${formatarBRL(rr.paraAnuais)} para as despesas anuais (deixe na conta ou no Tesouro Selic).`),
       rr.provisao > 0 && aviso('info', `Separe ${formatarBRL(rr.provisao)} deste mês para as despesas anuais: o 13º e as férias não cobrem todas (deixe na conta ou no Tesouro Selic).`),
