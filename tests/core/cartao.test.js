@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
   adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao,
-  editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE,
+  editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
 import { somarMeses } from '../../js/core/meses.js';
@@ -409,4 +409,55 @@ test('já tenho: de todo mês que muda de valor mantém a marca de cada fatura n
   assert.deepEqual(marcas(daCasa), [false, true, false, false]);
   const tudoCasa = editarFixa(casa, { cartaoId: K, fixaId: 'f1', fatura: '2026-12', para: 'casa', novoId: () => 'nao' });
   assert.deepEqual(tudoCasa.cartoes[0].fixas.map((f) => 'jaTenhoEm' in f), [false, false]);
+});
+
+test('cofrinho: soma o já tenho das faturas que ainda não venceram, separado por fatura', () => {
+  const novoId = ids('k');
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Farmácia', valor: 20, para: 'q1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-20', nome: 'Uber', valor: 10, para: 'p2', jaTenho: true, novoId }); // do próprio Leo: guardou
+  casa = anotar(casa, { data: '2026-12-15', nome: 'Livro', valor: 30, para: 'p1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-12-16', nome: 'Mercado', valor: 100, para: 'casa', novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Celular', valor: 5, todoMes: true, para: 'q1', novoId: () => 'f1' });
+  casa = marcarJaTenho(casa, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
+  const noVencimento = cofrinhoDoCartao(casa, K, '2026-12-10');
+  assert.deepEqual(noVencimento.faturas, [
+    { fatura: '2026-12', vence: '2026-12-10', valor: 30 },
+    { fatura: '2027-01', vence: '2027-01-10', valor: 35 },
+  ]);
+  assert.equal(noVencimento.total, 65);
+  const diaSeguinte = cofrinhoDoCartao(casa, K, '2026-12-11');
+  assert.deepEqual(diaSeguinte.faturas, [{ fatura: '2027-01', vence: '2027-01-10', valor: 35 }]);
+  assert.equal(diaSeguinte.total, 35);
+});
+
+test('cofrinho: quem ainda te deve, desde dezembro de 2026 até a fatura aberta, sem a Casa nem a dona', () => {
+  const novoId = ids('k');
+  let casa = anotar(casaBase(), { data: '2026-10-20', nome: 'Remédio', valor: 15, para: 'q1', novoId }); // fatura 2026-11: antes do começo
+  casa = anotar(casa, { data: '2026-11-25', nome: 'Farmácia', valor: 62, para: 'q1', novoId });
+  casa = anotar(casa, { data: '2026-12-10', nome: 'Mercado da Mãe', valor: 156.3, para: 'q1', novoId });
+  casa = anotar(casa, { data: '2026-12-11', nome: 'Farmácia', valor: 48.9, para: 'q1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-12-05', nome: 'Blusa', valor: 80, para: 'p2', novoId }); // do dono do cartão
+  casa = anotar(casa, { data: '2026-12-14', nome: 'Livro', valor: 59.9, para: 'p1', novoId });
+  casa = anotar(casa, { data: '2026-12-16', nome: 'Mercado', valor: 100, para: 'casa', novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Celular', valor: 38, todoMes: true, para: 'q1', novoId: () => 'f1' });
+  casa.meses.find((m) => m.mes === '2026-12').compras.push({ id: 'velha', contaId: K, nome: 'Antiga', valor: 10, para: 'q1' });
+  const c = cofrinhoDoCartao(casa, K, '2026-12-20'); // fatura aberta: 2027-01
+  assert.deepEqual(c.devem.map((p) => [p.para, p.nome, p.total]), [['p1', 'Ana', 59.9], ['q1', 'Mãe', 304.3]]);
+  assert.deepEqual(c.devem[0].itens.map((i) => [i.fatura, i.tipo, i.nome, i.valor, i.data]), [['2027-01', 'compra', 'Livro', 59.9, '2026-12-14']]);
+  assert.deepEqual(c.devem[1].itens.map((i) => [i.fatura, i.tipo, i.nome, i.valor, i.data]), [
+    ['2026-12', 'compra', 'Farmácia', 62, '2026-11-25'],
+    ['2026-12', 'compra', 'Antiga', 10, null],
+    ['2026-12', 'fixa', 'Celular', 38, null],
+    ['2027-01', 'compra', 'Mercado da Mãe', 156.3, '2026-12-10'],
+    ['2027-01', 'fixa', 'Celular', 38, null],
+  ]);
+  assert.equal(c.devem[1].itens[2].id, 'f1');
+  assert.equal(c.devem[1].itens[1].id, 'velha');
+});
+
+test('cofrinho: cartão sem os dias ou que não existe devolve null; sem nada, vazio', () => {
+  const semDias = casaBase({ cartoes: [{ id: K, contaId: K, donaId: 'p2', viraNoDia: null, venceNoDia: null, fixas: [] }] });
+  assert.equal(cofrinhoDoCartao(semDias, K, '2026-12-20'), null);
+  assert.equal(cofrinhoDoCartao(casaBase(), 'sumiu', '2026-12-20'), null);
+  assert.deepEqual(cofrinhoDoCartao(casaBase(), K, '2026-12-20'), { total: 0, faturas: [], devem: [] });
 });

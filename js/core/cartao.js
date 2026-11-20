@@ -187,6 +187,13 @@ function ordenarCompras(compras) {
   }).map(({ c }) => c);
 }
 
+// Sem repetir, na ordem das escolhas: Casa, a dona, as pessoas da casa, os outros perfis, as outras pessoas.
+function ordenarParas(casa, cartaoId, paras) {
+  const ordem = todasAsOpcoes(casa, cartaoId).map((p) => p.id);
+  const posicao = (para) => (ordem.indexOf(para) === -1 ? 99 : ordem.indexOf(para));
+  return [...new Set(paras)].sort((a, b) => posicao(a) - posicao(b));
+}
+
 export function faturaDoCartao(casa, cartaoId, fatura) {
   const cartao = acharCartao(casa, cartaoId);
   const reg = casa.meses.find((m) => m.mes === fatura);
@@ -198,9 +205,7 @@ export function faturaDoCartao(casa, cartaoId, fatura) {
   const itens = [...compras, ...fixas];
   const somar = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
   const total = somar(itens);
-  const ordem = todasAsOpcoes(casa, cartaoId).map((p) => p.id);
-  const posicao = (para) => (ordem.indexOf(para) === -1 ? 99 : ordem.indexOf(para));
-  const paras = [...new Set(itens.map((x) => x.para))].sort((a, b) => posicao(a) - posicao(b));
+  const paras = ordenarParas(casa, cartaoId, itens.map((x) => x.para));
   // Quanto é de cada um; fora da Casa, quanto já tem (guardado ou pago) e quanto falta.
   const porPessoa = paras
     .map((para) => {
@@ -325,4 +330,39 @@ export function primeiraFatura(casa, cartaoId) {
     ...cartao.fixas.map((f) => f.desde),
   ].sort();
   return meses[0] ?? null;
+}
+
+// ---------- o cofrinho ----------
+// Quanto deve ter no cofrinho: o "já tenho" das faturas que ainda não venceram (a fatura conta até o dia do
+// vencimento; depois, o dinheiro foi usado para pagar). Quem ainda te deve: o que não tem marca, de quem não é a
+// Casa nem a dona, desde JA_TENHO_DESDE até a fatura aberta (as futuras ainda não foram cobradas).
+// Cartão sem os dias: null (não dá para saber as faturas).
+export function cofrinhoDoCartao(casa, cartaoId, hoje) {
+  const cartao = acharCartao(casa, cartaoId);
+  if (!cartaoPronto(cartao)) return null;
+  const somar = (lista) => centavos(lista.reduce((s, x) => s + x.valor, 0));
+
+  const comMarca = new Set([
+    ...casa.meses.filter((m) => comprasDoCartao(cartao, m).some((c) => c.jaTenho)).map((m) => m.mes),
+    ...cartao.fixas.flatMap((f) => Object.keys(f.jaTenhoEm ?? {})),
+  ]);
+  const faturas = [...comMarca].sort()
+    .map((fatura) => {
+      const f = faturaDoCartao(casa, cartaoId, fatura);
+      return { fatura, vence: periodoDaFatura(fatura, cartao).vence, valor: somar([...f.compras, ...f.fixas].filter((x) => x.jaTenho)) };
+    })
+    .filter((x) => x.valor > 0 && x.vence >= hoje);
+
+  const pendente = (x) => !x.jaTenho && podeTerJaTenho(x) && x.para !== cartao.donaId;
+  const itens = [];
+  for (let fatura = JA_TENHO_DESDE, aberta = faturaDaCompra(hoje, cartao); fatura <= aberta; fatura = somarMeses(fatura, 1)) {
+    const f = faturaDoCartao(casa, cartaoId, fatura);
+    for (const c of f.compras.filter(pendente)) itens.push({ para: c.para, fatura, tipo: 'compra', id: c.id, nome: c.nome, valor: c.valor, data: c.data ?? null });
+    for (const x of f.fixas.filter(pendente)) itens.push({ para: x.para, fatura, tipo: 'fixa', id: x.id, nome: x.nome, valor: x.valor, data: null });
+  }
+  const devem = ordenarParas(casa, cartaoId, itens.map((i) => i.para)).map((para) => {
+    const deste = itens.filter((i) => i.para === para).map(({ para: _para, ...item }) => item);
+    return { para, nome: nomeDoPara(casa, para), total: somar(deste), itens: deste };
+  });
+  return { total: somar(faturas), faturas, devem };
 }
