@@ -77,7 +77,7 @@ p { margin: 6px 0; }
 @keyframes menu-pilula { from { transform: scaleX(0.4); } }
 /* Contas da casa: menu próprio de 3 botões; aparece o menu do espaço atual. */
 .menu-casa { display: none; }
-.menu-casa .menu-dentro { grid-template-columns: repeat(3, 1fr); }
+.menu-casa .menu-dentro { grid-template-columns: repeat(4, 1fr); }
 body.espaco-casa .menu-aposentadoria { display: none; }
 body.espaco-casa .menu-casa { display: block; }
 body.sem-abas .menu { display: none; }

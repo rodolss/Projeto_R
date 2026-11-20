@@ -37,7 +37,7 @@ const registro = (casa, mes) => casa.meses.find((m) => m.mes === mes) ?? null;
 const comprasDa = (reg, contaId) => (reg?.compras ?? []).filter((c) => c.contaId === contaId);
 
 // Compra sem `para` é da casa (as anotadas antes do cartão).
-export const ehDaCasa = (item) => !item.para || item.para === 'casa';
+export const compraDaCasa = (item) => !item.para || item.para === 'casa';
 
 // As de todo mês do cartão que valem no mês (fatura).
 export const fixasNoMes = (casa, mes) => (casa.cartao?.fixas ?? [])
@@ -46,8 +46,8 @@ export const fixasNoMes = (casa, mes) => (casa.cartao?.fixas ?? [])
 // O que a conta da casa soma no mês: compras da casa e, na conta ligada ao cartão, as de todo mês da casa.
 function itensDaCasa(casa, reg, mes, conta) {
   if (!conta.compraPorCompra) return [];
-  const compras = comprasDa(reg, conta.id).filter(ehDaCasa);
-  const fixas = conta.id === casa.cartao?.contaId ? fixasNoMes(casa, mes).filter(ehDaCasa) : [];
+  const compras = comprasDa(reg, conta.id).filter(compraDaCasa);
+  const fixas = conta.id === casa.cartao?.contaId ? fixasNoMes(casa, mes).filter(compraDaCasa) : [];
   return [...compras, ...fixas];
 }
 
@@ -146,7 +146,7 @@ export function comMes(casa, mes, alterar) {
 
 // Fatura já conferida acompanha a soma das compras da casa (com compras, o valor digitado só marca "conferida").
 export function acompanharFatura(reg, contaId) {
-  if (tem(reg.valores, contaId)) reg.valores[contaId] = soma(comprasDa(reg, contaId).filter(ehDaCasa));
+  if (tem(reg.valores, contaId)) reg.valores[contaId] = soma(comprasDa(reg, contaId).filter(compraDaCasa));
 }
 
 export function salvarValor(casa, { mes, contaId, valor }) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   SCHEMA_CASA, criarCasa, migrarCasa, primeiroMes, valorDaConta, salarioNoMes, resumoDoMes,
   salvarValor, salvarSalario, adicionarCompra, apagarCompra, conferirFatura,
-  adicionarConta, editarConta, moverConta, renomearPessoa, ehDaCasa, fixasNoMes,
+  adicionarConta, editarConta, moverConta, renomearPessoa, compraDaCasa, fixasNoMes,
 } from '../../js/core/casa.js';
 
 const ids = () => { let n = 0; return () => `id${++n}`; };
@@ -279,9 +279,9 @@ test('cartão: mês com só compras pessoais segue a previsão da conta da casa'
   casa = adicionarCompra(casa, { mes: '2026-12', contaId: 'c4', nome: 'Blusa', valor: 80, novoId: ids(), extra: { data: '2026-11-20', para: 'p2' } });
   const v = valorDaConta(casa, '2026-12', 'c4');
   assert.deepEqual([v.valor, v.situacao, v.deOnde], [700, 'a-confirmar', '2026-11']);
-  assert.equal(ehDaCasa({ para: 'p2' }), false);
-  assert.equal(ehDaCasa({ para: 'casa' }), true);
-  assert.equal(ehDaCasa({}), true);
+  assert.equal(compraDaCasa({ para: 'p2' }), false);
+  assert.equal(compraDaCasa({ para: 'casa' }), true);
+  assert.equal(compraDaCasa({}), true);
 });
 
 test('cartão: conferir a fatura grava a parte da casa, com as de todo mês', () => {

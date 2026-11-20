@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   resolverRota, abaDoMenu, TELAS, folhaAberta, depoisDeSalvar, ehDaCasa, parametroDoHash, podeAtualizarSozinho,
+  espacoParaLembrar,
 } from '../../js/ui/rotas.js';
 
 test('contas da casa: rotas próprias, que funcionam sem plano de aposentadoria', () => {
@@ -36,7 +37,7 @@ test('contas da casa: depois de salvar numa folha da casa', () => {
 });
 
 test('telas conhecidas', () => {
-  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-ano', 'casa-ajustes']);
+  assert.deepEqual(TELAS, ['boas-vindas', 'inicio', 'mes', 'simular', 'mais', 'orcamento', 'historico', 'config', 'casa', 'casa-cartao', 'casa-ano', 'casa-ajustes']);
 });
 test('rotas', () => {
   assert.equal(resolverRota('', true), 'inicio');
@@ -74,4 +75,22 @@ test('revisão: dados de outro aparelho só redesenham sem campo em foco e sem f
   assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11', false), true);
   assert.equal(podeAtualizarSozinho('#/casa?mes=2026-11&folha=cartao-c4', false), false);
   assert.equal(podeAtualizarSozinho('#/casa', true), false);
+});
+
+test('cartão: rota da casa, com menu próprio, que funciona sem plano de aposentadoria', () => {
+  assert.equal(resolverRota('#/casa-cartao?fatura=2026-12', false), 'casa-cartao');
+  assert.equal(abaDoMenu('casa-cartao'), 'casa-cartao');
+  assert.equal(ehDaCasa('casa-cartao'), true);
+});
+
+test('cartão: o app abre na última tela usada entre Mês e Cartão', () => {
+  assert.equal(resolverRota('', false, 'casa-cartao'), 'casa-cartao');
+  assert.equal(resolverRota('#/xyz', true, 'casa-cartao'), 'casa-cartao');
+  assert.equal(resolverRota('', true, 'casa'), 'casa');
+  assert.equal(espacoParaLembrar('casa-cartao', 'casa'), 'casa-cartao');
+  assert.equal(espacoParaLembrar('casa', 'casa-cartao'), 'casa');
+  assert.equal(espacoParaLembrar('casa-ano', 'casa-cartao'), 'casa-cartao');
+  assert.equal(espacoParaLembrar('casa-ajustes', 'aposentadoria'), 'casa');
+  assert.equal(espacoParaLembrar('casa-ano', null), 'casa');
+  assert.equal(espacoParaLembrar('inicio', 'casa-cartao'), 'aposentadoria');
 });
