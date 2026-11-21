@@ -1,4 +1,4 @@
-// Aba Mês em lista de 4 tarefas (desenho de 2026-11-12): situação das tarefas, rascunho, datas e totais.
+// Aba Mês em lista de 4 tarefas — 3 na visão única, sem a do salário (desenhos de 2026-11-12 e 2026-11-21-salario-no-balanco): situação das tarefas, rascunho, datas e totais.
 // Funções puras; a tela fica em js/ui/mes.js e o rascunho é guardado por js/ui/mes-rascunho.js.
 
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -33,9 +33,12 @@ export function validarRascunho(salvo, mes) {
   return ok ? salvo : null;
 }
 
-export function situacao({ registrado, rascunho }) {
+// `semSalario` (visão única, desenho 2026-11-21-salario-no-balanco): o salário vem do Balanço e a etapa some — 3
+// etapas, e o investir libera com proventos e saldos.
+export function situacao({ registrado, rascunho, semSalario = false }) {
+  const total = semSalario ? 3 : 4;
   if (registrado && !rascunho?.editando) {
-    return { modo: 'registrado', feitas: { salario: true, proventos: true, saldos: true, investir: true }, quantas: 4, podeInvestir: false };
+    return { modo: 'registrado', feitas: { salario: true, proventos: true, saldos: true, investir: true }, quantas: total, total, podeInvestir: false };
   }
   const r = rascunho ?? rascunhoVazio(null);
   const feitas = {
@@ -47,8 +50,9 @@ export function situacao({ registrado, rascunho }) {
   return {
     modo: r.editando ? 'editando' : 'novo',
     feitas,
-    quantas: Object.values(feitas).filter(Boolean).length,
-    podeInvestir: feitas.salario && feitas.proventos && feitas.saldos,
+    quantas: Object.entries(feitas).filter(([k, v]) => v && !(semSalario && k === 'salario')).length,
+    total,
+    podeInvestir: (semSalario || feitas.salario) && feitas.proventos && feitas.saldos,
   };
 }
 
@@ -90,10 +94,10 @@ const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho'
 export const nomeDoMes = (mes) => MESES_LONGOS[Number(mes.slice(5, 7)) - 1];
 
 // Cartão "Dia de pagamento?" do Início: mês registrado, pela metade (rascunho com 1 a 3 tarefas) ou para abrir.
-export function cartaoDoPagamento({ entrada, rascunho }) {
+export function cartaoDoPagamento({ entrada, rascunho, semSalario = false }) {
   if (entrada) return { tipo: 'registrado', total: totalAplicado(entrada), data: entrada.data };
-  const { quantas } = situacao({ registrado: false, rascunho });
-  return quantas > 0 ? { tipo: 'continuar', quantas } : { tipo: 'abrir' };
+  const { quantas, total } = situacao({ registrado: false, rascunho, semSalario });
+  return quantas > 0 ? { tipo: 'continuar', quantas, total } : { tipo: 'abrir' };
 }
 
 // Tarefa 3: "Usar estes saldos" ou "Pular". Pular depois de copiar mantém os valores digitados (podem voltar a ser usados).

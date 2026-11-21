@@ -32,3 +32,9 @@ desenho 2026-11-21-salario-unico (que deixava digitar em vários lugares e repli
   digitado tarde não entra mais nele).
 - `extras` fica fora de `meses` (no topo do casa.json) para um app antigo que regrava o mês não apagá-lo. Funções
   puras em `js/core/salario.js`. Versão 21.
+
+## Depois (versão 22, pedido do usuário: "no dia de pagamento pode remover a etapa de salário caiu")
+
+- Na visão única, o Dia de pagamento tem 3 etapas (proventos, saldos, investir). O salário do registro vem do Balanço
+  (ainda não confirmado: a previsão; sem nada na casa: o do plano) e aparece só como uma linha no topo, com link para o
+  Balanço. Pela sobra, ele não muda o quanto investir. Fora da visão única, as 4 etapas continuam.
