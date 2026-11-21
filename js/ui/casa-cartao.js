@@ -19,7 +19,7 @@ import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './ro
 import { nomeDoMes } from './casa.js';
 import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
-import { etiquetasDosNomes, juntasDaCasa, semAcento } from '../core/tags.js';
+import { etiquetasDosNomes, juntasDaCasa, semAcento, tagsDoNome } from '../core/tags.js';
 import { graficoDasEtiquetas } from './casa-etiquetas.js';
 import { categoriaDe } from '../core/categorias.js';
 import { iconeCategoria } from './icones.js';
@@ -298,7 +298,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const dona = quemE(casa, cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
   // Mês travado (meses passados; do atual em diante, com tudo pago): a fatura só se lê (desenho 2026-11-21-meses-travados).
-  const { travado, cadeado, avisarTravado } = travaDoMes({ ctx, mes: fatura });
+  const { travado, cadeado } = travaDoMes({ ctx, mes: fatura });
 
   // Na tela do Cofrinho, o endereço leva `&tela=cofrinho` (abrir e fechar uma folha não sai dela).
   const naTela = telaDoCartao(location.hash);
@@ -396,14 +396,14 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         detalhe: [c.data && dataCurta(c.data), nomeDoPara(casa, c.para), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
         valor: c.valor,
         jaTenho: c.jaTenho,
-        aoTocar: () => (travado ? avisarTravado() : abrir(`compra-${c.id}`)),
+        aoTocar: () => abrir(`compra-${c.id}`),
       })))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
     // A soma das assinaturas e contas fixas desta fatura, ao lado do título: quanto vai todo mês de cara.
     h('h2', { class: 'titulo-com-soma' }, 'Todo mês', h('span', { class: 'soma-fixas', title: 'Soma de tudo que se repete todo mês neste cartão' }, formatarBRL(Math.round(f.fixas.reduce((t, x) => t + x.valor, 0) * 100) / 100))),
     h('div', {}, ...f.fixas.map((x) => linhaItem({
-      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, padrao: 'repetir', aoTocar: () => (travado ? avisarTravado() : abrir(`fixa-${x.id}`)),
+      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, padrao: 'repetir', aoTocar: () => abrir(`fixa-${x.id}`),
     }))));
 
   const conferir = temItens && !f.conferida && !travado && h('div', { class: 'cartao-conferir' },
@@ -444,7 +444,6 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   };
   // A folha da compra abre por cima do Cofrinho, na fatura dela; fechar volta para o Cofrinho já atualizado.
   const abrirDoCofrinho = (item) => {
-    if (estadoDoMes(casa, item.fatura, ctx.perfil?.visto?.id ?? null, hoje) !== 'livre') { ctx.aviso('Fatura travada: só leitura. Reabra o mês na tela da fatura.', 'info', 3000); return; }
     abertaAqui = true;
     location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${item.fatura}&tela=cofrinho&folha=${item.tipo === 'fixa' ? 'fixa' : 'compra'}-${item.id}`;
   };
@@ -610,6 +609,65 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     return caixa;
   };
 
+  // ---------- detalhes de uma compra / de uma de todo mês (desenho 2026-11-21-detalhes-da-compra) ----------
+  // Tocar abre os detalhes, só para ver; "Editar" abre o formulário (salvar ou cancelar volta para cá). Num mês travado,
+  // os detalhes abrem sem o "Editar".
+  const linhasDeDetalhe = (linhas) => h('div', { class: 'cartao detalhe-lista' },
+    ...linhas.filter(Boolean).map(([rotulo, valor]) => h('div', { class: 'detalhe-linha' }, h('span', {}, rotulo), h('b', {}, valor))));
+  const etiquetasDe = (nome) => {
+    const lista = tagsDoNome(nome, juntasDaCasa(casa));
+    return lista.length > 0 && h('div', { class: 'chips detalhe-etiquetas', 'aria-label': 'Etiquetas' }, ...lista.map((t) => h('span', { class: 'chip pequeno tag' }, t)));
+  };
+  const rodapeDoDetalhe = (editar) => h('div', { class: 'botoes botoes-fixos' },
+    botao('Fechar', fechar, { secundario: true }),
+    !travado && botao('Editar', editar));
+
+  function folhaDetalheCompra(compra) {
+    const parcelas = parcelasDaCompra(casa, { fatura, compraId: compra.id });
+    const n = parcelas.find((p) => p.compra.id === compra.id)?.n ?? 1;
+    const total = compra.parcela?.de ?? (compra.grupo ? parcelas.at(-1).n : 1);
+    const somaDasParcelas = parcelas.reduce((s, p) => s + p.compra.valor, 0);
+    const ultimaFatura = somarMeses(parcelas[0].mes, total - parcelas[0].n);
+    const ehParcela = total > 1;
+    return [
+      h('h2', {}, compra.nome),
+      h('div', { class: 'detalhe-topo' },
+        h('div', { class: 'valor-grande' }, formatarBRL(compra.valor)),
+        h('span', { class: 'suave' }, ehParcela ? `por parcela · ${n}ª de ${total}` : 'à vista')),
+      etiquetasDe(compra.nome),
+      linhasDeDetalhe([
+        ['Data da compra', compra.data ? dataComAno(compra.data) : 'sem data (veio da planilha)'],
+        ['Fatura', `${nomeDaFatura(fatura, hoje)} · vence ${dataCurta(periodoDaFatura(fatura, cfg).vence)}`],
+        ehParcela && ['Parcelas', `${total} de ${formatarBRL(compra.valor)}`],
+        ehParcela && ['No total', formatarBRL(somaDasParcelas)],
+        ehParcela && ['Última parcela', `fatura de ${nomeDaFatura(ultimaFatura, hoje)}`],
+        ['Para quem', nomeDoPara(casa, compra.para)],
+        travado && compra.jaTenho && ['Já tenho', 'sim ✓'],
+      ]),
+      !travado && jaTenhoDaFolha(compra, dicaDoJaTenho(compra.grupo ? { forma: 'parcela', parcela: compra.parcela ?? null } : { forma: 'vista' }), { compraId: compra.id }),
+      travado && h('p', { class: 'suave pequeno' }, 'Mês travado: só para ver.'),
+      rodapeDoDetalhe(() => abrir(`editarcompra-${compra.id}`)),
+    ];
+  }
+
+  function folhaDetalheFixa(fixa) {
+    return [
+      h('h2', {}, fixa.nome),
+      h('div', { class: 'detalhe-topo' }, h('div', { class: 'valor-grande' }, formatarBRL(fixa.valor)), h('span', { class: 'suave' }, 'todo mês')),
+      etiquetasDe(fixa.nome),
+      linhasDeDetalhe([
+        ['Desde', `fatura de ${nomeDaFatura(fixa.desde, hoje)}`],
+        fixa.ate && ['Até', `fatura de ${nomeDaFatura(fixa.ate, hoje)}`],
+        ['Nesta fatura', `${nomeDaFatura(fatura, hoje)} · vence ${dataCurta(periodoDaFatura(fatura, cfg).vence)}`],
+        ['Para quem', nomeDoPara(casa, fixa.para)],
+        travado && fixa.jaTenho && ['Já tenho', 'sim ✓'],
+      ]),
+      !travado && jaTenhoDaFolha(fixa, dicaDoJaTenho({ forma: 'fixa', nomeDaFatura: nomeDaFatura(fatura, hoje) }), { fixaId: fixa.id }),
+      travado && h('p', { class: 'suave pequeno' }, 'Mês travado: só para ver.'),
+      rodapeDoDetalhe(() => abrir(`editarfixa-${fixa.id}`)),
+    ];
+  }
+
   function folhaCompra(compra, folha) {
     const editado = { nome: compra.nome, valor: compra.valor, para: compra.para ?? 'casa', data: compra.data ?? null, fatura };
     const ehParcela = ehParcelada(compra);
@@ -751,7 +809,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         h('span', { class: 'campo-dica' }, 'O app calcula pela data. Mude só se o banco colocou a compra em outra fatura.')),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true }), salvar),
+      h('div', { class: 'botoes botoes-fixos' }, botao('Cancelar', fechar, { secundario: true }), salvar),
       apagar,
     ];
   }
@@ -789,7 +847,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true }), salvar),
+      h('div', { class: 'botoes botoes-fixos' }, botao('Cancelar', fechar, { secundario: true }), salvar),
       parar,
       apagar,
       !podeApagar && h('p', { class: 'suave pequeno' }, 'Ela começou numa fatura travada: só dá para parar de repetir.'),
@@ -799,11 +857,12 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   // ---------- folha aberta (vem do endereço) ----------
   const aberto = folhaAberta(location.hash);
   const [tipo, id] = aberto ? [aberto.split('-')[0], aberto.slice(aberto.indexOf('-') + 1)] : [];
-  const compra = tipo === 'compra' ? f.compras.find((c) => c.id === id) : null;
-  const fixa = tipo === 'fixa' ? f.fixas.find((x) => x.id === id) : null;
-  const conteudo = travado ? null : tipo === 'anotar' ? folhaAnotar(aberto)
-    : compra ? folhaCompra(compra, aberto)
-      : fixa ? folhaFixa(fixa, aberto) : null;
+  const compra = tipo === 'compra' || tipo === 'editarcompra' ? f.compras.find((c) => c.id === id) : null;
+  const fixa = tipo === 'fixa' || tipo === 'editarfixa' ? f.fixas.find((x) => x.id === id) : null;
+  // Detalhes abrem sempre (num mês travado, só para ver); anotar e editar, só com a fatura livre.
+  const conteudo = tipo === 'anotar' ? (travado ? null : folhaAnotar(aberto))
+    : compra ? (tipo === 'editarcompra' ? (travado ? null : folhaCompra(compra, aberto)) : folhaDetalheCompra(compra))
+      : fixa ? (tipo === 'editarfixa' ? (travado ? null : folhaFixa(fixa, aberto)) : folhaDetalheFixa(fixa)) : null;
   if (!conteudo) {
     abertaAqui = false;
     ultimaData = null; // folha fechada (até pelo voltar do celular): a próxima começa com a data de hoje
