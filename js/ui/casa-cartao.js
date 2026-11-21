@@ -585,11 +585,10 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         data: nova.data, nome: nova.nome, valor: nova.valor, para: nova.para,
         vezes: nova.forma === 'parcelado' ? nova.vezes : 1, todoMes: nova.forma === 'todoMes', jaTenho: nova.jaTenho,
       }));
-      ultimaData = nova.data;
       ctx.aviso(nova.forma === 'todoMes'
         ? `Anotada: aparece todo mês a partir da fatura de ${nomeDaFatura(fat, hoje)}.`
         : `Anotada na fatura de ${nomeDaFatura(fat, hoje)}.${nova.forma === 'parcelado' ? ` As outras ${nova.vezes - 1} parcelas vão nas seguintes.` : ''}`, 'ok', 3500);
-      ctx.rerender(); // a folha volta limpa para a próxima compra, com a mesma data
+      terminar(folha); // fecha a folha (a fatura aparece atualizada); a próxima compra começa de novo
     });
 
     return [
