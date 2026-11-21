@@ -309,6 +309,8 @@ details.detalhes[open] > summary::after { content: "−"; }
 .passos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; }
 .passos i { height: 5px; border-radius: 3px; background: var(--cartao-2); }
 .passos i.feito { background: var(--destaque); }
+.cartao:has(> .cadeado-mes) { position: relative; }
+.cadeado-mes { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; cursor: pointer; }
 .cartao.registrado { border-color: var(--ok); }
 .titulo-check { display: flex; align-items: center; gap: 10px; }
 .titulo-check h1, .titulo-check h2, .titulo-check h3 { margin: 0; }
