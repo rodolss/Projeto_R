@@ -5,6 +5,7 @@ import { h, campoMoeda, campoTag, cartao, botao, aviso, copiarTexto, mostrarFolh
 import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
 import { categoriaDaConta } from '../core/categorias.js';
 import { icone, iconeCategoria } from './icones.js';
+import { avatar } from './topo.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
@@ -186,8 +187,8 @@ function desenharMes(container, ctx) {
   const divisao = r.divide
     ? [
       // Tocar no quanto cada um paga copia o valor (só os números, como "1234,56") para colar no app do banco.
-      h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('button', {
-        type: 'button', class: 'cartao casa-pessoa copiavel', 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
+      h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p, k) => h('button', {
+        type: 'button', class: `cartao casa-pessoa copiavel cor-${k % 2}`, 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
         onclick: async (e) => {
           const cartaoPessoa = e.currentTarget;
           const ok = await copiarTexto(p.paga.toFixed(2).replace('.', ','));
@@ -195,13 +196,16 @@ function desenharMes(container, ctx) {
           ctx.aviso(ok ? `Copiado: ${formatarBRL(p.paga)}` : 'Não deu para copiar neste aparelho.', ok ? 'ok' : 'atencao', 2500);
         },
       },
-      h('span', { class: 'copiar-icone', 'aria-hidden': 'true' }, icone('copiar')),
-      h('div', { class: 'rotulo' }, `${p.pessoa.nome} paga`),
-      h('div', { class: 'valor-com-parte' },
-        h('span', { class: 'valor' }, formatarBRL(p.paga)),
-        r.total > 0 && h('span', { class: 'parte-das-contas', title: 'Fatia do total das contas do mês' }, formatarPct(p.paga / r.total, 0))),
-      h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`),
-      h('div', { class: 'suave pequeno dica-copiar' }, 'Toque para copiar')))),
+      // Quem paga: foto ou inicial, o valor em destaque, a fatia do total numa barra e, embaixo, o que sobra.
+      h('div', { class: 'pessoa-topo' },
+        avatar((casa.perfis ?? []).find((x) => x.id === p.pessoa.id) ?? p.pessoa),
+        h('span', { class: 'pessoa-nome' }, h('b', {}, p.pessoa.nome), ' paga'),
+        h('span', { class: 'copiar-icone', 'aria-hidden': 'true' }, icone('copiar'))),
+      h('div', { class: 'valor pessoa-valor' }, formatarBRL(p.paga)),
+      r.total > 0 && h('div', { class: 'pessoa-fatia', title: 'Fatia do total das contas do mês' },
+        h('div', { class: 'pessoa-barra', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round((p.paga / r.total) * 100)}%` })),
+        h('b', {}, formatarPct(p.paga / r.total, 0))),
+      h('div', { class: 'suave pequeno pessoa-sobra' }, 'sobra ', h('b', {}, formatarBRL(p.sobra)))))),
       h('p', { class: 'nota' }, `Cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),
     ]
     : [aviso('info', perfilVisto ? 'Preencha o salário de cada um no Balanço para o app dividir as contas.' : 'Preencha os salários lá embaixo para o app dividir as contas.')];
