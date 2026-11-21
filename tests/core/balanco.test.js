@@ -85,7 +85,7 @@ test('revisão: o salário da outra pessoa ainda a confirmar muda a sua parte da
 });
 
 test('revisão: cartão que vence no começo do mês seguinte entra no mês em que a fatura fecha (as compras do mês)', () => {
-  // Vira no dia 24 e vence no dia 1: compras de 24/10 a 23/11 vencem em 01/12 e são as de novembro.
+  // Vira no dia 24 e vence no dia 1: compras de 24/10 a 23/11 vencem em 01/12 e são a fatura de dezembro, paga com o salário de dezembro.
   let casa = migrarCasa({
     schemaVersion: 3,
     pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }],
@@ -96,9 +96,9 @@ test('revisão: cartão que vence no começo do mês seguinte entra no mês em q
   });
   casa = anotarCompra(casa, { cartaoId: 'c2', data: '2026-10-10', nome: 'Livro', valor: 40, para: 'p2', novoId: () => 'k1' }); // vence 01/11
   casa = anotarCompra(casa, { cartaoId: 'c2', data: '2026-11-10', nome: 'Tênis', valor: 300, para: 'p2', novoId: () => 'k2' }); // vence 01/12
-  const novembro = balancoDoMes(casa, '2026-11', 'p2', '2026-11-20');
-  assert.deepEqual([novembro.cartoes[0].fatura, novembro.cartoes[0].vence, novembro.cartoes[0].seu, novembro.cartoes[0].aberta], ['2026-12', '2026-12-01', 300, true]);
-  assert.deepEqual([balancoDoMes(casa, '2026-10', 'p2', '2026-11-20').cartoes[0].seu], [40]);
+  const dezembro = balancoDoMes(casa, '2026-12', 'p2', '2026-11-20');
+  assert.deepEqual([dezembro.cartoes[0].fatura, dezembro.cartoes[0].vence, dezembro.cartoes[0].seu, dezembro.cartoes[0].aberta], ['2026-12', '2026-12-01', 300, true]);
+  assert.deepEqual([balancoDoMes(casa, '2026-11', 'p2', '2026-11-20').cartoes[0].seu], [40]);
   // Cartão sem os dias: a fatura do próprio mês, sem vencimento.
   const semDias = { ...casa, cartoes: [{ ...casa.cartoes[0], viraNoDia: null, venceNoDia: null }] };
   assert.deepEqual([balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].fatura, balancoDoMes(semDias, '2026-12', 'p2', '2026-11-20').cartoes[0].vence], ['2026-12', null]);

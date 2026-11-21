@@ -179,7 +179,7 @@ function desenhar(container, ctx) {
     }),
     ...b.cartoes.map((k) => linha({
       titulo: k.nome,
-      // A fatura que fecha no mês; o vencimento diz qual é (com vencimento no dia 1, a do mês seguinte).
+      // A fatura do mês (a mesma do Cartão); o vencimento diz o dia.
       detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ',
         k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`,
         k.seuJaTenho > 0 && ` (já tenho ${formatarBRL(k.seuJaTenho)} guardados: só o que falta entra)`,
