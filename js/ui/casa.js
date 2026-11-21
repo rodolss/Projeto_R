@@ -224,13 +224,15 @@ function desenharMes(container, ctx) {
   const dicaAnterior = (v) => v.situacao !== 'vazio' && h('p', { class: 'suave pequeno' }, `Em ${nomeDoMes(mesAnterior)}: ${formatarBRL(v.valor)}`);
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // valor digitado ainda não salvo: a atualização automática espera
 
-  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha }) {
+  // `depois(valor)`: o que mais fazer depois de salvar (o salário de quem administra também vai para o plano).
+  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha, depois = null }) {
     let valor = situacao === 'vazio' ? null : valorAtual;
     const salvar = botao('Salvar', async () => {
       if (valor == null) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
       salvar.disabled = true;
       await ctx.salvarCasa((c) => aoSalvar(c, valor));
-      ctx.aviso('Salvo.', 'ok', 2500);
+      const mais = depois ? await depois(valor) : null;
+      ctx.aviso(mais ?? 'Salvo.', 'ok', 2500);
       terminar(folha);
     });
     return [
@@ -256,13 +258,18 @@ function desenharMes(container, ctx) {
     });
   }
 
+  // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, o salário de quem administra no
+  // mês atual já abre o Dia de pagamento preenchido (para conferir). O salário do plano não muda por aqui.
   function folhaSalario(pessoa, folha) {
     const s = salarioNoMes(casa, mes, pessoa.id);
+    const abreODia = ctx.unica && ctx.estado && pessoa.id === visto?.id && mes === mesAtual
+      && !(ctx.estado.meses ?? []).some((m) => m.mes === mes);
     return folhaValor({
       folha, texto: `Salário de ${pessoa.nome} em ${nome}`, situacao: s.situacao, valorAtual: s.valor,
       anterior: salarioNoMes(casa, mesAnterior, pessoa.id), dica: 'O salário líquido que caiu na conta.',
       aoSalvar: (c, valor) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor }),
       aoTirar: (c) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor: null }),
+      depois: abreODia ? async () => 'Salvo. O Dia de pagamento já abre com esse valor para você conferir.' : null,
     });
   }
 
