@@ -10,7 +10,7 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
-import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago, mesFechado } from '../core/pagamentos.js';
+import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago, mesFechado, contasPagas } from '../core/pagamentos.js';
 import { avisoMesFechado, AVISO_FECHADO } from './fechado.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
@@ -167,10 +167,14 @@ function desenharMes(container, ctx) {
   const textoDaMedia = pct > 0
     ? `${formatarPct(pct / 100, 1)} ${media.diferenca > 0 ? 'mais' : 'menos'} que a média dos meses anteriores`
     : media?.diferenca === 0 ? 'Igual à média dos meses anteriores' : null;
+  // Tudo pago (contas e, com perfil, os cartões de quem vê): um selo verde no total, mesmo com o mês reaberto.
+  const perfilVisto = ctx.perfil?.visto ?? null;
+  const quitado = perfilVisto ? tudoPago(casa, mes, perfilVisto.id) : contasPagas(casa, mes);
   const total = cartao(
     h('div', { class: 'rotulo' }, 'Contas da casa'),
     h('div', { class: 'valor-grande total-com-seta' }, formatarBRL(r.total), seta),
     h('div', { style: 'margin-top:4px' }, situacaoTotal),
+    quitado && h('div', { style: 'margin-top:8px' }, h('span', { class: 'selo ok' }, 'Tudo pago ✓')),
     textoDaMedia && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia));
   const divisao = r.divide
     ? [
