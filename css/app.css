@@ -615,14 +615,26 @@ a.barra-item:active { background: var(--cartao-2); }
 .top-nota { margin: 14px 0 0; }
 /* Etiquetas no "O que foi" (campoTag). */
 .tag-baloes { margin-top: 8px; }
-.tag-escolhidas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
-.tag-escolhidas:empty { display: none; }
 .chip.tag { background: var(--destaque-suave); border-color: var(--destaque-suave); color: var(--destaque); font-weight: 600; }
 .chip.tag.ativo { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-texto); }
 .chip.tag.nova { background: transparent; border: 1px dashed var(--destaque); }
 .chip.tag.nova.ativo { border-style: solid; background: var(--ok-fundo); border-color: var(--ok); color: var(--ok); }
 .chip.pequeno { padding: 5px 12px; font-size: 14px; background: var(--cartao-2); border-color: var(--cartao-2); }
-.tag-escolhidas .chip.ativo { box-shadow: none; }
+
+/* Anotar sem rolar (desenho 2026-11-21-anotar-sem-rolar): valor e data lado a lado, escolhas numa linha que desliza e
+   os botões presos no pé da folha. */
+.campos-lado { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.campos-lado .campo { min-width: 0; }
+.campos-lado .entrada { min-width: 0; padding-left: 10px; padding-right: 8px; }
+.folha .campos-lado + .cartao-vai { margin-top: -4px; }
+.linha-unica .chips, .tag-baloes { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin-left: -16px; margin-right: -16px; padding: 2px 16px; scroll-padding-inline: 16px; }
+.linha-unica .chips::-webkit-scrollbar, .tag-baloes::-webkit-scrollbar { display: none; }
+.linha-unica .chip, .tag-baloes .chip { flex: none; }
+.folha .botoes-fixos { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom, 0px)); z-index: 2;
+  margin-left: -16px; margin-right: -16px; margin-bottom: calc(-18px - env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--fundo);
+  box-shadow: 0 -12px 20px -14px rgba(0, 0, 0, 0.28); }
 
 /* ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ---------- */
 .ja-etiqueta { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 99px; background: var(--amarelo); color: var(--amarelo-tinta);

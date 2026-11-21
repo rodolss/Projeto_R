@@ -90,3 +90,9 @@ test('expressões da casa: acrescentar, não repetir, tirar; duas palavras ou ma
   const sem = removerJunta(casa, 'banho e tosa');
   assert.equal('etiquetasJuntas' in sem, false);
 });
+
+test('balões: o meio da palavra só conta a partir de 3 letras ("ra" não acha "Água Mineral")', () => {
+  const tags = ['Água Mineral', 'Raquete', 'Suco de Laranja'];
+  assert.deepEqual(opcoesDeTag(tags, 'ra').achadas, ['Raquete']);
+  assert.deepEqual(opcoesDeTag(tags, 'ran').achadas, ['Suco de Laranja']);
+});
