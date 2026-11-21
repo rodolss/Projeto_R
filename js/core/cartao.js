@@ -282,6 +282,55 @@ export function editarCompraDoCartao(casa, { fatura, compraId, nome, valor, para
   });
 }
 
+// ---------- corrigir o número de parcelas (desenho 2026-11-21-mudar-parcelas) ----------
+// As parcelas de uma compra, na ordem das faturas, com o número de cada uma. À vista: ela mesma, como 1 de 1. Uma
+// importação antiga pode não ter o número: conta a partir do número da primeira que tem (ou 1).
+export function parcelasDaCompra(casa, { fatura, compraId }) {
+  const alvo = casa.meses.find((m) => m.mes === fatura)?.compras?.find((c) => c.id === compraId);
+  if (!alvo) return [];
+  const lista = alvo.grupo
+    ? casa.meses.flatMap((m) => (m.compras ?? []).filter((c) => c.grupo === alvo.grupo).map((compra) => ({ mes: m.mes, compra })))
+      .sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0))
+    : [{ mes: fatura, compra: alvo }];
+  const inicio = lista[0].compra.parcela?.n ?? 1;
+  return lista.map((p, k) => ({ ...p, n: inicio + k }));
+}
+
+// Muda para `vezes` parcelas: a compra continua começando na mesma fatura; as que faltam entram nas faturas seguintes
+// (com o valor e o "para quem" da última; o "já tenho" fica só na primeira, como ao anotar) e as que sobram saem.
+// Uma vez só: vira compra à vista. À vista com mais vezes: vira parcelada.
+export function mudarParcelas(casa, { fatura, compraId, vezes, novoId = idPadrao }) {
+  const parcelas = parcelasDaCompra(casa, { fatura, compraId });
+  if (!parcelas.length) return casa;
+  // Nunca some a parcela que está sendo editada (nem as de antes dela).
+  const daEditada = parcelas.find((p) => p.compra.id === compraId).n;
+  const total = Math.max(daEditada, Math.min(48, Math.floor(vezes)));
+  const atual = parcelas[0].compra.parcela?.de ?? (parcelas[0].compra.grupo ? parcelas.at(-1).n : 1);
+  if (total === atual && parcelas.at(-1).n === total) return casa;
+  const grupo = total > 1 ? (parcelas[0].compra.grupo ?? novoId()) : null;
+  const comoParcela = (c, n) => {
+    const { grupo: _g, parcela: _p, ...resto } = c;
+    return grupo ? { ...resto, grupo, parcela: { n, de: total } } : resto;
+  };
+  let resultado = casa;
+  for (const { mes, compra, n } of parcelas) {
+    resultado = comMes(resultado, mes, (r) => {
+      r.compras = n > total ? r.compras.filter((c) => c.id !== compra.id) : r.compras.map((c) => (c.id === compra.id ? comoParcela(c, n) : c));
+      acompanharFatura(r, compra.contaId);
+    });
+  }
+  const ultima = parcelas.at(-1);
+  const { id: _id, jaTenho: _ja, ...modelo } = ultima.compra;
+  for (let n = ultima.n + 1; n <= total; n++) {
+    const nova = comoParcela({ ...modelo, id: novoId() }, n);
+    resultado = comMes(resultado, somarMeses(ultima.mes, n - ultima.n), (r) => {
+      r.compras.push(nova);
+      acompanharFatura(r, nova.contaId);
+    });
+  }
+  return resultado;
+}
+
 // ---------- as de todo mês ----------
 // Trechos da mesma de todo mês (o valor mudou numa fatura) formam uma série: o primeiro trecho dá o nome à série.
 const serieDe = (f) => f.serie ?? f.id;
