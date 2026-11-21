@@ -16,3 +16,10 @@ casa". Sem perguntas.
 - **Um ícone ordena**: mais novas primeiro (o começo) ↔ mais antigas primeiro; o desenho do ícone mostra a ordem do
   momento e a dica diz o que o toque faz. Compras sem data (da planilha) ficam no fim. A escolha vale até fechar o app.
 - Folha no endereço: `pessoa-<id>` (`pessoa-casa`). Versão do site 68.
+
+## Depois (versão 69, pedido do usuário: "gostaria que abrisse de acordo com a última coisa que eu deixei, pois a
+Nínive gosta de crescente e eu de decrescente")
+
+- A ordem fica guardada **no aparelho, por perfil** (`projetoR.ordemCompras.<perfil>`): cada um abre a lista do jeito
+  que deixou da última vez. Sem nada guardado, mais novas primeiro. É conveniência do aparelho (localStorage), não vai
+  para o casa.json.
