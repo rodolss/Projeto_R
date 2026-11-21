@@ -1,5 +1,5 @@
 // Utilitários de interface: criação de elementos, campos e textos comuns.
-import { formatarBRL, parseBRL } from '../core/formato.js';
+import { formatarBRL, parseBRL, mascararReais, valorDosReais, REGEX_REAIS } from '../core/formato.js';
 
 export function h(tag, atributos = {}, ...filhos) {
   const el = document.createElement(tag);
@@ -40,17 +40,26 @@ export async function copiarTexto(texto) {
 
 export const numeroBR = (valor) => formatarBRL(valor).replace(/^-?R\$ /, (m) => (m.startsWith('-') ? '-' : ''));
 
-// Campo de dinheiro: aceita digitação livre ("7.800", "7800,50") e formata ao sair. Nunca mostra NaN.
+// Campo de dinheiro com máscara de reais: o teclado é só de números, vírgula e ponto digitados não entram e a máscara
+// monta "1.234,56" sozinha (digitou 123456 → 1.234,56). Colar "R$ 1.234,56" ou "1234.5" também vale.
 export function campoMoeda({ rotulo, valor = null, aoMudar, dica = null, grande = false, id = null }) {
   const input = h('input', {
-    type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'campo-input', placeholder: '0,00', id,
-    'aria-label': rotulo,
+    type: 'text', inputmode: 'numeric', autocomplete: 'off', class: 'campo-input', placeholder: '0,00', id,
+    pattern: REGEX_REAIS.source, 'aria-label': rotulo,
   });
   input.value = valor == null ? '' : numeroBR(valor);
-  input.addEventListener('input', () => aoMudar(parseBRL(input.value)));
-  input.addEventListener('blur', () => {
-    const v = parseBRL(input.value);
-    if (v != null) input.value = numeroBR(v);
+  const aplicar = (texto) => {
+    input.value = mascararReais(texto);
+    aoMudar(valorDosReais(input.value));
+  };
+  // Vírgula e ponto não entram nem por um instante (teclado físico, teclado do celular).
+  input.addEventListener('beforeinput', (e) => { if (e.data && /[.,]/.test(e.data) && e.inputType === 'insertText') e.preventDefault(); });
+  input.addEventListener('input', () => aplicar(input.value));
+  input.addEventListener('paste', (e) => {
+    const colado = parseBRL(e.clipboardData?.getData('text') ?? '');
+    if (colado == null) { e.preventDefault(); return; } // texto que não é valor: ignora
+    e.preventDefault();
+    aplicar(colado.toFixed(2));
   });
   const campo = h('label', { class: 'campo' },
     rotulo && h('span', { class: 'campo-rotulo' }, rotulo),
