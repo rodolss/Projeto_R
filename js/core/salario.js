@@ -17,11 +17,25 @@ export function definirSalario(casa, { mes, pessoaId, salario, extra }) {
   return Object.keys(extras).length ? { ...semExtras, extras } : semExtras;
 }
 
-// O salário do plano acompanha o salário do mês digitado no Balanço, do último mês já usado em diante (um mês antigo
-// corrigido não muda o plano). O a mais nunca entra aqui.
-export function salarioDoPlanoDepois(config, { mes, salario }) {
-  if (salario == null || salario === config.salario || mes < (config.mesSalario ?? '')) return config;
-  return { ...config, salario, mesSalario: mes };
+// O salário do plano é sempre o salário do último mês confirmado até hoje (revisão do desenho): um mês futuro não
+// mexe, um mês menor seguido de um normal volta ao normal, tirar um mês volta ao anterior — e, por ser calculado e
+// não acumulado, nada trava. Mesmo valor num mês mais novo também anda o mês (a correção pela inflação parte dele).
+// O a mais nunca entra aqui. Sem nenhum salário confirmado, ou já em dia: o mesmo objeto.
+export function salarioDoPlanoPelaCasa(config, { casa, pessoaId, hoje }) {
+  const ate = hoje.slice(0, 7);
+  const ultimo = (casa?.meses ?? [])
+    .filter((m) => m.mes <= ate && m.salarios?.[pessoaId] > 0)
+    .reduce((a, m) => (!a || m.mes > a.mes ? m : a), null);
+  if (!ultimo) return config;
+  const salario = ultimo.salarios[pessoaId];
+  if (salario === config.salario && ultimo.mes === config.mesSalario) return config;
+  return { ...config, salario, mesSalario: ultimo.mes };
+}
+
+// O rascunho do Dia de pagamento com o salário do Balanço (só leitura): o que caiu é o salário + o a mais, feito só
+// com o salário do mês confirmado. O mesmo para a tela do Mês e para o cartão do Início.
+export function rascunhoComBalanco(base, dia) {
+  return { ...base, recebido: dia.pronto ? dia.recebido : null, tipoExtra: null, feito: { ...base.feito, salario: dia.pronto } };
 }
 
 // O que o Dia de pagamento mostra (só leitura): o salário do mês e o a mais, do Balanço. Pronto só com o salário do

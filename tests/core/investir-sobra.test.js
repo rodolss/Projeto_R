@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { regraDaSobra } from '../../js/core/investir-sobra.js';
+import { definirSalario } from '../../js/core/salario.js';
 import { migrarCasa, salvarValor, salvarSalario } from '../../js/core/casa.js';
 
 // Casa inventada, sem cartões: Ana (p1, quem administra) ganha 6000 e o Leo 4000; só a Luz (1000), confirmada.
@@ -57,4 +58,13 @@ test('investir a sobra: sem os salários do mês anterior, incompleto (o valor v
   const semOutubro = salvarSalario(salvarSalario(casa, { mes: '2026-10', pessoaId: 'p1', valor: null }), { mes: '2026-10', pessoaId: 'p2', valor: null });
   assert.equal(regra(semOutubro, { meses: [] }, '2026-12').incompleto, true);
   assert.equal(regra(semOutubro, { meses: [] }, '2026-12').mes, '2026-11');
+});
+
+test('salário só no Balanço: o a mais de novembro (13º) entra na sobra e é investido em dezembro, sem mudar a parte das contas', () => {
+  const casa = definirSalario(casaBase(), { mes: '2026-11', pessoaId: 'p1', salario: 6000, extra: 6000 });
+  const r = regra(casa, { meses: [] }, '2026-12');
+  assert.deepEqual([r.sobra, r.base, r.lazer, r.investir], [11400, 11400, 1140, 10260]);
+  // Novembro registrado pelo orçamento com o 13º já investido naquele dia: o que saiu é descontado (não investe 2 vezes).
+  const antigo = { meses: [{ mes: '2026-11', aplicado: [{ valor: 9000 }], proventos: 0, sugestao: { origem: 'orcamento' } }] };
+  assert.deepEqual([regra(casa, antigo, '2026-12').jaInvestido, regra(casa, antigo, '2026-12').investir], [9000, 2160]);
 });

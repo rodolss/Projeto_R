@@ -11,7 +11,7 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
-import { salarioParaODia } from '../core/salario.js';
+import { salarioParaODia, rascunhoComBalanco } from '../core/salario.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
   saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
@@ -67,12 +67,12 @@ function desenhar(container, ctx) {
   }
   // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, "Salário que caiu" só mostra o
   // salário (e o a mais) do Balanço deste mês, e fica feito quando ele está confirmado lá. Recalculado a cada desenho.
-  const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
-  const doBalanco = visto ? salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id }) : null;
-  if (doBalanco && !existente) {
-    const base = rascunho ?? rascunhoVazio(mes);
-    rascunho = { ...base, recebido: doBalanco.pronto ? doBalanco.recebido : null, tipoExtra: null, feito: { ...base.feito, salario: doBalanco.pronto } };
-  }
+  // Num mês já registrado, o salário do registro fica (só leitura). Casa ainda carregando: espera, sem campo.
+  const visto = ctx.unica ? ctx.perfil?.visto ?? null : null;
+  const doBalanco = !visto ? null
+    : ctx.casa ? salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id })
+      : { carregando: true, pronto: false, salario: null, extra: 0, recebido: null };
+  if (doBalanco && !existente) rascunho = rascunhoComBalanco(rascunho ?? rascunhoVazio(mes), doBalanco);
   const sit = situacao({ registrado: Boolean(existente), rascunho });
   const r = rascunho ?? rascunhoVazio(mes);
   const guardar = () => salvarRascunho(r);
@@ -135,10 +135,19 @@ function desenhar(container, ctx) {
   // histórico: voltar do Balanço traz para o Mês).
   function folhaSalarioDoBalanco() {
     const nomeDoBalanco = `#/casa-balanco?mes=${mes}&folha=salario`;
+    const noBalanco = doBalanco.pronto ? doBalanco.recebido : null;
     return [
       h('h2', {}, 'Salário que caiu'),
-      doBalanco.pronto
+      existente
         ? cartao(
+          h('div', { class: 'rotulo' }, `Registrado em ${dataCurta(existente.data)}`),
+          h('div', { class: 'valor-grande' }, formatarBRL(existente.recebido ?? 0)),
+          noBalanco != null && noBalanco !== existente.recebido
+          && h('div', { class: 'suave' }, `No Balanço agora: ${formatarBRL(noBalanco)}. O registro guarda o valor do dia; a sobra de ${nome} (e o próximo Dia de pagamento) já usa o do Balanço.`))
+        : doBalanco.carregando
+          ? aviso('info', 'As contas da casa ainda estão carregando. O salário aparece aqui sozinho.')
+          : doBalanco.pronto
+            ? cartao(
           h('div', { class: 'rotulo' }, `Do Balanço de ${nome}`),
           h('div', { class: 'valor-grande' }, formatarBRL(doBalanco.recebido)),
           doBalanco.extra > 0 && h('div', { class: 'suave' }, `${formatarBRL(doBalanco.salario)} de salário + ${formatarBRL(doBalanco.extra)} a mais (vai pela sobra, no próximo Dia de pagamento).`))
@@ -152,7 +161,7 @@ function desenhar(container, ctx) {
 
   // ---------- folhas ----------
   function folhaSalario() {
-    if (doBalanco && !existente) return folhaSalarioDoBalanco();
+    if (doBalanco) return folhaSalarioDoBalanco();
     const extra = h('div');
     const desenharExtra = () => {
       const pergunta = r.recebido != null && resposta().perguntarExtra;
@@ -251,7 +260,7 @@ function desenhar(container, ctx) {
     const pct = `${Math.round(LAZER * 100)}%`;
     const extra = rr.extra?.valor > 0 && rr.extra;
     const linha = regra.incompleto
-      ? aviso('info', `Para investir pela sobra, preencha os salários de ${nomeAnterior} no Mês da casa. Por enquanto, o valor sai do orçamento.`)
+      ? aviso('info', `Para investir pela sobra, faltam os salários de ${nomeAnterior} (o seu se digita no Balanço; o da outra pessoa, no Mês da casa). Por enquanto, o valor sai do orçamento.`)
       : h('p', { class: 'suave' },
         `Sobrou em ${nomeAnterior}: ${formatarBRL(regra.sobra)}${regra.previsao ? ' (com valores ainda a confirmar)' : ''}. `,
         regra.jaInvestido > 0 && `Desse salário, ${formatarBRL(regra.jaInvestido)} já tinham sido investidos no Dia de pagamento de ${nomeAnterior}. `,
@@ -390,7 +399,7 @@ function desenhar(container, ctx) {
     {
       n: 1, chave: 'salario', titulo: 'Salário que caiu',
       // Na visão única, o salário vem do Balanço (só lá se digita).
-      detalhe: sit.feitas.salario ? formatarBRL(recebido) : doBalanco && !registrado ? 'Digite seu salário no Balanço' : 'Falta preencher',
+      detalhe: sit.feitas.salario ? formatarBRL(recebido) : doBalanco?.carregando ? 'Carregando o Balanço…' : doBalanco && !registrado ? 'Digite seu salário no Balanço' : 'Falta preencher',
     },
     {
       n: 2, chave: 'proventos', titulo: 'Proventos desde o último registro',
@@ -403,7 +412,7 @@ function desenhar(container, ctx) {
     type: 'button', class: 'tarefa', disabled: t.bloqueada,
     onclick: () => {
       if (t.chave === 'saldos' && sit.modo !== 'novo') { abrir('so-saldos'); return; }
-      if (registrado) entrarEmEdicao();
+      if (registrado && !(t.chave === 'salario' && doBalanco)) entrarEmEdicao(); // o salário só se vê (vem do Balanço)
       abrir(t.chave);
     },
   },

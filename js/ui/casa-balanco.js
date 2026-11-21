@@ -6,7 +6,7 @@ import { h, cartao, botao, campoMoeda, mostrarFolha, esconderFolha } from './dom
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import { primeiroMes, salarioNoMes } from '../core/casa.js';
-import { definirSalario, extraDoMes, salarioDoPlanoDepois } from '../core/salario.js';
+import { definirSalario, extraDoMes } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
@@ -25,7 +25,7 @@ export const enderecoDaFatura = (cartaoId, mes) => `#/casa-cartao?cartao=${carta
 // Nunca "livre" nem "pode parar de investir": quem diz para onde vai cada real é o Dia de pagamento.
 export function textoDoPlano({ situacao, falta = 0 }) {
   if (situacao === 'registrado') return 'Este mês você já investiu ✓';
-  if (situacao === 'incompleto') return 'Preencha os salários no Mês para comparar com o plano.';
+  if (situacao === 'incompleto') return 'Faltam os salários deste mês para comparar com o plano.';
   if (situacao === 'vermelho') return 'Neste mês não sobrou: o balanço fechou no vermelho.';
   if (situacao === 'sem-aporte') return 'No ritmo de hoje você chega no prazo. Siga o Dia de pagamento.';
   if (situacao === 'cobre') return 'Investindo isso, você cobre o que o plano pede ✓';
@@ -172,7 +172,7 @@ function desenhar(container, ctx) {
   const linhasSaiu = [
     c && linha({
       titulo: 'Contas da casa',
-      detalhe: c.valor == null ? 'Preencha os salários no Mês para dividir as contas.'
+      detalhe: c.valor == null ? 'Faltam os salários deste mês para dividir as contas.'
         : [c.aConfirmar && selo('a confirmar'), c.aConfirmar && ' ', `sua parte do total de ${formatarBRL(c.total)} (${formatarPct(c.fatia, 0)} do salário)`],
       valor: c.valor == null ? '—' : formatarBRL(c.valor),
       aoTocar: irAoMes,
@@ -216,25 +216,32 @@ function desenhar(container, ctx) {
   function folhaSalario() {
     const atual = salarioNoMes(casa, mes, pessoaId);
     const novo = { salario: atual.situacao === 'vazio' ? null : atual.valor, extra: extraDoMes(casa, mes, pessoaId) || null };
-    const salvar = botao('Salvar', async () => {
-      if (!(novo.salario > 0)) { ctx.aviso('Digite o salário do mês.', 'atencao', 3000); return; }
-      salvar.disabled = true;
-      await ctx.salvarCasa((c) => definirSalario(c, { mes, pessoaId, salario: novo.salario, extra: novo.extra }));
-      // O salário do plano acompanha (do último mês já usado em diante); o a mais nunca entra nele.
-      if (ctx.estado && salarioDoPlanoDepois(ctx.estado.config, { mes, salario: novo.salario }) !== ctx.estado.config) {
-        await ctx.salvar((e) => ({ ...e, config: salarioDoPlanoDepois(e.config, { mes, salario: novo.salario }) }));
+    // Grava na casa; o salário do plano acompanha sozinho (app.js: o do último mês confirmado até hoje).
+    const gravar = async (mudar, texto, botaoUsado) => {
+      if (botaoUsado) botaoUsado.disabled = true;
+      try {
+        await ctx.salvarCasa(mudar);
+      } catch (erro) {
+        console.warn('Não salvei o salário', erro);
+        ctx.aviso('Não deu para salvar. Tente de novo.', 'atencao', 4000);
+        if (botaoUsado) botaoUsado.disabled = false;
+        return;
       }
-      ctx.aviso('Salário salvo. Vale para as contas da casa, o Dia de pagamento e o plano.', 'ok', 3000);
+      ctx.aviso(texto, 'ok', 3000);
       terminar();
+    };
+    const salvar = botao('Salvar', () => {
+      if (!(novo.salario > 0)) { ctx.aviso('Digite o salário do mês.', 'atencao', 3000); return; }
+      gravar((c) => definirSalario(c, { mes, pessoaId, salario: novo.salario, extra: novo.extra }),
+        'Salário salvo. Vale para as contas da casa, o Dia de pagamento e o plano.', salvar);
     });
     const tirar = atual.situacao === 'confirmado' && h('button', {
       type: 'button', class: 'botao-link',
-      onclick: async () => {
-        await ctx.salvarCasa((c) => definirSalario(c, { mes, pessoaId, salario: null, extra: null }));
-        ctx.aviso('Salário tirado. O app volta a prever.', 'ok', 3000);
-        terminar();
-      },
+      onclick: (e) => gravar((c) => definirSalario(c, { mes, pessoaId, salario: null, extra: null }), 'Salário tirado. O app volta a prever.', e.currentTarget),
     }, 'Tirar o salário deste mês');
+    // O a mais vai pela sobra no Dia de pagamento do mês seguinte: se ele já foi registrado, não entra mais.
+    const proximo = somarMeses(mes, 1);
+    const proximoRegistrado = (ctx.estado?.meses ?? []).some((m) => m.mes === proximo);
     return [
       h('h2', { 'data-sem-recarregar': '' }, `Seu salário de ${nomeDoMes(mes)}`),
       atual.situacao === 'a-confirmar' && h('p', { class: 'suave' }, `Previsão: igual a ${quando(atual.deOnde, mes)}. Confira e salve o valor certo.`),
@@ -245,9 +252,10 @@ function desenhar(container, ctx) {
       }),
       campoMoeda({
         rotulo: 'A mais neste mês (se veio)', valor: novo.extra, id: 'a-mais-do-mes',
-        dica: '13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra e é investido no próximo Dia de pagamento. O adiantamento das férias não conta aqui.',
+        dica: '13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra e é investido no próximo Dia de pagamento. Férias: o adiantamento não conta aqui — no mês seguinte, digite o salário de sempre.',
         aoMudar: (v) => { novo.extra = v; },
       }),
+      proximoRegistrado && h('p', { class: 'suave pequeno' }, `O Dia de pagamento de ${nomeDoMes(proximo)} já foi registrado: um a mais digitado agora não entra mais nele.`),
       h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
       tirar,
     ];

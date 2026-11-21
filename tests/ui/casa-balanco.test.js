@@ -22,7 +22,7 @@ test('texto do plano no balanço: cada situação (sem "livres", sem "não pede 
   assert.equal(textoDoPlano({ situacao: 'sem-aporte' }), 'No ritmo de hoje você chega no prazo. Siga o Dia de pagamento.');
   assert.equal(textoDoPlano({ situacao: 'cobre', livre: 1799.5 }), 'Investindo isso, você cobre o que o plano pede ✓');
   assert.match(textoDoPlano({ situacao: 'falta', falta: 400 }), /^Faltam R\$\s400,00 para o que o plano pede\.$/);
-  assert.equal(textoDoPlano({ situacao: 'incompleto' }), 'Preencha os salários no Mês para comparar com o plano.');
+  assert.equal(textoDoPlano({ situacao: 'incompleto' }), 'Faltam os salários deste mês para comparar com o plano.');
   assert.equal(textoDoPlano({ situacao: 'registrado' }), 'Este mês você já investiu ✓');
   assert.equal(textoDoPlano({ situacao: 'sem-plano' }), null);
 });

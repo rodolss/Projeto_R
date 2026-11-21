@@ -224,15 +224,13 @@ function desenharMes(container, ctx) {
   const dicaAnterior = (v) => v.situacao !== 'vazio' && h('p', { class: 'suave pequeno' }, `Em ${nomeDoMes(mesAnterior)}: ${formatarBRL(v.valor)}`);
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // valor digitado ainda não salvo: a atualização automática espera
 
-  // `depois(valor)`: o que mais fazer depois de salvar (o salário de quem administra também vai para o plano).
-  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha, depois = null }) {
+  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha }) {
     let valor = situacao === 'vazio' ? null : valorAtual;
     const salvar = botao('Salvar', async () => {
       if (valor == null) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
       salvar.disabled = true;
       await ctx.salvarCasa((c) => aoSalvar(c, valor));
-      const mais = depois ? await depois(valor) : null;
-      ctx.aviso(mais ?? 'Salvo.', 'ok', 2500);
+      ctx.aviso('Salvo.', 'ok', 2500);
       terminar(folha);
     });
     return [

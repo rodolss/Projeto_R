@@ -1,5 +1,7 @@
 # Salário digitado uma vez só — desenho curto
 
+> **Substituído** por 2026-11-21-salario-no-balanco (versão 21): o salário passou a ser digitado só no Balanço.
+
 Data: 2026-11-21. Pedido do usuário: "tenho a impressão que estou tendo que digitar meu salário muitas vezes […] só
 preciso uma única vez e isso conta para tudo, pode tomar as decisões, não me pergunte nada". Exemplos INVENTADOS
 (repositório público): Ana administra e tem o planejador; Leo divide a casa.

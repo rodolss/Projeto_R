@@ -23,8 +23,12 @@ desenho 2026-11-21-salario-unico (que deixava digitar em vários lugares e repli
     editável).
   - Ajustes do planejador › Renda: o salário mostra o salário do plano (que vem do Balanço) e leva a ele; "recebo
     13º" e "recebo férias" continuam editáveis.
-- **O salário do plano acompanha o Balanço:** salvar o salário de um mês igual ou depois do último já usado
-  (`config.mesSalario`) atualiza o salário do plano. Sem o risco do desenho anterior (um mês menor travando o plano):
-  os extras agora são digitados à parte e um mês menor seguido de um normal volta ao normal.
+- **O salário do plano acompanha o Balanço (revisto depois da revisão):** é sempre o salário do último mês confirmado
+  até hoje, recalculado (não acumulado) depois de cada gravação da casa e a cada desenho de tela (app.js). Um mês
+  futuro não mexe; um mês menor seguido de um normal volta ao normal; tirar um mês volta ao anterior; nada trava. O a
+  mais nunca entra nele.
+- Mês já registrado: o Dia de pagamento mostra o salário do registro (só leitura) e, se o Balanço mudou depois, o
+  valor de lá. Na folha do Balanço, aviso quando o Dia de pagamento do mês seguinte já foi registrado (o a mais
+  digitado tarde não entra mais nele).
 - `extras` fica fora de `meses` (no topo do casa.json) para um app antigo que regrava o mês não apagá-lo. Funções
   puras em `js/core/salario.js`. Versão 21.
