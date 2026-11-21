@@ -18,6 +18,26 @@ export function h(tag, atributos = {}, ...filhos) {
   return el;
 }
 
+// Copia um texto para a área de transferência (para colar no app do banco). Sem a API moderna (aparelho sem https,
+// casca antiga), cai no execCommand. Devolve se deu certo.
+export async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    const campo = document.createElement('textarea');
+    campo.value = texto;
+    campo.setAttribute('readonly', '');
+    campo.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.append(campo);
+    campo.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    campo.remove();
+    return ok;
+  }
+}
+
 export const numeroBR = (valor) => formatarBRL(valor).replace(/^-?R\$ /, (m) => (m.startsWith('-') ? '-' : ''));
 
 // Campo de dinheiro: aceita digitação livre ("7.800", "7800,50") e formata ao sair. Nunca mostra NaN.
