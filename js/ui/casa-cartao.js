@@ -340,6 +340,12 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próxima fatura', disabled: fatura >= somarMeses(aberta, 12), onclick: () => irPara(somarMeses(fatura, 1)) }, '›'));
   const sub = h('p', { class: 'suave cartao-sub' },
     `Compras de ${dataCurta(periodo.de)} a ${dataCurta(periodo.ate)} · vence ${dataComAno(periodo.vence)}`);
+  // Com mais de um cartão, o cabeçalho de cada mês mostra a soma das faturas de todos (os que este perfil vê).
+  const cartoesDaSoma = casaVisivel.cartoes ?? [];
+  const somaDosCartoes = cartoesDaSoma.length > 1
+    ? Math.round(cartoesDaSoma.reduce((t, k) => t + faturaDoCartao(casa, k.id, fatura).total, 0) * 100) / 100 : null;
+  const somaNoCabecalho = somaDosCartoes != null
+    && h('p', { class: 'suave cartao-sub', 'data-soma-cartoes': '' }, `Soma dos ${cartoesDaSoma.length} cartões em ${nomeDoMes(fatura)}: `, h('b', {}, formatarBRL(somaDosCartoes)));
   const voltar = fatura !== aberta
     && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(aberta) }, 'Voltar para a fatura aberta');
 
@@ -452,7 +458,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
     }));
   } else {
-    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao()].filter(Boolean));
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, somaNoCabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao()].filter(Boolean));
   }
 
   // ---------- folhas ----------
