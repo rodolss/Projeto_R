@@ -477,10 +477,12 @@ a.barra-item:active { background: var(--cartao-2); }
 .balanco-plano { display: flex; flex-direction: column; gap: 8px; border-color: var(--destaque-suave); }
 .balanco-plano p { margin: 0; }
 
-/* "Já paguei" (desenho 2026-11-21-ja-paguei): o círculo de marcar à esquerda de cada conta. */
+/* "Já paguei" (desenho 2026-11-21-ja-paguei): um switch à esquerda de cada conta. */
 .linha-paga { display: flex; align-items: stretch; border-top: 1px solid var(--borda); }
 .linha-paga .casa-linha { border-top: 0; flex: 1; min-width: 0; padding-left: 4px; }
-.linha-paga .marca-paga { flex: none; width: 52px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-.linha-paga .bola-paga { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--suave); box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; font-weight: 700; line-height: 1; }
-.linha-paga .marca-paga.feita .bola-paga { background: #1f7a4d; border-color: #1f7a4d; }
+.linha-paga .sw-pago { flex: none; width: 62px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.linha-paga .sw-trilho { position: relative; width: 40px; height: 24px; border-radius: 12px; background: var(--borda); transition: background 0.15s; }
+.linha-paga .sw-trilho::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform 0.15s; }
+.linha-paga .sw-pago[aria-checked="true"] .sw-trilho { background: #1f7a4d; }
+.linha-paga .sw-pago[aria-checked="true"] .sw-trilho::after { transform: translateX(16px); }
 .linha-paga.paga .casa-linha .texto, .linha-paga.paga .casa-linha .quanto { opacity: 0.55; }
