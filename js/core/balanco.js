@@ -51,8 +51,8 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
 
 // ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------
 // A sobra do mês contra o que o plano pede por mês (o necessário para chegar no alvo, contando a reserva que falta).
-// Só confere: o quanto investir de verdade continua saindo do salário e do orçamento, no Dia de pagamento. Mês já
-// registrado: já investiu. Sem salário ou sem divisão (`completo` falso): sem veredito.
+// O que se compara é o que vai ser investido (a sobra menos o lazer: desenho 2026-11-20-investir-a-sobra). Sem
+// salário ou sem divisão (`completo` falso): sem veredito. `registrado` fica para quem quiser dizer "já investiu".
 export function compararComPlano({ sobra, pmtNec, completo = true, registrado = false }) {
   if (registrado) return { situacao: 'registrado', falta: 0, livre: 0 };
   if (!completo) return { situacao: 'incompleto', falta: 0, livre: 0 };
@@ -79,3 +79,12 @@ export function gastoMedioFechado(casa, pessoaId, mes, hoje, n = 3) {
 
 // O gasto real passou 10% do custo mensal do orçamento do plano: hora de revisar.
 export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => saiu != null && custoMensal > 0 && saiu > custoMensal * 1.1;
+
+// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
+// Quem administra investe só o que sobrou no mês, separando uma parte para lazer.
+export const LAZER = 0.1;
+export function divisaoDaSobra(sobra, lazerPct = LAZER) {
+  const base = centavos(Math.max(0, sobra));
+  const lazer = centavos(base * lazerPct);
+  return { sobra: base, lazer, investir: centavos(base - lazer) };
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { balancoDoMes, compararComPlano, gastouMaisQueOOrcamento, dadosCompletos, gastoMedioFechado } from '../../js/core/balanco.js';
+import { balancoDoMes, compararComPlano, gastouMaisQueOOrcamento, dadosCompletos, gastoMedioFechado, divisaoDaSobra, LAZER } from '../../js/core/balanco.js';
 import { migrarCasa, salvarValor, salvarSalario, conferirFatura } from '../../js/core/casa.js';
 import { anotarCompra, adicionarCartao } from '../../js/core/cartao.js';
 import { adicionarPerfil } from '../../js/core/perfis.js';
@@ -135,4 +135,12 @@ test('revisão: o gasto médio dos últimos meses já fechados (sem previsão), 
   // Em março, janeiro e fevereiro ainda são previsão (salários a confirmar): só dezembro, fechado, entra.
   assert.equal(gastoMedioFechado(casa, 'p2', '2027-03', '2027-03-15'), 290);
   assert.equal(gastoMedioFechado(casaBase(), 'p2', '2026-12', '2026-12-20'), null); // nenhum mês fechado antes
+});
+
+// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
+test('investir a sobra: 10% para lazer e o resto para investir; sem sobra, nada', () => {
+  assert.deepEqual(divisaoDaSobra(1000), { sobra: 1000, lazer: 100, investir: 900 });
+  assert.deepEqual(divisaoDaSobra(333.33), { sobra: 333.33, lazer: 33.33, investir: 300 });
+  assert.deepEqual(divisaoDaSobra(-50), { sobra: 0, lazer: 0, investir: 0 });
+  assert.equal(LAZER, 0.1);
 });

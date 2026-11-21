@@ -6,7 +6,7 @@ import { h, cartao } from './dom.js';
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import { primeiroMes } from '../core/casa.js';
-import { balancoDoMes, compararComPlano, dadosCompletos } from '../core/balanco.js';
+import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash } from './rotas.js';
 import { nomeDoMes, mesDaTela } from './casa.js';
@@ -27,13 +27,14 @@ export function textoDoPlano({ situacao, falta = 0 }) {
   if (situacao === 'incompleto') return 'Preencha os salários no Mês para comparar com o plano.';
   if (situacao === 'vermelho') return 'Neste mês não sobrou: o balanço fechou no vermelho.';
   if (situacao === 'sem-aporte') return 'No ritmo de hoje você chega no prazo. Siga o Dia de pagamento.';
-  if (situacao === 'cobre') return 'A sobra cobre o que o plano pede ✓. O Dia de pagamento diz onde pôr cada real.';
+  if (situacao === 'cobre') return 'Investindo isso, você cobre o que o plano pede ✓';
   if (situacao === 'falta') return `Faltam ${formatarBRL(falta)} para o que o plano pede.`;
   return null;
 }
 
-// Na visão única (quem administra, com o planejador), o Balanço é a tela inicial: no mês atual, o plano junto.
-// Só confere — o quanto investir sai do Dia de pagamento, pelo salário e pelo orçamento.
+// Na visão única (quem administra, com o planejador), o Balanço é a primeira aba: no mês atual, o plano junto.
+// Investir a sobra (desenho 2026-11-20-investir-a-sobra): a sobra deste mês vai para o Dia de pagamento do mês
+// seguinte — 10% para lazer, o resto para investir —, e é isso que se compara com o que o plano pede.
 function cartaoDoPlano(ctx, b) {
   let painel;
   try {
@@ -46,14 +47,19 @@ function cartaoDoPlano(ctx, b) {
   // O mesmo "para chegar no alvo" da tela de detalhes do plano: conta a reserva que ainda falta formar.
   const alvo = painel.necessarioAlvo;
   const pede = Number.isFinite(alvo) && alvo > 0;
-  const registrado = (ctx.estado.meses ?? []).some((m) => m.mes === ctx.hoje.slice(0, 7));
-  const texto = textoDoPlano(compararComPlano({ sobra: b.sobra, pmtNec: alvo, completo: dadosCompletos(b), registrado }));
+  const completo = dadosCompletos(b);
+  const divisao = divisaoDaSobra(b.sobra);
+  const proximo = nomeDoMes(somarMeses(b.mes, 1));
+  const texto = textoDoPlano(compararComPlano({ sobra: b.sobra <= 0 ? b.sobra : divisao.investir, pmtNec: alvo, completo }));
   return h('section', { class: 'cartao balanco-plano' },
     h('div', { class: 'rotulo' }, 'Seu plano'),
     conquistada
       ? h('p', {}, h('b', {}, 'Renda plena conquistada ✓'))
       : h('p', {}, h('b', {}, `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`), ' no ritmo de hoje.'),
-    pede && !registrado && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
+    completo && b.sobra > 0 && h('p', {},
+      `Desta sobra${b.previsao ? ' (previsão)' : ''}, no Dia de pagamento de ${proximo}: `, h('b', {}, formatarBRL(divisao.investir)), ' para investir e ',
+      h('b', {}, formatarBRL(divisao.lazer)), ` para lazer (${Math.round(LAZER * 100)}%).`),
+    pede && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
     texto && h('p', {}, texto),
     h('div', { class: 'botoes' },
       h('a', { class: 'botao', href: '#/mes' }, 'Dia de pagamento'),

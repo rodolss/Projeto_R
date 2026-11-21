@@ -215,22 +215,58 @@ export function saldosAtuais(estado, hoje) {
 
 // ---------- tela do mês ----------
 
-export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje }) {
+const centavos = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+// O mesmo formato de calcularExcedente, com o quanto investir já decidido. O que veio a mais no mês (13º, PLR,
+// férias) é sobra extra: o lazer sai dele também, e o resto se investe agora. Férias: só o 1/3 é extra; os 3/4
+// adiantam o salário do mês que vem (que vem menor) e ficam guardados, como na regra do orçamento.
+function excedenteDefinido({ recebidoEfetivo, salario, tipoExtra, investir, lazerPct }) {
+  let extra = Math.max(0, recebidoEfetivo - salario);
+  let guardar = 0;
+  if (tipoExtra === 'ferias') {
+    guardar = extra * 3 / 4;
+    extra /= 4;
+  }
+  const lazer = centavos(extra * lazerPct);
+  const extraInvestir = centavos(extra - lazer);
+  const excedente = centavos(Math.max(0, investir) + extraInvestir);
+  return {
+    recebidoEfetivo,
+    semAporte: excedente <= 0,
+    motivo: excedente <= 0 ? 'sem-sobra' : null,
+    excedente,
+    paraAnuais: 0,
+    provisao: 0,
+    guardarParaProximoMes: centavos(guardar),
+    paraDiaADia: 0, // o dia a dia já está no Balanço
+    extra: { valor: centavos(extra), guardar: centavos(guardar), lazer, investir: extraInvestir },
+  };
+}
+
+// `investirDefinido` (desenho 2026-11-20-investir-a-sobra): o quanto investir já decidido fora daqui (a sobra do
+// Balanço do mês anterior, menos o lazer — js/core/investir-sobra.js). Ele substitui o excedente do orçamento — sem
+// provisão nem anuais, que o Balanço já conta quando acontecem; a divisão entre reserva, carteira e caixa continua a
+// mesma. A resposta diz de onde veio (`origem`), e o registro do mês guarda isso.
+export function calcularMes({
+  estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje, investirDefinido = null, lazerPct = 0.1,
+}) {
   const cx = contexto(estado, hoje, saldosAtualizados, { excluirMes: hoje.slice(0, 7) });
   const { mes, custo, salario, grupo } = cx;
 
   const anterior = estado.meses.find((m) => m.mes === somarMeses(mes, -1));
   const atual = estado.meses.find((m) => m.mes === mes);
   const contadores = somarAoCiclo(estado.contadoresAnuais, mes, -(atual?.paraAnuais ?? 0));
-  const exc = calcularExcedente({
-    recebido,
-    pendenteDoMesAnterior: anterior?.guardarParaProximoMes ?? 0,
-    salario,
-    custoMensal: custo.mensal,
-    provisao: cx.provisao,
-    tipoExtra,
-    anuaisFaltando: anuaisFaltando({ anual: custo.anual, contadores, mes }),
-  });
+  const exc = investirDefinido == null
+    ? calcularExcedente({
+      recebido,
+      pendenteDoMesAnterior: anterior?.guardarParaProximoMes ?? 0,
+      salario,
+      custoMensal: custo.mensal,
+      provisao: cx.provisao,
+      tipoExtra,
+      anuaisFaltando: anuaisFaltando({ anual: custo.anual, contadores, mes }),
+    })
+    : excedenteDefinido({ recebidoEfetivo: recebido + (anterior?.guardarParaProximoMes ?? 0), salario, tipoExtra, investir: investirDefinido, lazerPct });
 
   const avisos = [];
   if (cx.diasDesdeAtualizacao > DIAS_SALDOS) avisos.push('saldos-desatualizados');
@@ -254,6 +290,8 @@ export function calcularMes({ estado, recebido, tipoExtra = null, proventos = 0,
     porque: '',
     avisos,
     estimado: grupo.estimado,
+    origem: investirDefinido == null ? 'orcamento' : 'sobra',
+    extra: exc.extra ?? null,
   };
   if (exc.semAporte && proventos <= 0) return resposta;
 

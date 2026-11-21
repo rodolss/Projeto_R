@@ -253,3 +253,26 @@ test('"quanto seria preciso para o alvo" é o mesmo no painel e no simulador, co
   perto(p.necessarioAlvo, r.alvo.necessario, 0.5);
   assert.ok(p.necessarioAlvo > p.pmtNec);
 });
+
+// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
+test('investir a sobra: o valor definido pelo Balanço substitui o excedente do orçamento (sem provisão nem anuais)', () => {
+  const r = calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10', investirDefinido: 1800 });
+  assert.deepEqual([r.excedente, r.paraAnuais, r.provisao, r.guardarParaProximoMes, r.semAporte, r.paraDiaADia, r.origem], [1800, 0, 0, 0, false, 0, 'sobra']);
+  assert.equal(r.sugestoes.reduce((s, x) => s + x.valor, 0), 1800);
+  const nada = calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10', investirDefinido: 0 });
+  assert.deepEqual([nada.semAporte, nada.motivo, nada.excedente], [true, 'sem-sobra', 0]);
+  // Sem o valor definido: como antes (pelo orçamento).
+  const antigo = calcularMes({ estado: estadoBase(), recebido: 7800, hoje: '2026-11-10' });
+  assert.deepEqual([antigo.excedente, antigo.origem], [2800, 'orcamento']);
+});
+
+test('investir a sobra: 13º e PLR entram como sobra extra do mês (10% para lazer); férias, só o 1/3 (o resto guardado)', () => {
+  // Salário do plano: 7800. 13º: veio 15600 → 7800 a mais.
+  const decimo = calcularMes({ estado: estadoBase(), recebido: 15600, tipoExtra: 'decimo-terceiro', hoje: '2026-11-10', investirDefinido: 1000 });
+  assert.deepEqual(decimo.extra, { valor: 7800, guardar: 0, lazer: 780, investir: 7020 });
+  assert.deepEqual([decimo.excedente, decimo.guardarParaProximoMes], [8020, 0]);
+  // Férias: veio 11800 → 4000 a mais, mas 3/4 adiantam o salário do mês que vem (vem menor): só 1000 é extra.
+  const ferias = calcularMes({ estado: estadoBase(), recebido: 11800, tipoExtra: 'ferias', hoje: '2026-11-10', investirDefinido: 1000 });
+  assert.deepEqual(ferias.extra, { valor: 1000, guardar: 3000, lazer: 100, investir: 900 });
+  assert.deepEqual([ferias.excedente, ferias.guardarParaProximoMes], [1900, 3000]);
+});
