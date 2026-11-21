@@ -240,7 +240,8 @@ export function editarCompraDoCartao(casa, { fatura, compraId, nome, valor, para
     return resultado;
   }
   const nova = { ...aplicar(alvo), ...definidos({ data }) };
-  const destino = novaFatura ?? fatura;
+  // Só para a mesma fatura ou as seguintes: a compra nunca volta para uma fatura anterior (desenho 2026-11-21-editar-compra).
+  const destino = novaFatura && novaFatura > fatura ? novaFatura : fatura;
   if (destino === fatura) {
     return comMes(casa, fatura, (r) => {
       r.compras = r.compras.map((c) => (c.id === compraId ? nova : c));
@@ -282,6 +283,22 @@ export function editarFixa(casa, { cartaoId, fixaId, fatura, nome, valor, para, 
       return [{ ...f, ate: somarMeses(fatura, -1) }, limpar({ ...f, ...mudanca, id: novoId(), serie, desde: fatura })];
     }),
   }));
+}
+
+// Apagar (lançou algo errado): a de todo mês some inteira, com todos os trechos da série, de qualquer fatura.
+export function apagarFixa(casa, { cartaoId, fixaId }) {
+  const fixa = acharCartao(casa, cartaoId)?.fixas.find((f) => f.id === fixaId);
+  if (!fixa) return casa;
+  const serie = serieDe(fixa);
+  return comCartao(casa, cartaoId, (c) => ({ ...c, fixas: c.fixas.filter((f) => serieDe(f) !== serie) }));
+}
+
+// A primeira fatura em que a de todo mês existe (o começo da série): se ela já está travada, apagar mexeria no passado.
+export function inicioDaFixa(casa, { cartaoId, fixaId }) {
+  const fixa = acharCartao(casa, cartaoId)?.fixas.find((f) => f.id === fixaId);
+  if (!fixa) return null;
+  const serie = serieDe(fixa);
+  return acharCartao(casa, cartaoId).fixas.filter((f) => serieDe(f) === serie).map((f) => f.desde).sort()[0] ?? null;
 }
 
 // Parar some desta fatura em diante em toda a série (um preço novo planejado não volta sozinho).
