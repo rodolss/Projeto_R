@@ -10,7 +10,7 @@ import { definirSalario, extraDoMes } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
-import { nomeDoMes, mesDaTela } from './casa.js';
+import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
@@ -94,7 +94,7 @@ function desenhar(container, ctx) {
     return;
   }
   const mesAtual = hoje.slice(0, 7);
-  const mes = mesDaTela(location.hash, hoje);
+  const mes = mesDaTela(location.hash, hoje, mesPadraoDaCasa(ctx));
   const visto = ctx.perfil?.visto ?? null;
   const pessoaId = pessoaDoBalanco({ hash: location.hash, casa, visto });
   const quem = [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === pessoaId) ?? null;

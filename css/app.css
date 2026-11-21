@@ -476,3 +476,11 @@ a.barra-item:active { background: var(--cartao-2); }
 /* ---------- Balanço e plano (desenho 2026-11-20-balanco-e-plano) ---------- */
 .balanco-plano { display: flex; flex-direction: column; gap: 8px; border-color: var(--destaque-suave); }
 .balanco-plano p { margin: 0; }
+
+/* "Já paguei" (desenho 2026-11-21-ja-paguei): o círculo de marcar à esquerda de cada conta. */
+.linha-paga { display: flex; align-items: stretch; border-top: 1px solid var(--borda); }
+.linha-paga .casa-linha { border-top: 0; flex: 1; min-width: 0; padding-left: 4px; }
+.linha-paga .marca-paga { flex: none; width: 52px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.linha-paga .bola-paga { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--suave); box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; font-weight: 700; line-height: 1; }
+.linha-paga .marca-paga.feita .bola-paga { background: #1f7a4d; border-color: #1f7a4d; }
+.linha-paga.paga .casa-linha .texto, .linha-paga.paga .casa-linha .quanto { opacity: 0.55; }
