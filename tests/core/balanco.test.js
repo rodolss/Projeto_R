@@ -44,9 +44,9 @@ test('balanço: entrou o salário; saiu a parte das contas e o que é seu no car
   assert.deepEqual(leo.contas, { valor: 120, total: 300, fatia: 0.03, aConfirmar: false });
   // A parte da casa do cartão já está nas contas: no cartão entra só o que é dele (Blusa + Academia).
   assert.deepEqual(leo.cartoes, [{
-    cartaoId: 'c2', nome: 'Cartão Leo', fatura: '2026-12', vence: '2026-12-10', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, aberta: false, conferida: true,
+    cartaoId: 'c2', nome: 'Cartão Leo', fatura: '2026-12', vence: '2026-12-10', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, adiantado: 50, aberta: false, conferida: true,
   }]);
-  assert.deepEqual([leo.entrou, leo.saiu, leo.sobra, leo.previsao], [4000, 290, 3710, false]);
+  assert.deepEqual([leo.entrou, leo.saiu, leo.sobra, leo.previsao], [4000, 340, 3660, false]);
   // O cartão do Leo é só dele: o presente para a Ana não aparece no balanço dela.
   const ana = balancoDoMes(casa, '2026-12', 'p1', '2026-12-20');
   assert.deepEqual([ana.entrou, ana.contas.valor, ana.cartoes, ana.saiu, ana.sobra], [6000, 180, [], 180, 5820]);
@@ -65,7 +65,7 @@ test('balanço: salário a confirmar, sem divisão e perfil que não divide a ca
   let semSalario = salvarSalario(casaBase(), { mes: '2026-12', pessoaId: 'p1', valor: null });
   semSalario = salvarSalario(semSalario, { mes: '2026-12', pessoaId: 'p2', valor: null });
   const sem = balancoDoMes(semSalario, '2026-12', 'p2', '2026-12-20');
-  assert.deepEqual([sem.salario.situacao, sem.contas.valor, sem.contas.fatia, sem.entrou, sem.saiu, sem.sobra], ['vazio', null, null, 0, 170, -170]);
+  assert.deepEqual([sem.salario.situacao, sem.contas.valor, sem.contas.fatia, sem.entrou, sem.saiu, sem.sobra], ['vazio', null, null, 0, 220, -220]);
 
   let comPerfil = adicionarPerfil(casaBase(), { nome: 'Bia', novoId: () => 'x9' }).casa;
   comPerfil = adicionarCartao(comPerfil, { donaId: 'x9', viraNoDia: 3, venceNoDia: 10, novoId: () => 'c9' }).casa;
@@ -134,7 +134,7 @@ test('revisão: sem salário ou sem divisão não dá veredito; mês já registr
 test('revisão: o gasto médio dos últimos meses já fechados (sem previsão), para conferir o orçamento', () => {
   const casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
   // Em março, janeiro e fevereiro ainda são previsão (salários a confirmar): só dezembro, fechado, entra.
-  assert.equal(gastoMedioFechado(casa, 'p2', '2027-03', '2027-03-15'), 290);
+  assert.equal(gastoMedioFechado(casa, 'p2', '2027-03', '2027-03-15'), 340);
   assert.equal(gastoMedioFechado(casaBase(), 'p2', '2026-12', '2026-12-20'), null); // nenhum mês fechado antes
 });
 
@@ -150,5 +150,16 @@ test('investir a sobra: 10% para lazer e o resto para investir; sem sobra, nada'
 test('balanço: o a mais do mês (13º, férias, PLR) entra no "entrou" e na sobra, sem mudar a parte das contas', () => {
   const casa = definirSalario(conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' }), { mes: '2026-12', pessoaId: 'p2', salario: 4000, extra: 4000 });
   const leo = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20');
-  assert.deepEqual([leo.salario.valor, leo.salario.extra, leo.entrou, leo.contas.valor, leo.saiu, leo.sobra], [4000, 4000, 8000, 120, 290, 7710]);
+  assert.deepEqual([leo.salario.valor, leo.salario.extra, leo.entrou, leo.contas.valor, leo.saiu, leo.sobra], [4000, 4000, 8000, 120, 340, 7660]);
+});
+
+test('balanço: o "já tenho" não pesa no saiu; o que ainda falta receber conta até chegar', () => {
+  const casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
+  const leo = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20');
+  // Outras pessoas: 30 da Mãe (já tenho) + 50 da Ana que ainda faltam receber. Saiu = contas 120 + seu 170 + a receber 50.
+  assert.deepEqual([leo.cartoes[0].outras.jaTenho, leo.cartoes[0].adiantado, leo.saiu], [30, 50, 340]);
+  // Marcando tudo como já tenho: nada fica adiantado e o saiu cai para contas + o que é seu.
+  const tudo = migrarCasa({ ...casa, meses: casa.meses.map((m) => ({ ...m, compras: (m.compras ?? []).map((c) => (c.para === 'q1' || c.para === 'p1' ? { ...c, jaTenho: true } : c)) })) });
+  const b = balancoDoMes(tudo, '2026-12', 'p2', '2026-12-20');
+  assert.deepEqual([b.cartoes[0].adiantado, b.saiu], [0, 290]);
 });

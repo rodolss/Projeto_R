@@ -181,8 +181,9 @@ function desenhar(container, ctx) {
       titulo: k.nome,
       // A fatura que fecha no mês; o vencimento diz qual é (com vencimento no dia 1, a do mês seguinte).
       detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ',
-        k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`],
-      valor: formatarBRL(k.seu),
+        k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`,
+        k.adiantado > 0 && ` + ${formatarBRL(k.adiantado)} que ainda faltam te devolverem`],
+      valor: formatarBRL(k.seu + k.adiantado),
       aoTocar: irAoCartao(k),
     })),
   ].filter(Boolean);
@@ -201,7 +202,7 @@ function desenhar(container, ctx) {
       valor: formatarBRL(k.outras.valor),
       aoTocar: irAoCartao(k),
     }))),
-    h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Você paga no cartão e recebe de volta: não entra na sobra.'));
+    h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Você paga no cartão e recebe de volta. O que já tem guardado ("já tenho") não pesa no Saiu; o que ainda falta receber conta como saída até chegar.'));
 
   // O plano só no mês atual, na visão única e no balanço de quem administra.
   const plano = ctx.unica && ctx.estado && mes === mesAtual && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
