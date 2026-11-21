@@ -4,7 +4,7 @@
 // Vários cartões (um por pessoa, ou mais): botões no topo para trocar; o aparelho lembra o último aberto.
 // Endereço: #/casa-cartao?cartao=<id>&fatura=…&folha=anotar|compra-<id>|fixa-<id> (o voltar do celular fecha a
 // folha), #/casa-cartao?novo=1 para criar outro cartão e &tela=cofrinho para a tela do Cofrinho (casa-cofrinho.js).
-import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
+import { h, campoMoeda, campoTag, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
 import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js';
@@ -527,20 +527,19 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     mostrarFatura();
 
     const para = escolhaPara(null, (id) => { nova.para = id; nova.paraNaMao = true; mostrarJa(); });
-    const caixaSugestoes = h('div', { class: 'cartao-sugestoes', role: 'group', 'aria-label': 'Sugestões' });
+    // O "O que foi" é uma etiqueta (desenho 2026-11-21-tags): as que já existem viram balões; sem igual, dá para criar.
+    // `nova.nome` já chega na grafia da etiqueta que existe, então "coliseu" e "Coliseu" somam juntas.
     const mudarNome = (v) => {
-      nova.nome = v.trim();
+      nova.nome = v;
       const sugerido = paraSugerido(sugestoes, nova.nome);
       if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); mostrarJa(); }
-      caixaSugestoes.replaceChildren(...sugestoesDoNome(sugestoes, v).map((nome) => h('button', {
-        type: 'button', class: 'chip pequeno',
-        // Depois de escolher, o próximo é o valor: o teclado de números já abre.
-        onclick: () => { nomeCampo.input.value = nome; mudarNome(nome); valorCampo.input.focus(); },
-      }, nome)));
     };
-    const nomeCampo = campoTexto({ rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', aoMudar: mudarNome });
-    nomeCampo.input.classList.add('cartao-nome');
-    const blocoDoNome = h('div', { class: 'campo' }, nomeCampo, caixaSugestoes); // as sugestões fora do <label>
+    // Depois de escolher uma etiqueta, o próximo é o valor: o teclado de números já abre.
+    const nomeCampo = campoTag({
+      rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', tags: sugestoes.map((s) => s.nome),
+      aoMudar: mudarNome, aoEscolher: () => valorCampo.input.focus(),
+    });
+    const blocoDoNome = nomeCampo;
     const totalTexto = h('span', { class: 'campo-dica' });
     const mostrarTotal = () => {
       totalTexto.textContent = nova.valor ? `Total: ${formatarBRL(nova.valor * nova.vezes)} em ${nova.vezes} vezes.` : '';
@@ -646,7 +645,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       h('p', { class: 'suave pequeno' }, ehParcela
         ? `${parcela ? `Parcela ${parcela.n} de ${parcela.de}` : 'Repete nas faturas seguintes'}${compra.data ? `, comprada em ${dataComAno(compra.data)}` : ''}. O que mudar aqui vale para esta e as próximas.`
         : compra.data ? `Comprada em ${dataComAno(compra.data)}.` : 'Veio da planilha, sem data.'),
-      campoTexto({ rotulo: 'O que foi', valor: compra.nome, aoMudar: (v) => { editado.nome = v; } }),
+      campoTag({ rotulo: 'O que foi', valor: compra.nome, tags: nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: ehParcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
       !ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
         h('input', {
@@ -691,7 +690,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     return [
       titulo(fixa.nome),
       h('p', { class: 'suave pequeno' }, `Todo mês desde a fatura de ${nomeDaFatura(fixa.desde, hoje)}.${depois ? ' O que mudar aqui vale desta fatura em diante; as anteriores ficam como estão.' : ''}`),
-      campoTexto({ rotulo: 'O que é', valor: fixa.nome, aoMudar: (v) => { editado.nome = v; } }),
+      campoTag({ rotulo: 'O que é', valor: fixa.nome, tags: nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
