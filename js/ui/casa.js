@@ -193,26 +193,39 @@ function desenharMes(container, ctx) {
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
-  // "Já paguei": quem vê a casa como um perfil marca as contas que já pagou; com tudo pago, abre o mês seguinte.
-  const marcarPagamento = async (contaId, pago) => {
-    const nova = marcarPago(casa, { mes, pessoaId: visto.id, contaId, pago });
-    await ctx.salvarCasa((c) => marcarPago(c, { mes, pessoaId: visto.id, contaId, pago }));
-    if (pago && tudoPago(nova, mes, visto.id)) {
-      ctx.aviso(`Tudo pago em ${nome}! Mostrando ${nomeDoMes(somarMeses(mes, 1))}.`, 'ok', 3500);
-      irPara(somarMeses(mes, 1));
-    } else {
-      ctx.rerender();
-    }
-  };
+  // "Já paguei": quem vê a casa como um perfil marca as contas que já pagou, com um switch que muda na hora (grava em
+  // segundo plano: não espera o GitHub); com tudo pago, abre o mês seguinte.
+  let casaAgora = casa;
   const comPago = (conta, botaoLinha) => {
     if (!visto) return botaoLinha;
-    const pago = estaPago(casa, mes, visto.id, conta.id);
-    return h('div', { class: `linha-paga${pago ? ' paga' : ''}` },
-      h('button', {
-        type: 'button', class: `marca-paga${pago ? ' feita' : ''}`, 'aria-pressed': pago ? 'true' : 'false',
-        'aria-label': `${pago ? 'Desmarcar' : 'Marcar'} já paguei: ${conta.nome}`, onclick: () => marcarPagamento(conta.id, !pago),
-      }, h('span', { class: 'bola-paga', 'aria-hidden': 'true' }, pago ? '✓' : '')),
-      botaoLinha);
+    let pago = estaPago(casa, mes, visto.id, conta.id);
+    const linhaPaga = h('div', { class: `linha-paga${pago ? ' paga' : ''}` });
+    const chave = h('button', { type: 'button', class: 'sw-pago', role: 'switch', 'aria-label': `Já paguei: ${conta.nome}` }, h('span', { class: 'sw-trilho', 'aria-hidden': 'true' }));
+    const mostrar = () => {
+      chave.setAttribute('aria-checked', String(pago));
+      linhaPaga.classList.toggle('paga', pago);
+    };
+    chave.addEventListener('click', () => {
+      const antes = pago;
+      pago = !pago;
+      mostrar();
+      casaAgora = marcarPago(casaAgora, { mes, pessoaId: visto.id, contaId: conta.id, pago });
+      const acabou = pago && tudoPago(casaAgora, mes, visto.id);
+      ctx.salvarCasa((c) => marcarPago(c, { mes, pessoaId: visto.id, contaId: conta.id, pago })).catch((erro) => {
+        console.warn('Não salvei o já paguei', erro);
+        pago = antes;
+        casaAgora = marcarPago(casaAgora, { mes, pessoaId: visto.id, contaId: conta.id, pago });
+        mostrar();
+        ctx.aviso('Não deu para salvar. Tente de novo.', 'atencao', 3500);
+      });
+      if (acabou) {
+        ctx.aviso(`Tudo pago em ${nome}! Mostrando ${nomeDoMes(somarMeses(mes, 1))}.`, 'ok', 3500);
+        setTimeout(() => irPara(somarMeses(mes, 1)), 350);
+      }
+    });
+    mostrar();
+    linhaPaga.append(chave, botaoLinha);
+    return linhaPaga;
   };
   const linhasContas = r.contas.map((c) => comPago(c.conta, linha({
     titulo: c.conta.nome, detalhe: detalheConta(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
@@ -227,7 +240,7 @@ function desenharMes(container, ctx) {
     : [];
   const listaContas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Contas'),
-    visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Toque no círculo para marcar o que você já pagou.'),
+    visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Ligue o switch das contas que você já pagou.'),
     h('div', {}, ...linhasContas, ...semValor),
     !casa.contas.some((c) => !c.arquivada) && h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma conta cadastrada. Cadastre em Ajustes.'));
 
