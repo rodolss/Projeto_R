@@ -19,6 +19,7 @@ import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './ro
 import { nomeDoMes } from './casa.js';
 import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
+import { etiquetasDosNomes } from '../core/tags.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -534,10 +535,9 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       const sugerido = paraSugerido(sugestoes, nova.nome);
       if (!nova.paraNaMao && sugerido && opcoesPara(casa, cfg.id).some((o) => o.id === sugerido)) { nova.para = sugerido; para.marcar(sugerido); mostrarJa(); }
     };
-    // Depois de escolher uma etiqueta, o próximo é o valor: o teclado de números já abre.
     const nomeCampo = campoTag({
-      rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', tags: sugestoes.map((s) => s.nome),
-      aoMudar: mudarNome, aoEscolher: () => valorCampo.input.focus(),
+      rotulo: 'O que foi', placeholder: 'Ex.: mercado, farmácia, presente', tags: etiquetasDosNomes(sugestoes.map((s) => s.nome)),
+      aoMudar: mudarNome,
     });
     const blocoDoNome = nomeCampo;
     const totalTexto = h('span', { class: 'campo-dica' });
@@ -659,7 +659,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       h('p', { class: 'suave pequeno' }, ehParcela
         ? `${parcela ? `Parcela ${parcela.n} de ${parcela.de}` : 'Repete nas faturas seguintes'}${compra.data ? `, comprada em ${dataComAno(compra.data)}` : ''}. O que mudar aqui vale para esta e as próximas.`
         : compra.data ? `Comprada em ${dataComAno(compra.data)}.` : 'Veio da planilha, sem data.'),
-      campoTag({ rotulo: 'O que foi', valor: compra.nome, tags: nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), aoMudar: (v) => { editado.nome = v; } }),
+      campoTag({ rotulo: 'O que foi', valor: compra.nome, tags: etiquetasDosNomes(nomesUsados(casaVisivel, cfg.id).map((s) => s.nome)), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: ehParcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
       !ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
         h('input', {
@@ -715,7 +715,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     return [
       titulo(fixa.nome),
       h('p', { class: 'suave pequeno' }, `Todo mês desde a fatura de ${nomeDaFatura(fixa.desde, hoje)}.${depois ? ' O que mudar aqui vale desta fatura em diante; as anteriores ficam como estão.' : ''}`),
-      campoTag({ rotulo: 'O que é', valor: fixa.nome, tags: nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), aoMudar: (v) => { editado.nome = v; } }),
+      campoTag({ rotulo: 'O que é', valor: fixa.nome, tags: etiquetasDosNomes(nomesUsados(casaVisivel, cfg.id).map((s) => s.nome)), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
