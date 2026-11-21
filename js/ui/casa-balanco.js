@@ -34,7 +34,7 @@ export function textoDoPlano({ situacao, falta = 0 }) {
   return null;
 }
 
-// Na visão única (quem administra, com o planejador), o Balanço é a primeira aba: no mês atual, o plano junto.
+// Na visão única (quem administra, com o planejador), o Balanço é a primeira aba: no mês atual (ou no seguinte, se o atual já está todo pago), o plano junto.
 // Investir a sobra (desenho 2026-11-20-investir-a-sobra): a sobra deste mês vai para o Dia de pagamento do mês
 // seguinte — 10% para lazer, o resto para investir —, e é isso que se compara com o que o plano pede.
 function cartaoDoPlano(ctx, b) {
@@ -207,8 +207,8 @@ function desenhar(container, ctx) {
     }))),
     h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Você paga no cartão e recebe de volta. O que já tem guardado ("já tenho") não pesa no Saiu; o que ainda falta receber conta como saída até chegar.'));
 
-  // O plano só no mês atual, na visão única e no balanço de quem administra.
-  const plano = ctx.unica && ctx.estado && mes === mesAtual && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
+  // O plano no mês atual e, fechado o atual (tudo pago), no mês seguinte que a tela abre; só na visão única e no balanço de quem administra.
+  const plano = ctx.unica && ctx.estado && (mes === mesAtual || mes === mesPadraoDaCasa(ctx)) && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
   container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, entrou, saiu, outras, plano].filter(Boolean));
 
   // ---------- a folha do salário (o único lugar onde ele se digita) ----------
