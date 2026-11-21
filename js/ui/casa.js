@@ -306,7 +306,7 @@ function desenharMes(container, ctx) {
       situacao === 'a-confirmar' && h('p', { class: 'suave' }, 'Este valor é uma previsão. Confira e salve o valor certo.'),
       campoMoeda({ rotulo: null, valor, grande: true, dica, aoMudar: (v) => { valor = v; } }),
       dicaAnterior(anterior),
-      h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), salvar),
       situacao === 'confirmado' && h('button', {
         type: 'button', class: 'botao-link',
         onclick: async () => { await ctx.salvarCasa(aoTirar); ctx.aviso('Valor tirado. O app volta a prever.', 'ok', 3000); terminar(folha); },
@@ -337,8 +337,8 @@ function desenharMes(container, ctx) {
         h('div', { class: 'valor' }, s.situacao === 'vazio' ? '—' : formatarBRL(s.valor)),
         h('p', { class: 'suave' }, ctx.unica ? 'Seu salário se digita só no Balanço: ele vale para as contas da casa, o Dia de pagamento e o plano.' : 'Seu salário se digita só no Balanço: ele vale para as contas da casa e para o seu balanço.'),
         h('div', { class: 'botoes' },
-          botao('Digitar no Balanço', () => location.replace(`#/casa-balanco?mes=${mes}&folha=salario`)),
-          botao('Fechar', fechar, { secundario: true })),
+          botao('Fechar', fechar, { secundario: true }),
+          botao('Digitar no Balanço', () => location.replace(`#/casa-balanco?mes=${mes}&folha=salario`))),
       ];
     }
     return folhaValor({
@@ -434,12 +434,12 @@ function desenharMes(container, ctx) {
           h('span', { class: 'campo-dica' }, 'As próximas parcelas aparecem sozinhas nos meses seguintes.')),
         h('div', { class: 'botoes', style: 'margin-top:12px' }, anotar)),
       h('div', { class: 'botoes' },
+        botao('Fechar', fechar, { secundario: true }),
         v.compras.length > 0 && botao('Pronto, fatura conferida', async () => {
           await ctx.salvarCasa((c) => conferirFatura(c, { mes, contaId: conta.id }));
           ctx.aviso('Fatura conferida.', 'ok', 2500);
           terminar(folha);
-        }),
-        botao('Fechar', fechar, { secundario: true })),
+        })),
       !v.compras.length && h('button', { type: 'button', class: 'botao-link', onclick: abrirSoTotal }, 'Digitar só o total da fatura'),
       soTotal,
       botaoPago(conta, folha),
@@ -477,8 +477,8 @@ function desenharMes(container, ctx) {
           ...d.fixas.map((x) => linhaItem(x, 'todo mês')))
         : semDetalhe && h('p', { class: 'suave' }, semDetalhe),
       h('div', { class: 'botoes' },
-        d.podeAbrirCartao && botao('Abrir no Cartão', abrirCartao),
-        botao('Fechar', fechar, { secundario: true })),
+        botao('Fechar', fechar, { secundario: true }),
+        d.podeAbrirCartao && botao('Abrir no Cartão', abrirCartao)),
       botaoPago(conta, `parte-${conta.id}`),
     ];
   }

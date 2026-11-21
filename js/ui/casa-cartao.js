@@ -214,7 +214,7 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
     h('p', { class: 'suave pequeno', style: 'margin:0' }, contaLigada
       ? `A parte da casa entra na conta "${contaLigada.nome}" das contas da casa.`
       : 'A parte da casa entra numa conta nova das contas da casa, com o nome do cartão.'),
-    h('div', { class: 'botoes' }, salvar, aoCancelar && botao('Cancelar', aoCancelar, { secundario: true })));
+    h('div', { class: 'botoes' }, aoCancelar && botao('Cancelar', aoCancelar, { secundario: true }), salvar));
 }
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
@@ -602,7 +602,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     return [
       titulo('Anotar compra'),
       blocoDoNome, valorCampo, dataCampo, para, forma, caixaJa,
-      h('div', { class: 'botoes' }, anotarBotao, botao('Fechar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), anotarBotao),
     ];
   }
 
@@ -689,7 +689,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         h('span', { class: 'campo-dica' }, 'O app calcula pela data. Mude só se o banco colocou a compra em outra fatura.')),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes' }, salvar, botao('Fechar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), salvar),
       apagar,
     ];
   }
@@ -727,7 +727,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes' }, salvar, botao('Fechar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), salvar),
       parar,
       apagar,
       !podeApagar && h('p', { class: 'suave pequeno' }, 'Ela começou numa fatura travada: só dá para parar de repetir.'),
