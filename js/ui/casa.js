@@ -155,8 +155,10 @@ function desenharMes(container, ctx) {
     h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Mês anterior', disabled: !podeVoltar, onclick: () => irPara(somarMeses(mes, -1)) }, '‹'),
     h('h1', {}, tituloDoMes(mes)),
     h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próximo mês', disabled: !podeAvancar, onclick: () => irPara(somarMeses(mes, 1)) }, '›'));
-  const voltarAoAtual = mes !== mesAtual
-    && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(mesAtual) }, `Voltar para ${nomeDoMes(mesAtual)}`);
+  // O mês em foco: o atual, ou o seguinte enquanto o atual está todo pago e fechado (é o que a tela abre).
+  const mesDoFoco = mesPadraoDaCasa(ctx);
+  const voltarAoAtual = mes !== mesDoFoco
+    && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(mesDoFoco) }, `Voltar para ${nomeDoMes(mesDoFoco)}`);
 
   // ---------- total e divisão ----------
   const situacaoTotal = r.aConfirmar
