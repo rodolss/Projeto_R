@@ -229,6 +229,13 @@ const lembrar = (id) => { try { localStorage.setItem(CHAVE_CARTAO, id); } catch 
 // gosta das mais novas primeiro, o outro das mais antigas). Sem nada guardado: mais novas primeiro.
 export const chaveDaOrdem = (perfilId) => `projetoR.ordemCompras${perfilId ? `.${perfilId}` : ''}`;
 const lerOrdem = (perfilId) => { try { return localStorage.getItem(chaveDaOrdem(perfilId)) !== 'antigas'; } catch { return true; } };
+// Mais novas ou mais antigas primeiro; sem data (veio da planilha) fica sempre no fim.
+const compararPorData = (maisNovas) => (a, b) => {
+  if (!a.data || !b.data) return !a.data && !b.data ? 0 : !a.data ? 1 : -1;
+  return maisNovas ? b.data.localeCompare(a.data) : a.data.localeCompare(b.data);
+};
+// Grupos de "Compras" abertos (a lista começa reduzida; fica aberto o que a pessoa abriu, até fechar o app).
+const gruposAbertos = new Set();
 const gravarOrdem = (perfilId, maisNovas) => { try { localStorage.setItem(chaveDaOrdem(perfilId), maisNovas ? 'novas' : 'antigas'); } catch { /* sem armazenamento: só não lembra */ } };
 
 // Botões no topo para trocar de cartão (só com dois ou mais).
@@ -393,23 +400,43 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe, jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
     h('span', { class: 'quanto' }, formatarBRL(valor)),
     h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
+  const perfilDaOrdem = ctx.perfil?.visto?.id ?? null;
+  const ordemDasCompras = lerOrdem(perfilDaOrdem); // a mesma ordem da lista de cada pessoa (guardada por perfil)
+  const textoDaOrdem = ordemDasCompras ? 'Mais novas primeiro (tocar: mais antigas primeiro)' : 'Mais antigas primeiro (tocar: mais novas primeiro)';
+  const botaoDeOrdem = h('button', {
+    type: 'button', class: 'botao-icone pequeno', 'aria-label': textoDaOrdem, title: textoDaOrdem,
+    onclick: () => { gravarOrdem(perfilDaOrdem, !ordemDasCompras); ctx.rerender(); },
+  }, icone(ordemDasCompras ? 'maisNovas' : 'maisAntigas'));
   const compras = h('section', { class: 'cartao casa-lista' },
-    h('h2', {}, f.compras.length ? `Compras (${f.compras.length})` : 'Compras'),
+    h('div', { class: 'titulo-com-ordem' },
+      h('h2', {}, f.compras.length ? `Compras (${f.compras.length})` : 'Compras'),
+      f.compras.length > 1 && botaoDeOrdem),
     f.compras.length
-      // Agrupadas por "De quem é", na mesma ordem dessa lista, cada grupo com o subtotal.
+      // Agrupadas por "De quem é" (na ordem dessa lista), reduzidas: tocar no grupo abre as compras dele.
       ? h('div', {}, ...f.porPessoa.flatMap((p) => {
-        const deles = f.compras.filter((c) => c.para === p.para);
+        const deles = f.compras.filter((c) => c.para === p.para).sort(compararPorData(ordemDasCompras));
         if (!deles.length) return [];
-        return [
-          h('div', { class: 'grupo-titulo' }, h('span', {}, p.nome), h('span', {}, formatarBRL(deles.reduce((s, c) => s + c.valor, 0)))),
-          ...deles.map((c) => linhaItem({
+        const aberto = gruposAbertos.has(p.para);
+        const corpo = h('div', { class: 'grupo-corpo', inert: !aberto }, h('div', { class: 'grupo-dentro' }, ...deles.map((c) => linhaItem({
             titulo: c.nome,
             detalhe: [c.data && dataCurta(c.data), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
             valor: c.valor,
             jaTenho: c.jaTenho,
             aoTocar: () => abrir(`compra-${c.id}`),
-          })),
-        ];
+          }))));
+        const topo = h('button', {
+          type: 'button', class: 'grupo-titulo', 'aria-expanded': String(aberto),
+          onclick: () => {
+            const abre = !gruposAbertos.has(p.para);
+            if (abre) gruposAbertos.add(p.para); else gruposAbertos.delete(p.para);
+            grupo.classList.toggle('aberto', abre);
+            topo.setAttribute('aria-expanded', String(abre));
+            corpo.inert = !abre;
+          },
+        }, h('span', { class: 'grupo-nome' }, p.nome, h('small', {}, plural(deles.length, 'compra', 'compras'))),
+        h('span', { class: 'grupo-valor' }, formatarBRL(deles.reduce((s, c) => s + c.valor, 0)), h('span', { class: 'grupo-seta', 'aria-hidden': 'true' }, icone('chevron'))));
+        const grupo = h('div', { class: `grupo${aberto ? ' aberto' : ''}` }, topo, corpo);
+        return [grupo];
       }))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
@@ -641,18 +668,13 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       h('span', { class: 'quanto' }, formatarBRL(x.valor)),
       h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
     const detalheDaCompra = (c) => [c.data ? dataCurta(c.data) : 'sem data', c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · ');
-    // Sem data (veio da planilha) fica sempre no fim.
-    const porData = (a, b) => {
-      if (!a.data || !b.data) return !a.data && !b.data ? 0 : !a.data ? 1 : -1;
-      return ordemMaisNovas ? b.data.localeCompare(a.data) : a.data.localeCompare(b.data);
-    };
     const desenharLista = () => {
       const texto = ordemMaisNovas ? 'Mais novas primeiro (tocar: mais antigas primeiro)' : 'Mais antigas primeiro (tocar: mais novas primeiro)';
       botaoOrdem.replaceChildren(icone(ordemMaisNovas ? 'maisNovas' : 'maisAntigas'));
       botaoOrdem.setAttribute('aria-label', texto);
       botaoOrdem.title = texto;
       lista.replaceChildren(
-        ...[...compras].sort(porData).map((c) => linha(c, detalheDaCompra(c), `compra-${c.id}`)),
+        ...[...compras].sort(compararPorData(ordemMaisNovas)).map((c) => linha(c, detalheDaCompra(c), `compra-${c.id}`)),
         ...fixas.map((x) => linha(x, 'todo mês', `fixa-${x.id}`)));
     };
     desenharLista();
