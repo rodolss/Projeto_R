@@ -11,6 +11,8 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
+import { salarioRegular, preencherRecebido, configComSalario } from '../core/salario.js';
+import { salarioNoMes, salvarSalario } from '../core/casa.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
   saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
@@ -63,6 +65,16 @@ function desenhar(container, ctx) {
   if (rascunho?.editando && !existente) { // o registro sumiu (outro aparelho): a edição não faz mais sentido
     apagarRascunho();
     rascunho = null;
+  }
+  // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, o salário já confirmado no Mês
+  // da casa preenche "Salário que caiu" (se ainda não foi digitado neste mês).
+  const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
+  if (visto) {
+    const pre = preencherRecebido({ rascunho: rascunho ?? rascunhoVazio(mes), registrado: Boolean(existente), salarioCasa: salarioNoMes(ctx.casa, mes, visto.id) });
+    if (pre) {
+      rascunho = pre;
+      salvarRascunho(pre);
+    }
   }
   const sit = situacao({ registrado: Boolean(existente), rascunho });
   const r = rascunho ?? rascunhoVazio(mes);
@@ -122,6 +134,20 @@ function desenhar(container, ctx) {
     });
   }
 
+  // Salário digitado uma vez só: o salário de todo mês contido no que caiu vale também para o Mês da casa e para o
+  // salário do plano (com 13º, férias ou PLR, o do plano). Grava depois de fechar a folha, sem segurar a tela.
+  async function levarSalario() {
+    if (!visto) return;
+    const regular = salarioRegular({ recebido: r.recebido, tipoExtra: r.tipoExtra, pareceExtra: resposta().perguntarExtra, salarioPlano: estado.config.salario });
+    if (regular == null) return;
+    const naCasa = salarioNoMes(ctx.casa, mes, visto.id);
+    if (!(naCasa.situacao === 'confirmado' && naCasa.valor === regular)) {
+      await ctx.salvarCasa((c) => salvarSalario(c, { mes, pessoaId: visto.id, valor: regular }));
+    }
+    if (regular !== estado.config.salario) await ctx.salvar((e) => ({ ...e, config: configComSalario(e.config, regular, mes) }));
+    ctx.aviso('Salário salvo também nas contas da casa e no plano.', 'ok', 3000);
+  }
+
   // ---------- folhas ----------
   function folhaSalario() {
     const extra = h('div');
@@ -151,6 +177,7 @@ function desenhar(container, ctx) {
           r.feito.salario = true;
           guardar();
           fechar();
+          levarSalario();
         }),
         botao('Fechar', fechar, { secundario: true })),
     ];
