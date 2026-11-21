@@ -1,4 +1,4 @@
-// Aba Mês em lista de 4 tarefas (desenho de 2026-11-12): situação das tarefas, rascunho, datas e totais.
+// Aba Mês em lista de 4 tarefas — 3 na visão única, sem a do salário (desenhos de 2026-11-12 e 2026-11-21-salario-no-balanco): situação das tarefas, rascunho, datas e totais.
 // Funções puras; a tela fica em js/ui/mes.js e o rascunho é guardado por js/ui/mes-rascunho.js.
 
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -97,7 +97,7 @@ export const nomeDoMes = (mes) => MESES_LONGOS[Number(mes.slice(5, 7)) - 1];
 export function cartaoDoPagamento({ entrada, rascunho, semSalario = false }) {
   if (entrada) return { tipo: 'registrado', total: totalAplicado(entrada), data: entrada.data };
   const { quantas, total } = situacao({ registrado: false, rascunho, semSalario });
-  return quantas > 0 ? { tipo: 'continuar', quantas, ...(semSalario && { total }) } : { tipo: 'abrir' };
+  return quantas > 0 ? { tipo: 'continuar', quantas, total } : { tipo: 'abrir' };
 }
 
 // Tarefa 3: "Usar estes saldos" ou "Pular". Pular depois de copiar mantém os valores digitados (podem voltar a ser usados).

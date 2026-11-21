@@ -103,7 +103,7 @@ test('cartaoDoPagamento: registrado, pela metade ou para abrir', () => {
   const entrada = { mes: '2026-11', data: '2026-11-12', aplicado: [{ valor: 4000 }, { valor: 596.01 }] };
   assert.deepEqual(cartaoDoPagamento({ entrada, rascunho: null }), { tipo: 'registrado', total: 4596.01, data: '2026-11-12' });
   assert.deepEqual(cartaoDoPagamento({ entrada, rascunho: { ...rascunhoVazio('2026-11'), editando: true } }).tipo, 'registrado');
-  assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: comFeito({ recebido: 9200, feito: { salario: true, proventos: false } }) }), { tipo: 'continuar', quantas: 1 });
+  assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: comFeito({ recebido: 9200, feito: { salario: true, proventos: false } }) }), { tipo: 'continuar', quantas: 1, total: 4 });
   assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: null }), { tipo: 'abrir' });
   assert.deepEqual(cartaoDoPagamento({ entrada: undefined, rascunho: rascunhoVazio('2026-11') }), { tipo: 'abrir' });
 });
@@ -135,4 +135,10 @@ test('sem a etapa do salário: 3 etapas, o investir libera com proventos e saldo
   // O cartão do Início conta do mesmo jeito: só o salário não é "pela metade".
   assert.deepEqual(cartaoDoPagamento({ entrada: null, rascunho: vazio, semSalario: true }), { tipo: 'abrir' });
   assert.deepEqual(cartaoDoPagamento({ entrada: null, rascunho: pronto, semSalario: true }), { tipo: 'continuar', quantas: 2, total: 3 });
+  // Sem salário no rascunho (casa ainda carregando, nada guardado): o investir libera igual.
+  const semRecebido = { ...pronto, recebido: null, feito: { salario: false, proventos: true } };
+  assert.equal(situacao({ registrado: false, rascunho: semRecebido, semSalario: true }).podeInvestir, true);
+  // Editando um mês registrado: proventos e saldos já feitos (2 de 3), o investir libera.
+  const editando = situacao({ registrado: true, rascunho: rascunhoDoRegistro({ mes: '2026-12', recebido: 6000, proventos: 0 }), semSalario: true });
+  assert.deepEqual([editando.modo, editando.quantas, editando.total, editando.podeInvestir], ['editando', 2, 3, true]);
 });

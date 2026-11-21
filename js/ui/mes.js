@@ -1,4 +1,4 @@
-// Aba Mês em lista de 4 tarefas (desenho de 2026-11-12): salário, proventos desde o último registro,
+// Aba Mês em lista de 4 tarefas (desenho de 2026-11-12; 3 na visão única, sem o salário): salário, proventos desde o último registro,
 // saldos da corretora e investir. Cada tarefa abre uma folha por baixo (#/mes?folha=…); o voltar do celular fecha.
 // O que já foi preenchido fica num rascunho no aparelho até o mês ser registrado.
 import {
@@ -133,8 +133,8 @@ function desenhar(container, ctx) {
     });
   }
 
-  // Na visão única, o salário não se digita aqui: a folha mostra o do Balanço e leva até ele (troca a entrada do
-  // histórico: voltar do Balanço traz para o Mês).
+  // Na visão única não há mais a etapa do salário; esta folha só abre por um endereço antigo (#/mes?folha=salario):
+  // mostra o do Balanço e leva até ele (troca a entrada do histórico: voltar do Balanço traz para o Mês).
   function folhaSalarioDoBalanco() {
     const nomeDoBalanco = `#/casa-balanco?mes=${mes}&folha=salario`;
     const noBalanco = doBalanco.pronto ? doBalanco.recebido : null;
@@ -409,9 +409,10 @@ function desenhar(container, ctx) {
     { chave: 'investir', titulo: 'Investir', detalhe: situacaoInvestir(), bloqueada: !registrado && !sit.podeInvestir },
   ].filter(Boolean).map((t, k) => ({ ...t, n: k + 1 }));
   // Na visão única, o salário do mês só como informação (vem do Balanço, o único lugar onde se digita).
-  const salarioDoMes = semSalario && !registrado && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
-    doBalanco.carregando ? 'Carregando o salário do Balanço…'
-      : doBalanco.pronto ? `Salário de ${nome}: ${formatarBRL(doBalanco.recebido)}, do Balanço. `
+  // Só num mês novo (na edição de um registrado, vale o salário do registro).
+  const salarioDoMes = semSalario && sit.modo === 'novo' && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
+    doBalanco.carregando ? 'Carregando o salário do Balanço… Por enquanto, vale o salário do plano.'
+      : doBalanco.pronto ? `Salário de ${nome}: ${formatarBRL(doBalanco.salario)}${doBalanco.extra > 0 ? ` + ${formatarBRL(doBalanco.extra)} a mais` : ''}, do Balanço. `
         : `Seu salário de ${nome} ainda não está no Balanço${doBalanco.recebido != null ? ` (previsão: ${formatarBRL(doBalanco.recebido)})` : ''}. `,
     !doBalanco.carregando && h('a', { href: `#/casa-balanco?mes=${mes}&folha=salario` }, doBalanco.pronto ? 'Ver no Balanço' : 'Digitar no Balanço'));
   const linhaTarefa = (t) => h('button', {
