@@ -9,7 +9,7 @@ const casca = [...texto.match(/const CASCA = \[([\s\S]*?)\];/)[1].matchAll(/'\.\
 const modulos = (dir) => readdirSync(dir, { withFileTypes: true })
   .flatMap((d) => (d.isDirectory() ? modulos(join(dir, d.name)) : d.name.endsWith('.js') ? [join(dir, d.name).replaceAll('\\', '/')] : []));
 
-test('service worker na versão 36', () => assert.match(texto, /const VERSAO = 'projeto-r-v36'/));
+test('service worker na versão 37', () => assert.match(texto, /const VERSAO = 'projeto-r-v37'/));
 // A página compara a própria versão com a do service worker novo: só recarrega se forem diferentes.
 test('página e service worker na mesma versão, e o service worker responde a versão', () => {
   const daPagina = readFileSync('js/versao.js', 'utf8').match(/VERSAO = '([^']+)'/)?.[1];
