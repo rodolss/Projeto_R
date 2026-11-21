@@ -9,15 +9,22 @@ import { contar } from './movimento.js';
 import { renderDetalhes } from './detalhes.js';
 import { comemorar } from './festa.js';
 import { registrarComemoracao } from '../core/marcos.js';
-import { cartaoDoPagamento, dataCurta, nomeDoMes } from '../core/lista-mes.js';
+import { cartaoDoPagamento, dataCurta, nomeDoMes, rascunhoVazio } from '../core/lista-mes.js';
+import { salarioParaODia, rascunhoComBalanco } from '../core/salario.js';
 import { lerRascunho } from './mes-rascunho.js';
 
 let comemorando = false; // vale entre renders: impede duas comemorações ao mesmo tempo
 
 // Cartão do dia do pagamento: acompanha a aba Mês (registrado, pela metade ou para abrir).
-function cartaoPagamento(estado, hoje) {
+// Na visão única, o salário vem do Balanço (desenho 2026-11-21-salario-no-balanco): a mesma conta da tela do Mês.
+function cartaoPagamento(estado, hoje, ctx) {
   const mes = hoje.slice(0, 7);
-  const c = cartaoDoPagamento({ entrada: estado.meses.find((m) => m.mes === mes), rascunho: lerRascunho(mes) });
+  const entrada = estado.meses.find((m) => m.mes === mes);
+  const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
+  const rascunho = visto && !entrada
+    ? rascunhoComBalanco(lerRascunho(mes) ?? rascunhoVazio(mes), salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id }))
+    : lerRascunho(mes);
+  const c = cartaoDoPagamento({ entrada, rascunho });
   if (c.tipo === 'registrado') {
     const nome = nomeDoMes(mes);
     return h('section', { class: 'cartao acao registrado' },
@@ -121,7 +128,7 @@ export function render(container, ctx) {
     renda.cartao,
     fileiraDeMarcos(p),
     fraseDoAlvo(p),
-    cartaoPagamento(estado, hoje),
+    cartaoPagamento(estado, hoje, ctx),
     precisaRevisarOrcamento(estado.config.ultimaRevisaoOrcamento, hoje.slice(0, 7))
       && aviso('atencao', 'Já faz 6 meses desde a última revisão do orçamento. ', h('a', { href: '#/orcamento' }, 'Revisar agora')),
     p.avisos.includes('ipca-indisponivel') && aviso('info', 'Ainda não tenho a inflação mais recente; as metas usam a última disponível.'),

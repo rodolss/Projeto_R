@@ -276,3 +276,8 @@ test('investir a sobra: 13º e PLR entram como sobra extra do mês (10% para laz
   assert.deepEqual(ferias.extra, { valor: 1000, guardar: 3000, lazer: 100, investir: 900 });
   assert.deepEqual([ferias.excedente, ferias.guardarParaProximoMes], [1900, 3000]);
 });
+
+test('salário só no Balanço: pela sobra, o a mais já vai pela sobra do mês — o Dia de pagamento não o investe de novo', () => {
+  const r = calcularMes({ estado: estadoBase(), recebido: 15600, hoje: '2026-11-10', investirDefinido: 1000, semExtra: true });
+  assert.deepEqual([r.excedente, r.extra.valor, r.guardarParaProximoMes], [1000, 0, 0]);
+});

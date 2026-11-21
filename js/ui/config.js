@@ -5,7 +5,6 @@ import { formatarMes, diffMeses } from '../core/meses.js';
 import { CLASSES } from '../core/alocacao.js';
 import { migrar, novoId } from '../core/esquema.js';
 import { ultimoMes } from '../core/ipca.js';
-import { salarioNoMes, salvarSalario } from '../core/casa.js';
 import { PAPEIS, NOMES_CLASSE_CURTOS } from './boas-vindas.js';
 import { montarLembretes, descreverProximo } from '../core/lembretes.js';
 import {
@@ -87,20 +86,26 @@ export function render(container, ctx) {
 
   // ---------- Renda ----------
   const renda = { salario: estado.config.salario, recebe13: estado.config.recebe13, recebeFerias: estado.config.recebeFerias };
+  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário aqui só aparece (vem do
+  // Balanço, o único lugar onde se digita); "recebo 13º" e "recebo férias" continuam editáveis.
+  const salarioNoBalanco = Boolean(ctx.unica && ctx.casa);
+  const campoSalario = salarioNoBalanco
+    ? h('div', { class: 'campo' },
+      h('span', { class: 'campo-rotulo' }, 'Salário líquido mensal'),
+      h('div', { class: 'valor' }, formatarBRL(estado.config.salario)),
+      h('span', { class: 'campo-dica' }, 'Vem do Balanço: é só lá que o salário se digita. ', h('a', { href: '#/casa-balanco?folha=salario' }, 'Digitar no Balanço')))
+    : campoMoeda({ rotulo: 'Salário líquido mensal', valor: renda.salario, dica: `Informado em ${formatarMes(estado.config.mesSalario)}. Atualize quando tiver aumento.`, aoMudar: (v) => { renda.salario = v; } });
   const cartaoRenda = cartao(h('h2', {}, 'Renda'),
-    campoMoeda({ rotulo: 'Salário líquido mensal', valor: renda.salario, dica: `Informado em ${formatarMes(estado.config.mesSalario)}. Atualize quando tiver aumento.`, aoMudar: (v) => { renda.salario = v; } }),
+    campoSalario,
     h('label', { class: 'marcar' }, h('input', { type: 'checkbox', checked: renda.recebe13, onchange: (e) => { renda.recebe13 = e.target.checked; } }), 'Recebo 13º salário'),
     h('label', { class: 'marcar' }, h('input', { type: 'checkbox', checked: renda.recebeFerias, onchange: (e) => { renda.recebeFerias = e.target.checked; } }), 'Recebo férias com 1/3'),
-    h('div', { class: 'botoes' }, botao('Salvar renda', async () => {
+    h('div', { class: 'botoes' }, botao('Salvar renda', () => {
       if (!(renda.salario > 0)) { ctx.aviso('Informe o salário.', 'atencao', 3000); return; }
-      const mudouSalario = renda.salario !== estado.config.salario;
-      // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, um salário novo vale também
-      // para o salário deste mês no Mês da casa, se ele ainda for previsão.
-      const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
-      const levarParaCasa = mudouSalario && visto && salarioNoMes(ctx.casa, mes, visto.id).situacao !== 'confirmado';
-      if (levarParaCasa) await ctx.salvarCasa((c) => salvarSalario(c, { mes, pessoaId: visto.id, valor: renda.salario }));
-      salvarComAviso((e) => ({ ...e, config: { ...e.config, salario: renda.salario, recebe13: renda.recebe13, recebeFerias: renda.recebeFerias, mesSalario: mudouSalario ? mes : e.config.mesSalario } }),
-        levarParaCasa ? 'Renda salva. Vale também para as contas da casa deste mês.' : 'Renda salva.');
+      const mudouSalario = !salarioNoBalanco && renda.salario !== estado.config.salario;
+      salvarComAviso((e) => ({
+        ...e,
+        config: { ...e.config, salario: salarioNoBalanco ? e.config.salario : renda.salario, recebe13: renda.recebe13, recebeFerias: renda.recebeFerias, mesSalario: mudouSalario ? mes : e.config.mesSalario },
+      }), 'Renda salva.');
     })));
 
   // ---------- Premissas ----------

@@ -4,6 +4,7 @@ import { balancoDoMes, compararComPlano, gastouMaisQueOOrcamento, dadosCompletos
 import { migrarCasa, salvarValor, salvarSalario, conferirFatura } from '../../js/core/casa.js';
 import { anotarCompra, adicionarCartao } from '../../js/core/cartao.js';
 import { adicionarPerfil } from '../../js/core/perfis.js';
+import { definirSalario } from '../../js/core/salario.js';
 
 const ids = (prefixo = 'k') => { let n = 0; return () => `${prefixo}${++n}`; };
 
@@ -38,7 +39,7 @@ function casaBase() {
 test('balanço: entrou o salário; saiu a parte das contas e o que é seu no cartão; outras pessoas à parte', () => {
   const casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
   const leo = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20');
-  assert.deepEqual(leo.salario, { valor: 4000, situacao: 'confirmado', deOnde: null });
+  assert.deepEqual(leo.salario, { valor: 4000, situacao: 'confirmado', deOnde: null, extra: 0 });
   // Contas: Luz 200 + a parte da casa do cartão 100 = 300; o Leo ganha 40% da renda e paga 120.
   assert.deepEqual(leo.contas, { valor: 120, total: 300, fatia: 0.03, aConfirmar: false });
   // A parte da casa do cartão já está nas contas: no cartão entra só o que é dele (Blusa + Academia).
@@ -58,7 +59,7 @@ test('balanço: entrou o salário; saiu a parte das contas e o que é seu no car
 
 test('balanço: salário a confirmar, sem divisão e perfil que não divide a casa', () => {
   const previsto = balancoDoMes(casaBase(), '2027-01', 'p2', '2026-12-20');
-  assert.deepEqual(previsto.salario, { valor: 4000, situacao: 'a-confirmar', deOnde: '2026-12' });
+  assert.deepEqual(previsto.salario, { valor: 4000, situacao: 'a-confirmar', deOnde: '2026-12', extra: 0 });
   assert.equal(previsto.previsao, true);
 
   let semSalario = salvarSalario(casaBase(), { mes: '2026-12', pessoaId: 'p1', valor: null });
@@ -143,4 +144,11 @@ test('investir a sobra: 10% para lazer e o resto para investir; sem sobra, nada'
   assert.deepEqual(divisaoDaSobra(333.33), { sobra: 333.33, lazer: 33.33, investir: 300 });
   assert.deepEqual(divisaoDaSobra(-50), { sobra: 0, lazer: 0, investir: 0 });
   assert.equal(LAZER, 0.1);
+});
+
+// ---------- salário só no Balanço (desenho 2026-11-21-salario-no-balanco) ----------
+test('balanço: o a mais do mês (13º, férias, PLR) entra no "entrou" e na sobra, sem mudar a parte das contas', () => {
+  const casa = definirSalario(conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' }), { mes: '2026-12', pessoaId: 'p2', salario: 4000, extra: 4000 });
+  const leo = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20');
+  assert.deepEqual([leo.salario.valor, leo.salario.extra, leo.entrou, leo.contas.valor, leo.saiu, leo.sobra], [4000, 4000, 8000, 120, 290, 7710]);
 });

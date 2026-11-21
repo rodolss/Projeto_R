@@ -1,33 +1,64 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { salarioRegular, preencherRecebido, levarParaCasa } from '../../js/core/salario.js';
-import { rascunhoVazio } from '../../js/core/lista-mes.js';
+import { definirSalario, extraDoMes, salarioDoPlanoPelaCasa, salarioParaODia, rascunhoComBalanco } from '../../js/core/salario.js';
+import { migrarCasa, salarioNoMes, resumoDoMes } from '../../js/core/casa.js';
 
-test('salário de todo mês no que caiu: o próprio valor; com extra (13º, férias, PLR ou bem acima), o do plano', () => {
-  assert.equal(salarioRegular({ recebidoEfetivo: 5100, tipoExtra: null, pareceExtra: false, salarioPlano: 5000 }), 5100);
-  assert.equal(salarioRegular({ recebidoEfetivo: 10000, tipoExtra: 'decimo-terceiro', pareceExtra: true, salarioPlano: 5000 }), 5000);
-  assert.equal(salarioRegular({ recebidoEfetivo: 7000, tipoExtra: null, pareceExtra: true, salarioPlano: 5000 }), 5000); // "extra comum"
-  assert.equal(salarioRegular({ recebidoEfetivo: null, tipoExtra: null, pareceExtra: false, salarioPlano: 5000 }), null);
+const casaBase = () => migrarCasa({
+  schemaVersion: 3,
+  pessoas: [{ id: 'p1', nome: 'Ana' }, { id: 'p2', nome: 'Leo' }],
+  contas: [], meses: [], cartoes: [], outrasPessoas: [],
 });
 
-test('revisão: no mês depois das férias conta o que caiu mais o adiantamento guardado (o salário cheio), não o que caiu', () => {
-  // Caíram 300 (o resto veio adiantado nas férias e ficou guardado: 4700). O efetivo é 5000.
-  assert.equal(salarioRegular({ recebidoEfetivo: 300 + 4700, tipoExtra: null, pareceExtra: false, salarioPlano: 5000 }), 5000);
+test('salário no Balanço: o salário do mês vai para a casa; o a mais fica à parte (não muda a divisão)', () => {
+  let casa = definirSalario(casaBase(), { mes: '2026-12', pessoaId: 'p1', salario: 6000, extra: 6000 });
+  casa = definirSalario(casa, { mes: '2026-12', pessoaId: 'p2', salario: 4000, extra: 0 });
+  assert.deepEqual(salarioNoMes(casa, '2026-12', 'p1'), { valor: 6000, situacao: 'confirmado', deOnde: null });
+  assert.equal(extraDoMes(casa, '2026-12', 'p1'), 6000);
+  assert.equal(extraDoMes(casa, '2026-12', 'p2'), 0);
+  assert.deepEqual(casa.extras, { '2026-12': { p1: 6000 } }); // sem a mais: nada guardado
+  assert.equal(resumoDoMes(casa, '2026-12').renda, 10000); // a divisão usa só os salários
+  // Tirar o a mais e depois o salário: volta à previsão e não sobra nada guardado.
+  casa = definirSalario(casa, { mes: '2026-12', pessoaId: 'p1', salario: 6000, extra: null });
+  assert.equal('extras' in casa, false);
+  casa = definirSalario(casa, { mes: '2026-12', pessoaId: 'p1', salario: null, extra: null });
+  assert.equal(salarioNoMes(casa, '2026-12', 'p1').situacao, 'vazio');
 });
 
-test('revisão: o Dia de pagamento abre com o salário confirmado no Mês da casa, mas pede um toque para confirmar', () => {
-  const vazio = rascunhoVazio('2026-12');
-  const confirmado = { valor: 5100, situacao: 'confirmado' };
-  const pre = preencherRecebido({ rascunho: vazio, registrado: false, salarioCasa: confirmado });
-  assert.deepEqual([pre.recebido, pre.feito.salario, pre.mes], [5100, false, '2026-12']); // não marca feito: o 13º não some
-  assert.equal(preencherRecebido({ rascunho: vazio, registrado: true, salarioCasa: confirmado }), null); // mês já registrado
-  assert.equal(preencherRecebido({ rascunho: { ...vazio, recebido: 4900 }, registrado: false, salarioCasa: confirmado }), null); // já digitado
-  assert.equal(preencherRecebido({ rascunho: vazio, registrado: false, salarioCasa: { valor: 5000, situacao: 'a-confirmar' } }), null); // previsão
+test('revisão: o salário do plano é o do último mês confirmado até hoje — mês futuro não mexe, mês menor não trava, tirar desfaz', () => {
+  const config = { salario: 4000, mesSalario: '2026-10', recebe13: true };
+  let casa = definirSalario(casaBase(), { mes: '2026-11', pessoaId: 'p1', salario: 5000, extra: 0 });
+  casa = definirSalario(casa, { mes: '2027-10', pessoaId: 'p1', salario: 50000, extra: 0 }); // mês futuro (o Balanço deixa avançar)
+  assert.deepEqual(salarioDoPlanoPelaCasa(config, { casa, pessoaId: 'p1', hoje: '2026-11-21' }), { salario: 5000, mesSalario: '2026-11', recebe13: true });
+  // Um mês menor (dezembro) e um normal (janeiro): em janeiro o plano volta ao normal.
+  casa = definirSalario(casa, { mes: '2026-12', pessoaId: 'p1', salario: 300, extra: 0 });
+  casa = definirSalario(casa, { mes: '2027-01', pessoaId: 'p1', salario: 5000, extra: 6000 });
+  assert.deepEqual(salarioDoPlanoPelaCasa(config, { casa, pessoaId: 'p1', hoje: '2026-12-10' }).salario, 300);
+  assert.deepEqual(salarioDoPlanoPelaCasa(config, { casa, pessoaId: 'p1', hoje: '2027-01-10' }), { salario: 5000, mesSalario: '2027-01', recebe13: true }); // o a mais não entra
+  // Tirar o salário de janeiro: volta ao último confirmado antes (dezembro).
+  const semJaneiro = definirSalario(casa, { mes: '2027-01', pessoaId: 'p1', salario: null, extra: null });
+  assert.equal(salarioDoPlanoPelaCasa(config, { casa: semJaneiro, pessoaId: 'p1', hoje: '2027-01-10' }).mesSalario, '2026-12');
+  // Mesmo valor num mês mais novo: o mês do salário anda (a correção pela inflação parte dele).
+  const igual = { salario: 5000, mesSalario: '2026-11' };
+  assert.deepEqual(salarioDoPlanoPelaCasa(igual, { casa, pessoaId: 'p1', hoje: '2027-01-10' }), { salario: 5000, mesSalario: '2027-01' });
+  // Já em dia, ou sem nenhum salário confirmado: o mesmo objeto.
+  const emDia = { salario: 5000, mesSalario: '2027-01' };
+  assert.equal(salarioDoPlanoPelaCasa(emDia, { casa, pessoaId: 'p1', hoje: '2027-01-10' }), emDia);
+  assert.equal(salarioDoPlanoPelaCasa(config, { casa: casaBase(), pessoaId: 'p1', hoje: '2027-01-10' }), config);
 });
 
-test('revisão: o Dia de pagamento só leva o salário para o Mês da casa quando lá ainda é previsão (o digitado na casa manda)', () => {
-  assert.equal(levarParaCasa({ salarioCasa: { valor: 5000, situacao: 'a-confirmar' }, regular: 5100 }), true);
-  assert.equal(levarParaCasa({ salarioCasa: { valor: 0, situacao: 'vazio' }, regular: 5100 }), true);
-  assert.equal(levarParaCasa({ salarioCasa: { valor: 5300, situacao: 'confirmado' }, regular: 5100 }), false);
-  assert.equal(levarParaCasa({ salarioCasa: { valor: 5000, situacao: 'a-confirmar' }, regular: null }), false);
+test('Dia de pagamento: o salário (e o a mais) do Balanço; pronto só com o salário do mês confirmado', () => {
+  let casa = definirSalario(casaBase(), { mes: '2026-11', pessoaId: 'p1', salario: 6000, extra: 0 });
+  assert.deepEqual(salarioParaODia({ casa, mes: '2026-12', pessoaId: 'p1' }), { pronto: false, salario: 6000, extra: 0, recebido: 6000 }); // dezembro: previsão
+  casa = definirSalario(casa, { mes: '2026-12', pessoaId: 'p1', salario: 6100, extra: 6100 });
+  assert.deepEqual(salarioParaODia({ casa, mes: '2026-12', pessoaId: 'p1' }), { pronto: true, salario: 6100, extra: 6100, recebido: 12200 });
+  assert.deepEqual(salarioParaODia({ casa: casaBase(), mes: '2026-12', pessoaId: 'p1' }), { pronto: false, salario: null, extra: 0, recebido: null });
+});
+
+test('revisão: o rascunho do Dia de pagamento segue o Balanço (o mesmo para a tela e para o cartão do Início)', () => {
+  const base = { mes: '2026-12', editando: false, recebido: 999, tipoExtra: 'plr', proventos: 10, saldos: null, saldosModo: null, feito: { salario: true, proventos: true } };
+  assert.deepEqual(rascunhoComBalanco(base, { pronto: true, salario: 6000, extra: 100, recebido: 6100 }),
+    { ...base, recebido: 6100, tipoExtra: null, feito: { salario: true, proventos: true } });
+  // Tirado no Balanço: volta a faltar (mesmo que o rascunho guardado diga que estava feito).
+  assert.deepEqual(rascunhoComBalanco(base, { pronto: false, salario: 6000, extra: 0, recebido: 6000 }),
+    { ...base, recebido: null, tipoExtra: null, feito: { salario: false, proventos: true } });
 });
