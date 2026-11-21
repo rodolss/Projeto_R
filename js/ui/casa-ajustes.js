@@ -10,6 +10,7 @@ import {
   codigoDoAparelho,
 } from '../core/perfis.js';
 import { avatar } from './topo.js';
+import { adicionarJunta, removerJunta, JUNTAS_DO_APP } from '../core/tags.js';
 import { parametroDoHash } from './rotas.js';
 
 export function render(container, ctx) {
@@ -172,6 +173,27 @@ function desenhar(container, ctx) {
     ]
     : cartaoConectar(ctx, { titulo: 'Usar nos dois celulares', texto: 'Hoje as contas estão só neste aparelho. Conecte com uma chave do GitHub para ver as mesmas contas em outro celular.' });
 
+  // ---------- etiquetas compostas ----------
+  // Cada palavra de uma compra vira uma etiqueta ("Ração da Nami" → Ração e Nami). As expressões desta lista valem uma
+  // etiqueta só ("Pão de Queijo"): as do app vêm prontas; a casa acrescenta as suas (casa.etiquetasJuntas).
+  const novaJunta = { texto: '' };
+  const campoJunta = h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: Banho e Tosa', oninput: (e) => { novaJunta.texto = e.target.value; } });
+  const etiquetasCompostas = cartao(
+    h('h2', {}, 'Etiquetas compostas'),
+    h('p', { class: 'suave' }, 'Cada palavra de uma compra vira uma etiqueta: "Ração da Nami" tem duas, Ração e Nami. As expressões desta lista contam como uma etiqueta só, como "Pão de Queijo".'),
+    ...Object.entries(casa.etiquetasJuntas ?? {}).map(([chave, texto]) => h('div', { class: 'linha' },
+      h('div', { class: 'nome' }, h('span', {}, texto)),
+      botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => removerJunta(c, chave), 'Expressão tirada.')))),
+    h('div', { class: 'casa-ajuste' },
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nova expressão (duas palavras ou mais)'), campoJunta),
+      h('div', { class: 'botoes' }, botao('Adicionar', () => {
+        if (adicionarJunta(casa, novaJunta.texto) === casa) { ctx.aviso('Escreva duas palavras ou mais que ainda não estejam na lista.', 'atencao', 3500); return; }
+        salvar((c) => adicionarJunta(c, novaJunta.texto), 'Expressão adicionada.');
+      }, { secundario: true }))),
+    h('details', { class: 'casa-ajuste' },
+      h('summary', {}, `Já vêm com o app (${JUNTAS_DO_APP.length})`),
+      h('div', { class: 'chips', style: 'margin-top:8px' }, ...JUNTAS_DO_APP.map((f) => h('span', { class: 'chip pequeno tag' }, f)))));
+
   const comoFunciona = cartao(
     h('h2', {}, 'Como a divisão funciona'),
     h('p', {}, 'Todo mês o app soma as contas da casa e divide pela renda: quem ganha mais paga mais, e cada um paga a mesma fatia do que ganha.'),
@@ -220,6 +242,7 @@ function desenhar(container, ctx) {
     pessoas,
     contas,
     ...secaoCartoes,
+    etiquetasCompostas,
     ...[sincronizacao].flat(),
     comoFunciona,
     perfisEAparelhos,
