@@ -11,7 +11,7 @@ import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER }
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
-import { estaPago, marcaDoCartao, contasPagas } from '../core/pagamentos.js';
+import { estaPago, marcaDoCartao, contasPagas, estadoDoMes } from '../core/pagamentos.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
@@ -142,7 +142,7 @@ function desenhar(container, ctx) {
 
   // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário de quem administra se
   // digita aqui (o único lugar); nos outros casos a linha leva ao Mês, como antes.
-  const editavel = Boolean(visto && pessoaId === visto.id); // todo perfil digita o próprio salário aqui
+  const editavel = Boolean(visto && pessoaId === visto.id) && estadoDoMes(casa, mes, pessoaId, hoje) === 'livre'; // mês travado: só leitura // todo perfil digita o próprio salário aqui
   const fechar = () => {
     if (abertaAqui) {
       abertaAqui = false;

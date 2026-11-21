@@ -54,6 +54,16 @@ export function tudoPago(casa, mes, pessoaId) {
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
+// Meses passados (desenho 2026-11-21-meses-travados): todo mês antes do atual está travado. O mês anterior (mês-1) pode
+// ser destravado ('fechado' até reabrir); do mês-2 para trás é 'definitivo', sem volta. Do mês atual em diante vale o
+// "tudo pago" (mesFechado). Devolve 'livre' | 'fechado' | 'definitivo'.
+export function estadoDoMes(casa, mes, pessoaId, hoje) {
+  const anterior = somarMeses(hoje.slice(0, 7), -1);
+  if (mes < anterior) return 'definitivo';
+  if (mes === anterior) return casa?.reabertos?.[mes] ? 'livre' : 'fechado';
+  return mesFechado(casa, mes, pessoaId) ? 'fechado' : 'livre';
+}
+
 export const mesFechado = (casa, mes, pessoaId) => Boolean(pessoaId) && !casa?.reabertos?.[mes] && tudoPago(casa, mes, pessoaId);
 
 // O mês que a tela abre: o atual, ou o seguinte (e o seguinte...) enquanto tudo já estiver pago. Sem perfil, o atual.
