@@ -9,7 +9,7 @@ import { formatarMes } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
-import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
+import { LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
 import { salarioParaODia, rascunhoComBalanco } from '../core/salario.js';
 import {
@@ -271,14 +271,7 @@ function desenhar(container, ctx) {
         regra.deficitAgora > 0 && `Ficam ${formatarBRL(regra.deficitAgora)} no vermelho para as próximas sobras cobrirem. `,
         extra && `Do que veio a mais este mês (${formatarBRL(extra.valor)}): ${formatarBRL(extra.investir)} para investir e ${formatarBRL(extra.lazer)} para lazer. `,
         h('a', { href: `#/casa-balanco?mes=${regra.mes}` }, `Ver o balanço de ${nomeAnterior}`));
-    let custoMensal = 0;
-    try { custoMensal = calcularPainel({ estado, hoje }).custoTotal; } catch { /* sem painel: sem o aviso */ }
-    const media = gastoMedioFechado(ctx.casa, ctx.perfil.visto.id, mes, hoje);
-    return [
-      linha,
-      gastouMaisQueOOrcamento({ saiu: media, custoMensal })
-        && aviso('atencao', 'Nos últimos meses fechados, seu gasto real (contas da casa e cartão) ficou acima do orçamento do plano. ', h('a', { href: '#/orcamento' }, 'Revise o orçamento'), '.'),
-    ].filter(Boolean);
+    return [linha];
   }
 
   function folhaInvestir() {
@@ -443,6 +436,8 @@ function desenhar(container, ctx) {
       h('p', { class: 'suave', style: 'margin-top:12px' }, painel.faltam !== null
         ? `Faltam ${formatarDuracao(painel.faltam)} para a renda plena.`
         : 'No ritmo de hoje, a renda plena fica a mais de 50 anos.'));
+  // O cabeçalho do mês em aberto é o cartão herói, como o número principal do Balanço, das Contas e do Cartão.
+  if (!registrado) cabecalho.classList.add('heroi');
 
   container.replaceChildren(...[
     precisaRevisarOrcamento(estado.config.ultimaRevisaoOrcamento, mes)

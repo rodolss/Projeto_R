@@ -1,4 +1,5 @@
-// Orçamento: categorias mensais e anuais, com o impacto de cada mudança na data da renda plena.
+// Orçamento: categorias mensais e anuais, com o impacto de cada mudança na data da renda plena. Na visão única, o custo
+// de vida vem do Balanço (core/custo-de-vida.js) e esta tela só o mostra.
 import { h, campoMoeda, cartao, botao, aviso } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
 import { formatarMes } from '../core/meses.js';
@@ -7,6 +8,8 @@ import { taxaMensal } from '../core/financas.js';
 import { impactoNoPrazo } from '../core/projecao.js';
 import { calcularPainel } from '../core/motor.js';
 import { novoId } from '../core/esquema.js';
+import { custoDeVidaReal } from '../core/custo-de-vida.js';
+import { iconeCategoria } from './icones.js';
 
 function textoImpacto(deltaMensal, meses, tipo, deltaOriginal) {
   if (Math.abs(deltaMensal) < 0.005) return '';
@@ -17,8 +20,49 @@ function textoImpacto(deltaMensal, meses, tipo, deltaOriginal) {
   return `${valor} = ${Math.abs(meses)} ${Math.abs(meses) === 1 ? 'mês' : 'meses'} ${meses > 0 ? 'mais tarde' : 'mais cedo'}`;
 }
 
+// Visão única (desenho 2026-11-21-planejador-integrado): o custo de vida vem do Balanço — a média do que saiu nos últimos
+// meses fechados — e só se mostra aqui; o que muda é o que se anota nas Contas e no Cartão.
+function telaDoCustoReal(real, ctx) {
+  const vezes = real.meses.length;
+  const heroi = cartao(
+    h('div', { class: 'rotulo' }, 'Seu custo de vida'),
+    h('div', { class: 'valor-grande' }, `${formatarBRL(real.media)}/mês`),
+    h('div', { class: 'suave' }, vezes === 1 ? 'O que saiu no último mês fechado do Balanço.' : `Média do que saiu nos últimos ${vezes} meses fechados do Balanço.`));
+  heroi.classList.add('heroi');
+  const linhaParte = (cat, titulo, detalhe, valor, rota) => h('button', { type: 'button', class: 'casa-linha', onclick: () => ctx.navegar(rota) },
+    iconeCategoria(cat),
+    h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe)),
+    h('span', { class: 'quanto' }, formatarBRL(valor)),
+    h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
+  const partes = h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'De onde vem'),
+    h('div', {},
+      linhaParte('casa', 'Contas da casa', 'a sua parte, por mês', real.contas, '#/casa'),
+      linhaParte('cartao', 'Cartão', 'o que é seu, por mês', real.cartao, '#/casa-cartao')));
+  const maior = Math.max(...real.meses.map((m) => m.valor), 1);
+  const porMes = h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Mês a mês'),
+    h('div', {}, ...[...real.meses].reverse().map((m) => h('a', { class: 'barra-item', href: `#/casa-balanco?mes=${m.mes}` },
+      h('div', { class: 'barra-topo' }, h('b', {}, formatarMes(m.mes)), h('span', { class: 'quanto' }, formatarBRL(m.valor))),
+      h('small', {}, `contas ${formatarBRL(m.contas)} · cartão ${formatarBRL(m.cartao)}`),
+      h('div', { class: 'barra-trilho', 'aria-hidden': 'true' }, h('i', { style: `width:${((m.valor / maior) * 100).toFixed(1)}%` }))))));
+  return [
+    h('h1', {}, 'Custo de vida'),
+    heroi,
+    partes,
+    porMes,
+    h('p', { class: 'nota' }, 'É ele que define a meta de independência e a reserva de emergência do plano. Gastos que não passam pelas contas da casa nem pelo cartão não entram.'),
+  ];
+}
+
 export function render(container, ctx) {
   const { estado, hoje } = ctx;
+  const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto : null;
+  const real = visto ? custoDeVidaReal(ctx.casa, visto.id, hoje) : null;
+  if (real) {
+    container.replaceChildren(...telaDoCustoReal(real, ctx));
+    return;
+  }
   const mes = hoje.slice(0, 7);
   const painel = calcularPainel({ estado, hoje });
   const base = {
@@ -101,12 +145,14 @@ export function render(container, ctx) {
     ctx.rerender();
   });
 
-  container.replaceChildren(
+  container.replaceChildren(...[
     h('h1', {}, 'Orçamento'),
+    // Visão única sem nenhum mês fechado ainda: vale o orçamento digitado até lá.
+    visto && aviso('info', 'Quando um mês fechar no Balanço (tudo confirmado), o custo de vida passa a vir dele. Até lá, vale o orçamento abaixo.'),
     h('p', { class: 'suave' }, `Ajuste quanto você gasta em cada categoria. Ao lado, o efeito na data da renda plena. Última revisão: ${formatarMes(estado.config.ultimaRevisaoOrcamento)}.`),
     topo,
     listas,
     h('div', { class: 'botoes' }, salvar),
-  );
+  ].filter(Boolean));
   desenhar();
 }

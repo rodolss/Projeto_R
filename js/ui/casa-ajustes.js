@@ -11,6 +11,7 @@ import {
 } from '../core/perfis.js';
 import { avatar } from './topo.js';
 import { adicionarJunta, removerJunta, JUNTAS_DO_APP } from '../core/tags.js';
+import { iconeCategoria } from './icones.js';
 import { parametroDoHash } from './rotas.js';
 
 export function render(container, ctx) {
@@ -237,12 +238,21 @@ function desenhar(container, ctx) {
         ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
         a.id !== ctx.perfil.impressao && botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.'))))));
 
+  // Visão única (desenho 2026-11-21-planejador-integrado): um "Ajustes" só; o plano de aposentadoria é uma seção daqui.
+  const plano = ctx.unica && h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Plano de aposentadoria'),
+    h('div', {}, h('button', { type: 'button', class: 'casa-linha', onclick: () => ctx.navegar('#/config') },
+      iconeCategoria('mercado'),
+      h('span', { class: 'texto' }, h('b', {}, 'Ajustes do plano'), h('small', {}, 'Premissas, carteira-alvo, investimentos e backup')),
+      h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'))),
+    h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'O salário e o custo de vida do plano vêm do Balanço: não se digitam lá.'));
   container.replaceChildren(...[
-    h('h1', {}, 'Ajustes da casa'),
+    h('h1', {}, ctx.unica ? 'Ajustes' : 'Ajustes da casa'),
     pessoas,
     contas,
     ...secaoCartoes,
     etiquetasCompostas,
+    plano,
     ...[sincronizacao].flat(),
     comoFunciona,
     perfisEAparelhos,

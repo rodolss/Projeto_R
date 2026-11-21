@@ -13,10 +13,9 @@ const ITENS = [
 const ITENS_UNICA = [
   { href: '#/simular', titulo: 'Simulador', frase: 'E se eu investir mais, ou render menos?', cat: 'mercado', icone: 'investir' },
   { href: '#/casa-ano', titulo: 'Ano da casa', frase: 'Quanto foi para as contas no ano', cat: 'conexao', icone: 'grafico' },
-  { href: '#/orcamento', titulo: 'Orçamento', frase: 'Seu custo de vida', cat: 'salario' },
+  { href: '#/orcamento', titulo: 'Custo de vida', frase: 'O que saiu nos últimos meses, pelo Balanço', cat: 'casa', icone: 'recibo' },
   { href: '#/historico', titulo: 'Histórico', frase: 'Mês a mês da aposentadoria', cat: 'viagem', icone: 'historico' },
-  { href: '#/casa-ajustes', titulo: 'Ajustes da casa', frase: 'Pessoas, contas, cartões e perfis', cat: 'casa' },
-  { href: '#/config', titulo: 'Ajustes do planejador', frase: 'Premissas, conexão e backup', cat: 'outro', icone: 'ajustes' },
+  { href: '#/casa-ajustes', titulo: 'Ajustes', frase: 'Pessoas, contas, cartões, perfis e o plano', cat: 'outro', icone: 'ajustes' },
 ];
 
 // O selo de cada item (facelift): a cor da categoria com o ícone próprio do item, quando tem.

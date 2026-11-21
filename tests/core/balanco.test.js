@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { balancoDoMes, compararComPlano, gastouMaisQueOOrcamento, dadosCompletos, gastoMedioFechado, divisaoDaSobra, LAZER } from '../../js/core/balanco.js';
+import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../../js/core/balanco.js';
 import { migrarCasa, salvarValor, salvarSalario, conferirFatura } from '../../js/core/casa.js';
 import { anotarCompra, adicionarCartao } from '../../js/core/cartao.js';
 import { adicionarPerfil } from '../../js/core/perfis.js';
@@ -115,12 +115,6 @@ test('balanço e plano: a sobra do mês contra o que o plano pede', () => {
   assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: Infinity }), { situacao: 'sem-plano', falta: 0, livre: 0 });
 });
 
-test('balanço e plano: gastou bem mais que o orçamento do plano (mais de 10%)', () => {
-  assert.equal(gastouMaisQueOOrcamento({ saiu: 3301, custoMensal: 3000 }), true);
-  assert.equal(gastouMaisQueOOrcamento({ saiu: 3300, custoMensal: 3000 }), false);
-  assert.equal(gastouMaisQueOOrcamento({ saiu: 500, custoMensal: 0 }), false);
-});
-
 test('revisão: sem salário ou sem divisão não dá veredito; mês já registrado diz que já investiu', () => {
   assert.deepEqual(compararComPlano({ sobra: 800, pmtNec: 1200, completo: false }), { situacao: 'incompleto', falta: 0, livre: 0 });
   assert.deepEqual(compararComPlano({ sobra: -50, pmtNec: 1200, registrado: true }), { situacao: 'registrado', falta: 0, livre: 0 });
@@ -131,14 +125,6 @@ test('revisão: sem salário ou sem divisão não dá veredito; mês já registr
   assert.equal(dadosCompletos(balancoDoMes(semSalario, '2026-12', 'p2', '2026-12-20')), false); // sem divisão
 });
 
-test('revisão: o gasto médio dos últimos meses já fechados (sem previsão), para conferir o orçamento', () => {
-  const casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
-  // Em março, janeiro e fevereiro ainda são previsão (salários a confirmar): só dezembro, fechado, entra.
-  assert.equal(gastoMedioFechado(casa, 'p2', '2027-03', '2027-03-15'), 340);
-  assert.equal(gastoMedioFechado(casaBase(), 'p2', '2026-12', '2026-12-20'), null); // nenhum mês fechado antes
-});
-
-// ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
 test('investir a sobra: 10% para lazer e o resto para investir; sem sobra, nada', () => {
   assert.deepEqual(divisaoDaSobra(1000), { sobra: 1000, lazer: 100, investir: 900 });
   assert.deepEqual(divisaoDaSobra(333.33), { sobra: 333.33, lazer: 33.33, investir: 300 });

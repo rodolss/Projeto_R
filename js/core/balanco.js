@@ -5,7 +5,6 @@
 // O cartão de uma pessoa só aparece no balanço dela (como nos perfis).
 import { centavos, resumoDoMes } from './casa.js';
 import { faturaDoCartao, periodoDaFatura, cartaoPronto } from './cartao.js';
-import { somarMeses } from './meses.js';
 import { extraDoMes } from './salario.js';
 
 const somar = (lista) => centavos(lista.reduce((s, x) => s + (x ?? 0), 0));
@@ -71,20 +70,6 @@ export function compararComPlano({ sobra, pmtNec, completo = true, registrado = 
 
 // O balanço tem o que precisa para um veredito: salário preenchido e as contas divididas.
 export const dadosCompletos = (b) => Boolean(b?.salario && b.salario.situacao !== 'vazio' && b.contas && b.contas.valor != null);
-
-// O gasto médio ("saiu") dos últimos `n` meses já fechados (sem previsão) antes de `mes`; null se não houver nenhum.
-// Meses fechados e a média diluem despesas anuais pagas de uma vez e a fatura ainda aberta do mês corrente.
-export function gastoMedioFechado(casa, pessoaId, mes, hoje, n = 3) {
-  const fechados = [];
-  for (let k = 1; k <= n; k++) {
-    const b = balancoDoMes(casa, somarMeses(mes, -k), pessoaId, hoje);
-    if (!b.previsao && dadosCompletos(b)) fechados.push(b.saiu);
-  }
-  return fechados.length ? centavos(fechados.reduce((s, x) => s + x, 0) / fechados.length) : null;
-}
-
-// O gasto real passou 10% do custo mensal do orçamento do plano: hora de revisar.
-export const gastouMaisQueOOrcamento = ({ saiu, custoMensal }) => saiu != null && custoMensal > 0 && saiu > custoMensal * 1.1;
 
 // ---------- investir a sobra (desenho 2026-11-20-investir-a-sobra) ----------
 // Quem administra investe só o que sobrou no mês, separando uma parte para lazer.
