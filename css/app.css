@@ -519,6 +519,39 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-ajuste-linha .entrada { flex: 1; min-width: 0; }
 .casa-ajuste-linha .marcar { flex: 1; min-width: 0; font-size: 14.5px; }
 .casa-ajuste-linha .seta-mes { width: 42px; height: 42px; font-size: 18px; padding: 0; }
+/* Ajustes em gavetas (desenho 2026-11-21-ajustes-em-gavetas): o grupo abre com a altura animada (grid 0fr → 1fr), o
+   conteúdo desce e aparece, a seta gira e o selo dá um giro; a gaveta aberta ganha sombra e borda de destaque. */
+.gaveta { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); overflow: hidden;
+  scroll-margin-top: 12px; transition: box-shadow 320ms ease, border-color 320ms ease; }
+.gaveta.aberta { border-color: color-mix(in srgb, var(--destaque) 32%, var(--borda)); box-shadow: var(--sombra-alta); }
+.gaveta-topo { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; border: 0; background: none; color: var(--texto);
+  font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 160ms ease; }
+.gaveta-topo:active { background: var(--cartao-2); }
+.gaveta-topo .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gaveta-topo b { font-family: var(--fonte-titulo); font-size: 17px; letter-spacing: -0.01em; }
+.gaveta-topo small { color: var(--suave); font-size: 13px; }
+.gaveta-topo .icone-cat { width: 46px; height: 46px; border-radius: 15px; transition: transform 460ms cubic-bezier(.2, 1.4, .4, 1); }
+.gaveta.aberta .gaveta-topo .icone-cat { transform: scale(1.08) rotate(-8deg); }
+.gaveta-seta { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--cartao-2); color: var(--suave);
+  transition: transform 420ms cubic-bezier(.2, 1.2, .3, 1), background 260ms ease, color 260ms ease, box-shadow 260ms ease; }
+.gaveta-seta svg { width: 18px; height: 18px; }
+.gaveta.aberta .gaveta-seta { transform: rotate(180deg); background: var(--grad-botao); color: var(--destaque-texto); box-shadow: var(--sombra-botao); }
+.gaveta-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 460ms cubic-bezier(.2, .9, .25, 1); }
+.gaveta.aberta .gaveta-corpo { grid-template-rows: 1fr; }
+.gaveta-dentro { min-height: 0; overflow: hidden; padding: 0 16px; opacity: 0; transform: translateY(-10px);
+  transition: opacity 220ms ease, transform 420ms cubic-bezier(.2, .9, .25, 1), padding-bottom 460ms ease; }
+.gaveta.aberta .gaveta-dentro { opacity: 1; transform: none; padding-bottom: 8px; transition-delay: 90ms, 60ms, 0ms; }
+.gaveta-dentro::before { content: ""; display: block; height: 1px; background: var(--borda); margin: 0 -16px; }
+/* Dentro da gaveta, cada bloco vira uma seção (sem cartão em volta), separada por uma linha. */
+.gaveta-dentro > .cartao { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 16px 0; }
+.gaveta-dentro > .cartao + .cartao, .gaveta-dentro > .botoes + .cartao { border-top: 1px solid var(--borda); }
+.gaveta-dentro > .botoes { padding-bottom: 16px; }
+.gaveta-dentro > .cartao > h2 { font-size: 16px; }
+.gaveta-dentro > .cartao > h2 .titulo-icone { width: 28px; height: 28px; border-radius: 9px; }
+.gaveta-dentro > .casa-lista > h2 { padding: 0 0 8px; }
+.gaveta-dentro > .casa-lista .casa-linha { padding-left: 0; padding-right: 0; }
+.gaveta-dentro > .casa-lista .balanco-nota { padding: 10px 0 0; }
+
 /* Ano: listas com barra (uma série, uma cor; o valor fica sempre em texto). */
 .barra-item { display: block; padding: 11px 16px 13px; border-top: 1px solid var(--borda); color: var(--texto); text-decoration: none; }
 a.barra-item:active { background: var(--cartao-2); }

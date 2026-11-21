@@ -1,4 +1,5 @@
-// Contas da casa · Ajustes (desenho de 2026-11-19): nomes, contas, cartão, sincronização e a volta para a aposentadoria.
+// Contas da casa · Ajustes (desenho de 2026-11-19): nomes, contas, cartão, sincronização e a volta para a aposentadoria,
+// em gavetas por grupo (desenho 2026-11-21-ajustes-em-gavetas).
 // Cada mudança salva na hora (nome ao sair do campo; o resto ao tocar), sem botão "Salvar" para esquecer.
 import { h, cartao, botao } from './dom.js';
 import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core/casa.js';
@@ -11,7 +12,8 @@ import {
 } from '../core/perfis.js';
 import { avatar } from './topo.js';
 import { adicionarJunta, removerJunta, JUNTAS_DO_APP } from '../core/tags.js';
-import { iconeCategoria } from './icones.js';
+import { icone, iconeCategoria } from './icones.js';
+import { reduzMovimento } from './movimento.js';
 import { parametroDoHash } from './rotas.js';
 
 export function render(container, ctx) {
@@ -246,17 +248,74 @@ function desenhar(container, ctx) {
       h('span', { class: 'texto' }, h('b', {}, 'Ajustes do plano'), h('small', {}, 'Premissas, carteira-alvo, investimentos e backup')),
       h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'))),
     h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'O salário e o custo de vida do plano vêm do Balanço: não se digitam lá.'));
+  // ---------- gavetas (desenho 2026-11-21-ajustes-em-gavetas) ----------
+  // Os ajustes em grupos que abrem e fecham (um por vez). A gaveta aberta continua aberta depois de salvar (o desenho
+  // refaz a tela) e ao voltar para cá na mesma sessão.
+  const perfis = casa.perfis ?? [];
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const grupos = [
+    {
+      id: 'casa', icone: 'casa', cat: 'casa', titulo: 'Casa',
+      resumo: `${casa.pessoas.map((p) => p.nome).join(' e ')} · ${plural(ativas.length, 'conta', 'contas')}`,
+      conteudo: [pessoas, contas, comoFunciona],
+    },
+    {
+      id: 'cartoes', icone: 'cartao', cat: 'cartao', titulo: 'Cartões e compras',
+      resumo: `${cartoes.length ? plural(cartoes.length, 'cartão', 'cartões') : 'Nenhum cartão'} · etiquetas`,
+      conteudo: [...secaoCartoes, etiquetasCompostas],
+    },
+    plano && {
+      id: 'plano', icone: 'investir', cat: 'mercado', titulo: 'Plano de aposentadoria',
+      resumo: 'Premissas, carteira e investimentos', conteudo: [plano],
+    },
+    {
+      id: 'aparelhos', icone: 'celular', cat: 'conexao', titulo: 'Aparelhos e perfis',
+      resumo: [ctx.conexao ? 'Sincronizado' : 'Só neste aparelho', administra && plural(perfis.length, 'perfil', 'perfis')].filter(Boolean).join(' · '),
+      conteudo: [...[sincronizacao].flat(), perfisEAparelhos],
+    },
+  ].filter(Boolean);
+  // Vindo de "Perfis e aparelhos" (o menu da foto): abre a gaveta deles.
+  if (parametroDoHash(location.hash, 'secao') === 'perfis') gavetaAberta = 'aparelhos';
+
+  const gavetas = grupos.map((g) => {
+    const aberta = gavetaAberta === g.id;
+    return h('section', { class: `gaveta${aberta ? ' aberta' : ''}`, 'data-gaveta': g.id },
+      h('button', {
+        type: 'button', class: 'gaveta-topo', 'aria-expanded': String(aberta), 'aria-controls': `gaveta-${g.id}`,
+        onclick: () => alternarGaveta(container, g.id),
+      },
+      seloDoGrupo(g),
+      h('span', { class: 'texto' }, h('b', {}, g.titulo), h('small', {}, g.resumo)),
+      h('span', { class: 'gaveta-seta', 'aria-hidden': 'true' }, icone('chevron'))),
+      h('div', { class: 'gaveta-corpo', id: `gaveta-${g.id}`, role: 'region', 'aria-label': g.titulo, inert: !aberta },
+        h('div', { class: 'gaveta-dentro' }, ...g.conteudo.filter(Boolean))));
+  });
+
   container.replaceChildren(...[
     h('h1', {}, ctx.unica ? 'Ajustes' : 'Ajustes da casa'),
-    pessoas,
-    contas,
-    ...secaoCartoes,
-    etiquetasCompostas,
-    plano,
-    ...[sincronizacao].flat(),
-    comoFunciona,
-    perfisEAparelhos,
+    ...gavetas,
     veAposentadoria(visto) && !ctx.unica && h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
   ].filter(Boolean));
   if (parametroDoHash(location.hash, 'secao') === 'perfis') document.getElementById('perfis')?.scrollIntoView({ block: 'start' });
+}
+
+// O selo do grupo: a cor da categoria com o ícone próprio do grupo.
+function seloDoGrupo(g) {
+  const selo = iconeCategoria(g.cat);
+  selo.replaceChildren(icone(g.icone));
+  return selo;
+}
+
+// Abre a gaveta tocada e fecha as outras (ou fecha a que já estava aberta), sem redesenhar: o CSS anima.
+let gavetaAberta = null;
+function alternarGaveta(raiz, id) {
+  gavetaAberta = gavetaAberta === id ? null : id;
+  for (const g of raiz.querySelectorAll('.gaveta')) {
+    const esta = g.dataset.gaveta === gavetaAberta;
+    g.classList.toggle('aberta', esta);
+    g.querySelector('.gaveta-topo').setAttribute('aria-expanded', String(esta));
+    g.querySelector('.gaveta-corpo').inert = !esta;
+    // A gaveta que abriu sobe para o topo da tela (a de cima pode ter fechado e encolhido a página).
+    if (esta) setTimeout(() => g.scrollIntoView({ block: 'start', behavior: reduzMovimento() ? 'auto' : 'smooth' }), 140);
+  }
 }
