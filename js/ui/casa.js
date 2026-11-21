@@ -10,7 +10,8 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
-import { estaPago, marcarPago, tudoPago, mesEmFoco } from '../core/pagamentos.js';
+import { mesEmFoco, marcaDaConta } from '../core/pagamentos.js';
+import { criarMarcador } from './pago.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -193,40 +194,9 @@ function desenharMes(container, ctx) {
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
-  // "Já paguei": quem vê a casa como um perfil marca as contas que já pagou, com um switch que muda na hora (grava em
-  // segundo plano: não espera o GitHub); com tudo pago, abre o mês seguinte.
-  let casaAgora = casa;
-  const comPago = (conta, botaoLinha) => {
-    if (!visto) return botaoLinha;
-    let pago = estaPago(casa, mes, visto.id, conta.id);
-    const linhaPaga = h('div', { class: `linha-paga${pago ? ' paga' : ''}` });
-    const chave = h('button', { type: 'button', class: 'sw-pago', role: 'switch', 'aria-label': `Já paguei: ${conta.nome}` }, h('span', { class: 'sw-trilho', 'aria-hidden': 'true' }));
-    const mostrar = () => {
-      chave.setAttribute('aria-checked', String(pago));
-      linhaPaga.classList.toggle('paga', pago);
-    };
-    chave.addEventListener('click', () => {
-      const antes = pago;
-      pago = !pago;
-      mostrar();
-      casaAgora = marcarPago(casaAgora, { mes, pessoaId: visto.id, contaId: conta.id, pago });
-      const acabou = pago && tudoPago(casaAgora, mes, visto.id);
-      ctx.salvarCasa((c) => marcarPago(c, { mes, pessoaId: visto.id, contaId: conta.id, pago })).catch((erro) => {
-        console.warn('Não salvei o já paguei', erro);
-        pago = antes;
-        casaAgora = marcarPago(casaAgora, { mes, pessoaId: visto.id, contaId: conta.id, pago });
-        mostrar();
-        ctx.aviso('Não deu para salvar. Tente de novo.', 'atencao', 3500);
-      });
-      if (acabou) {
-        ctx.aviso(`Tudo pago em ${nome}! Mostrando ${nomeDoMes(somarMeses(mes, 1))}.`, 'ok', 3500);
-        setTimeout(() => irPara(somarMeses(mes, 1)), 350);
-      }
-    });
-    mostrar();
-    linhaPaga.append(chave, botaoLinha);
-    return linhaPaga;
-  };
+  // "Já paguei": o switch de cada conta (js/ui/pago.js). A conta ligada ao cartão de quem vê é a fatura inteira.
+  const marcador = criarMarcador({ ctx, casa, mes, visto, irPara });
+  const comPago = (conta, botaoLinha) => marcador(marcaDaConta(casa, conta.id, visto?.id), conta.nome, botaoLinha);
   const linhasContas = r.contas.map((c) => comPago(c.conta, linha({
     titulo: c.conta.nome, detalhe: detalheConta(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
   })));
