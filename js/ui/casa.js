@@ -158,18 +158,19 @@ function desenharMes(container, ctx) {
   const situacaoTotal = r.aConfirmar
     ? h('span', { class: 'selo' }, `${plural(r.aConfirmar, 'valor', 'valores')} a confirmar`)
     : r.contas.length ? h('span', { class: 'selo ok' }, 'Tudo confirmado ✓') : h('span', { class: 'suave' }, 'Nenhuma conta neste mês');
-  // Média do que a casa paga por mês (até 12 meses antes) e quanto este mês está acima ou abaixo dela.
+  // Média do que a casa paga por mês (até 12 meses antes): uma seta na frente do total — verde para baixo (gastando
+  // menos que a média), vermelha para cima (gastando mais) — e um texto curto.
   const media = mediaDasContas(casa, mes);
-  const textoDaMedia = (m) => {
-    const pct = m.diferenca == null ? null : Math.round(Math.abs(m.diferenca) * 1000) / 10;
-    const quanto = pct == null ? '' : pct === 0 ? ' · igual à média' : ` · ${formatarPct(pct / 100, 1)} ${m.diferenca > 0 ? 'acima' : 'abaixo'} da média`;
-    return `Média de ${m.meses === 12 ? '12 meses' : plural(m.meses, 'mês', 'meses')}: ${formatarBRL(m.media)}${quanto}`;
-  };
+  const pct = media?.diferenca == null ? 0 : Math.round(Math.abs(media.diferenca) * 1000) / 10;
+  const seta = pct > 0 && h('span', { class: `seta-media ${media.diferenca > 0 ? 'sobe' : 'desce'}`, 'aria-hidden': 'true' }, media.diferenca > 0 ? '▲' : '▼');
+  const textoDaMedia = pct > 0
+    ? `${formatarPct(pct / 100, 1)} ${media.diferenca > 0 ? 'mais' : 'menos'} que a média dos meses anteriores`
+    : media?.diferenca === 0 ? 'Igual à média dos meses anteriores' : null;
   const total = cartao(
     h('div', { class: 'rotulo' }, 'Contas da casa'),
-    h('div', { class: 'valor-grande' }, formatarBRL(r.total)),
+    h('div', { class: 'valor-grande total-com-seta' }, formatarBRL(r.total), seta),
     h('div', { style: 'margin-top:4px' }, situacaoTotal),
-    media && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia(media)));
+    textoDaMedia && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia));
   const divisao = r.divide
     ? [
       h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('section', { class: 'cartao casa-pessoa' },

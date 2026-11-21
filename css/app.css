@@ -476,3 +476,9 @@ a.barra-item:active { background: var(--cartao-2); }
 /* ---------- Balanço e plano (desenho 2026-11-20-balanco-e-plano) ---------- */
 .balanco-plano { display: flex; flex-direction: column; gap: 8px; border-color: var(--destaque-suave); }
 .balanco-plano p { margin: 0; }
+
+/* Seta do total das contas da casa contra a média: verde para baixo (gastando menos), vermelha para cima. */
+.total-com-seta { display: flex; align-items: baseline; gap: 10px; }
+.seta-media { font-size: 0.55em; line-height: 1; }
+.seta-media.desce { color: var(--ok); }
+.seta-media.sobe { color: var(--alerta); }
