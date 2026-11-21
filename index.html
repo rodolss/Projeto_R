@@ -13,7 +13,9 @@
   <link rel="preload" href="fontes/sora-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
+<body class="iniciando">
+  <!-- O menu do último espaço usado aparece já no primeiro quadro (app.js grava projetoR.menu); na primeira abertura, nenhum até o app decidir. -->
+  <script>try { var m = localStorage.getItem('projetoR.menu'); if (m !== null) document.body.className = m; } catch (e) {}</script>
   <div id="avisos" class="avisos" aria-live="polite"></div>
   <header id="topo" class="topo" hidden></header>
   <main id="tela" class="tela"></main>

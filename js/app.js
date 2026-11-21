@@ -25,6 +25,8 @@ const CHAVE_ESPACO = 'projetoR.espaco'; // 'casa' | 'casa-balanco' | 'casa-carta
 const CHAVE_USOU_APOSENTADORIA = 'projetoR.usouAposentadoria';
 const CHAVE_PERFIL_VISTO = 'projetoR.perfilVisto'; // quem administra: o perfil que está vendo neste aparelho
 const CHAVE_PERFIL_PROPRIO = 'projetoR.perfilProprio'; // o perfil deste aparelho, guardado: sem chave, continua nele
+const CHAVE_MENU = 'projetoR.menu'; // as classes do menu da última tela: o index.html as põe antes do primeiro quadro
+const CLASSES_DO_MENU = ['espaco-casa', 'espaco-unico', 'sem-abas'];
 const app = {
   estado: null, armazem: null, conexao: null, sincronizado: false,
   casa: null, armazemCasa: null, casaSincronizada: false, erroCasa: null,
@@ -187,6 +189,7 @@ let geracaoDoDesenho = 0; // cada desenho ganha um número: um desenho velho que
 let mostrandoEscolha = false; // "Quem usa este celular?" na tela: dados novos (a liberação) redesenham
 
 function contexto() {
+  const perfil = perfilDoMomento();
   return {
     estado: app.estado,
     hoje: dataISO(new Date()),
@@ -203,13 +206,13 @@ function contexto() {
     quandoSincronizado,
     casa: app.casa,
     // Visão única (desenho 2026-11-20-visao-unica): o Mais e os Ajustes da casa mudam um pouco nela.
-    unica: visaoUnica({ visto: perfilDoMomento().visto, temEstado: Boolean(app.estado) }),
+    unica: visaoUnica({ visto: perfil.visto, temEstado: Boolean(app.estado) }),
     salvarCasa,
     casaSincronizada: app.casaSincronizada,
     erroCasa: app.erroCasa,
     tentarCasaDeNovo: async () => { await sincronizarCasaAoAbrir(); renderizar(); },
     perfil: {
-      ...perfilDoMomento(),
+      ...perfil,
       impressao: app.impressao,
       // Quem administra: muda o perfil visto (só neste aparelho). A tela fica como a da outra pessoa.
       trocar: (id) => { gravarLocal(CHAVE_PERFIL_VISTO, id); renderizar(); },
@@ -252,6 +255,8 @@ async function renderizar() {
   document.body.classList.toggle('espaco-casa', daCasa);
   document.body.classList.toggle('espaco-unico', unica);
   document.body.classList.toggle('sem-abas', nome === 'boas-vindas' || (daCasa && !app.casa));
+  document.body.classList.remove('iniciando');
+  gravarLocal(CHAVE_MENU, CLASSES_DO_MENU.filter((c) => document.body.classList.contains(c)).join(' '));
   const aba = abaDoMenu(nome, unica);
   for (const a of document.querySelectorAll('.menu a')) {
     if (a.dataset.rota === aba) a.setAttribute('aria-current', 'page');

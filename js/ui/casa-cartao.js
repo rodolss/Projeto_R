@@ -19,12 +19,11 @@ import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './ro
 import { nomeDoMes } from './casa.js';
 import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
-import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
+import { etiquetasDosNomes, juntasDaCasa, semAcento } from '../core/tags.js';
 import { graficoDasEtiquetas } from './casa-etiquetas.js';
 import { categoriaDe } from '../core/categorias.js';
 import { iconeCategoria } from './icones.js';
 
-const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 // A dona de um cartão: uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
 const quemE = (casa, id) => casa.pessoas.find((p) => p.id === id) ?? (casa.perfis ?? []).find((p) => p.id === id) ?? null;
@@ -52,17 +51,6 @@ export function situacaoDaFatura({ hoje, periodo, conferida }) {
   if (conferida) return 'conferida';
   if (hoje > periodo.ate) return 'fechada';
   return hoje >= periodo.de ? 'aberta' : 'futura';
-}
-
-// Nomes já usados que combinam com o que foi digitado: os que começam assim primeiro, depois os que têm no meio.
-// A lista nativa do navegador (datalist) cobria a tela no Android; estas viram botõezinhos embaixo do campo.
-export function sugestoesDoNome(sugestoes, texto, limite = 4) {
-  const chave = semAcento(texto);
-  if (!chave) return [];
-  const nomes = sugestoes.map((s) => s.nome).filter((nome) => semAcento(nome) !== chave);
-  const comeca = nomes.filter((nome) => semAcento(nome).startsWith(chave));
-  const meio = nomes.filter((nome) => !semAcento(nome).startsWith(chave) && semAcento(nome).includes(chave));
-  return [...comeca, ...meio].slice(0, limite);
 }
 
 export function paraSugerido(sugestoes, nome) {

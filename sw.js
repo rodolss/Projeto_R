@@ -1,6 +1,7 @@
-// Service worker: o app abre sem internet. Estratégia network-first: com conexão, sempre busca a
-// versão nova (e atualiza o cache); sem conexão, usa o cache. APIs externas nunca passam pelo cache.
-const VERSAO = 'projeto-r-v58'; // igual a js/versao.js (um teste confere)
+// Service worker: o app abre na hora e sem internet. Estratégia cache-first por versão: cada versão do site tem o
+// seu cache, baixado inteiro na instalação; a página abre dele e a versão nova chega com o próximo service worker.
+// APIs externas (GitHub, IPCA) nunca passam pelo cache.
+const VERSAO = 'projeto-r-v59'; // igual a js/versao.js (um teste confere)
 const CASCA = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png',
@@ -34,24 +35,30 @@ self.addEventListener('activate', (evento) => {
   );
 });
 
+// Abre na hora, sem esperar a rede: a casca vem do cache desta versão (instalado inteiro, já confirmado com o servidor).
+// A versão nova chega por um service worker novo (o navegador confere o sw.js a cada abertura e a página pede
+// `update()` ao voltar): ele baixa tudo de novo, assume, e o atualizacao.js recarrega numa tela segura. O que não está
+// no cache vai à rede (confirmando com o servidor, sem a cópia de 10 minutos do aparelho) e fica guardado.
 self.addEventListener('fetch', (evento) => {
   const req = evento.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  // no-cache: confirma com o servidor se o arquivo mudou (a resposta 304 é pequena), em vez de usar a cópia
-  // de até 10 minutos. Pedido de navegação não aceita opções: vai pela URL, com redirecionamento "manual"
-  // (uma navegação não pode ser respondida com uma resposta já redirecionada).
-  const buscar = req.mode === 'navigate'
-    ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' })
-    : fetch(req, { cache: 'no-cache' });
-  evento.respondWith(
-    buscar
-      .then((resposta) => {
-        if (resposta.ok) {
-          const copia = resposta.clone();
-          caches.open(VERSAO).then((c) => c.put(req, copia));
-        }
-        return resposta;
-      })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r ?? caches.match('./index.html'))),
-  );
+  const navegacao = req.mode === 'navigate';
+  evento.respondWith((async () => {
+    const guardada = await caches.match(navegacao ? './index.html' : req, { ignoreSearch: true });
+    if (guardada) return guardada;
+    try {
+      // Pedido de navegação não aceita opções: vai pela URL, com redirecionamento "manual" (uma navegação não pode
+      // ser respondida com uma resposta já redirecionada).
+      const resposta = navegacao
+        ? await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' })
+        : await fetch(req, { cache: 'no-cache' });
+      if (resposta.ok) {
+        const copia = resposta.clone();
+        caches.open(VERSAO).then((c) => c.put(req, copia));
+      }
+      return resposta;
+    } catch {
+      return (await caches.match('./index.html')) ?? Response.error();
+    }
+  })());
 });
