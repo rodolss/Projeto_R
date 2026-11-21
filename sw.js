@@ -7,7 +7,7 @@ const CASCA = [
   './fontes/inter-latin.woff2', './fontes/sora-latin.woff2',
   './js/app.js', './js/versao.js',
   './js/core/alocacao.js', './js/core/aporte.js', './js/core/balanco.js', './js/core/cartao.js', './js/core/casa.js', './js/core/casa-ano.js', './js/core/checkup.js', './js/core/desempenho.js',
-  './js/core/esquema.js', './js/core/financas.js', './js/core/formato.js', './js/core/ipca.js',
+  './js/core/esquema.js', './js/core/financas.js', './js/core/formato.js', './js/core/investir-sobra.js', './js/core/ipca.js',
   './js/core/lembretes.js', './js/core/lista-mes.js', './js/core/marcos.js', './js/core/meses.js', './js/core/perfis.js', './js/core/metas.js', './js/core/motor.js', './js/core/projecao.js',
   './js/core/protecao.js', './js/core/simulador.js',
   './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/mesclar.js', './js/dados/mesclar-casa.js',

@@ -5,11 +5,12 @@ import {
   h, campoMoeda, cartao, botao, aviso, linha, AVISO_EXEMPLOS, mostrarFolha, esconderFolha,
 } from './dom.js';
 import { formatarBRL, formatarDuracao } from '../core/formato.js';
-import { formatarMes, somarMeses } from '../core/meses.js';
+import { formatarMes } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
-import { balancoDoMes, gastouMaisQueOOrcamento, dadosCompletos, gastoMedioFechado, divisaoDaSobra, LAZER } from '../core/balanco.js';
+import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
+import { regraDaSobra } from '../core/investir-sobra.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
   saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
@@ -80,18 +81,20 @@ function desenhar(container, ctx) {
     return lista.length ? lista : null;
   };
   // Investir a sobra (desenho 2026-11-20-investir-a-sobra): na visão única, o quanto investir no Dia de pagamento é a
-  // sobra do Balanço do mês anterior (o que já fechou), menos 10% para lazer. Sem os dados do Balanço: pelo orçamento.
+  // sobra do Balanço do mês anterior (o que já fechou), menos 10% para lazer — js/core/investir-sobra.js. Sem as
+  // contas da casa carregadas ou sem os dados do Balanço: pelo orçamento, com aviso.
   const regra = (() => {
-    if (!ctx.unica || !ctx.casa || !ctx.perfil?.visto) return null;
-    const anterior = somarMeses(mes, -1);
-    const b = balancoDoMes(ctx.casa, anterior, ctx.perfil.visto.id, hoje);
-    if (!dadosCompletos(b)) return { incompleto: true, mes: anterior };
-    return { incompleto: false, mes: anterior, previsao: b.previsao, ...divisaoDaSobra(b.sobra) };
+    if (!ctx.unica || !ctx.perfil?.visto) return null;
+    if (!ctx.casa) return { semCasa: true };
+    return regraDaSobra({ casa: ctx.casa, estado, pessoaId: ctx.perfil.visto.id, mes, hoje });
   })();
+  const pelaSobra = Boolean(regra && !regra.semCasa && !regra.incompleto);
   const resposta = () => calcularMes({
     estado, recebido: r.recebido ?? 0, tipoExtra: r.tipoExtra, proventos: r.proventos ?? 0, saldosAtualizados: saldosDoRascunho(), hoje,
-    investirDefinido: regra && !regra.incompleto ? regra.investir : null,
+    investirDefinido: pelaSobra ? regra.investir : null, lazerPct: LAZER,
   });
+  // Pela sobra, o mesmo texto na lista e na folha quando não há o que investir.
+  const semSobraTexto = () => `Em ${nomeDoMes(regra.mes)} não sobrou nada para investir.`;
   const ultimoRegistro = ultimoRegistroAntes(estado.meses, mes);
 
   // ---------- campos de saldos (tarefa 3 e "Atualizar só os saldos") ----------
@@ -212,14 +215,21 @@ function desenhar(container, ctx) {
   // Visão única (desenhos 2026-11-20-balanco-e-plano e -investir-a-sobra): de onde veio o valor (a sobra do mês
   // anterior no Balanço) ou, sem os dados dele, o pedido para preenchê-los. O aviso do orçamento olha a média dos
   // últimos meses já fechados (o orçamento ainda define as metas e a reserva).
-  function conferenciaDoBalanco() {
+  function conferenciaDoBalanco(rr) {
     if (!regra) return [];
+    if (regra.semCasa) return [aviso('info', 'As contas da casa ainda não carregaram: por enquanto, o valor sai do orçamento.')];
     const nomeAnterior = nomeDoMes(regra.mes);
+    const pct = `${Math.round(LAZER * 100)}%`;
+    const extra = rr.extra?.valor > 0 && rr.extra;
     const linha = regra.incompleto
       ? aviso('info', `Para investir pela sobra, preencha os salários de ${nomeAnterior} no Mês da casa. Por enquanto, o valor sai do orçamento.`)
       : h('p', { class: 'suave' },
         `Sobrou em ${nomeAnterior}: ${formatarBRL(regra.sobra)}${regra.previsao ? ' (com valores ainda a confirmar)' : ''}. `,
-        `${Math.round(LAZER * 100)}% para lazer: ${formatarBRL(regra.lazer)}. `,
+        regra.jaInvestido > 0 && `Desse salário, ${formatarBRL(regra.jaInvestido)} já tinham sido investidos no Dia de pagamento de ${nomeAnterior}. `,
+        regra.deficit > 0 && `Antes, ${formatarBRL(regra.deficit)} de meses no vermelho ainda precisavam ser cobertos. `,
+        regra.base > 0 && `${pct} para lazer: ${formatarBRL(regra.lazer)}. `,
+        regra.deficitAgora > 0 && `Ficam ${formatarBRL(regra.deficitAgora)} no vermelho para as próximas sobras cobrirem. `,
+        extra && `Do que veio a mais este mês (${formatarBRL(extra.valor)}): ${formatarBRL(extra.investir)} para investir e ${formatarBRL(extra.lazer)} para lazer. `,
         h('a', { href: `#/casa-balanco?mes=${regra.mes}` }, `Ver o balanço de ${nomeAnterior}`));
     let custoMensal = 0;
     try { custoMensal = calcularPainel({ estado, hoje }).custoTotal; } catch { /* sem painel: sem o aviso */ }
@@ -237,10 +247,9 @@ function desenhar(container, ctx) {
     }
     const rr = resposta();
     const blocos = [];
-    const pelaSobra = regra && !regra.incompleto;
     if (rr.semAporte) {
       blocos.push(aviso('atencao', h('b', {}, pelaSobra
-        ? `Em ${nomeDoMes(regra.mes)} não sobrou nada: este mês não há o que investir.`
+        ? semSobraTexto()
         : rr.motivo === 'custo-de-vida'
           ? 'Este mês não invista nada, o seu dia a dia vem primeiro.'
           : 'Este mês não sobra nada para investir.')));
@@ -250,7 +259,7 @@ function desenhar(container, ctx) {
         h('div', { class: 'valor-grande' }, formatarBRL(rr.excedente)),
         !pelaSobra && h('div', { class: 'suave' }, `${formatarBRL(rr.paraDiaADia)} ficam para o seu dia a dia.`)));
     }
-    blocos.push(...conferenciaDoBalanco());
+    blocos.push(...conferenciaDoBalanco(rr));
     blocos.push(...[
       rr.paraAnuais > 0 && aviso('info', `Separe ${formatarBRL(rr.paraAnuais)} para as despesas anuais (deixe na conta ou no Tesouro Selic).`),
       rr.provisao > 0 && aviso('info', `Separe ${formatarBRL(rr.provisao)} deste mês para as despesas anuais: o 13º e as férias não cobrem todas (deixe na conta ou no Tesouro Selic).`),
@@ -333,7 +342,7 @@ function desenhar(container, ctx) {
     if (registrado) return `${formatarBRL(totalAplicado(existente))} aplicados`;
     if (!sit.podeInvestir) return 'Libera depois das tarefas 1 a 3';
     const rr = resposta();
-    if (rr.semAporte) return rr.motivo === 'custo-de-vida' ? 'O seu dia a dia vem primeiro' : 'Este mês não sobra nada para investir';
+    if (rr.semAporte) return pelaSobra ? semSobraTexto() : rr.motivo === 'custo-de-vida' ? 'O seu dia a dia vem primeiro' : 'Este mês não sobra nada para investir';
     return `Separe ${formatarBRL(rr.excedente)}`;
   }
   function situacaoSaldos() {

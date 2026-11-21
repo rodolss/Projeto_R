@@ -28,3 +28,16 @@ lazer […] não me pergunte, só faça". Exemplos INVENTADOS (repositório púb
 O histórico falso de investimentos (importado do gerador em 12/11) foi tirado do `dados.json` do repositório
 privado: voltou-se à última versão real (início em nov/2026, o mês registrado de verdade), mantendo a série do IPCA.
 Versão do site 19.
+
+## Correções da revisão
+
+- **Troca de regra sem contar duas vezes:** cada mês registrado guarda a origem (`sugestao.origem`: `sobra` ou
+  `orcamento`). Se o mês anterior foi registrado pelo orçamento (ou antes desta regra, sem origem), o que saiu do
+  salário dele naquele Dia de pagamento (aplicado − proventos) é descontado da sobra.
+- **13º, PLR e férias:** o que veio a mais no mês do pagamento é sobra extra: 10% para lazer e o resto investido
+  agora; nas férias, só o 1/3 é extra e os 3/4 ficam guardados para o mês seguinte (como na regra do orçamento).
+- **Vermelho:** um mês que fecha negativo fica para as próximas sobras cobrirem, desde o começo da regra (o mês antes
+  do 1º Dia de pagamento registrado pela sobra), até 6 meses.
+- **A regra é pura e testada** (`regraDaSobra` em `js/core/investir-sobra.js`). Sem as contas da casa carregadas, o
+  valor sai do orçamento com aviso; o texto de "não sobrou nada" é o mesmo na lista e na folha; "dia a dia" fica 0 na
+  regra nova; "Desta sobra (previsão)" no Balanço.

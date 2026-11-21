@@ -57,7 +57,7 @@ function cartaoDoPlano(ctx, b) {
       ? h('p', {}, h('b', {}, 'Renda plena conquistada ✓'))
       : h('p', {}, h('b', {}, `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`), ' no ritmo de hoje.'),
     completo && b.sobra > 0 && h('p', {},
-      `Desta sobra, no Dia de pagamento de ${proximo}: `, h('b', {}, formatarBRL(divisao.investir)), ' para investir e ',
+      `Desta sobra${b.previsao ? ' (previsão)' : ''}, no Dia de pagamento de ${proximo}: `, h('b', {}, formatarBRL(divisao.investir)), ' para investir e ',
       h('b', {}, formatarBRL(divisao.lazer)), ` para lazer (${Math.round(LAZER * 100)}%).`),
     pede && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
     texto && h('p', {}, texto),

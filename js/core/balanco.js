@@ -51,8 +51,8 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
 
 // ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------
 // A sobra do mês contra o que o plano pede por mês (o necessário para chegar no alvo, contando a reserva que falta).
-// Só confere: o quanto investir de verdade continua saindo do salário e do orçamento, no Dia de pagamento. Mês já
-// registrado: já investiu. Sem salário ou sem divisão (`completo` falso): sem veredito.
+// O que se compara é o que vai ser investido (a sobra menos o lazer: desenho 2026-11-20-investir-a-sobra). Sem
+// salário ou sem divisão (`completo` falso): sem veredito. `registrado` fica para quem quiser dizer "já investiu".
 export function compararComPlano({ sobra, pmtNec, completo = true, registrado = false }) {
   if (registrado) return { situacao: 'registrado', falta: 0, livre: 0 };
   if (!completo) return { situacao: 'incompleto', falta: 0, livre: 0 };
