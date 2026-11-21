@@ -193,7 +193,7 @@ function desenharMes(container, ctx) {
       h('div', { class: 'suave pequeno dica-copiar' }, 'Toque para copiar')))),
       h('p', { class: 'nota' }, `Quem ganha mais paga mais: cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),
     ]
-    : [aviso('info', 'Preencha os salários lá embaixo para o app dividir as contas.')];
+    : [aviso('info', perfilVisto ? 'Preencha o salário de cada um no Balanço para o app dividir as contas.' : 'Preencha os salários lá embaixo para o app dividir as contas.')];
 
   // ---------- listas ----------
   const linha = ({ titulo, detalhe, valor, aConfirmar, aoTocar, vazio = false }) => h('button', {
@@ -254,7 +254,8 @@ function desenharMes(container, ctx) {
     }))));
 
   container.replaceChildren(...[
-    cabecalho, voltarAoAtual, total, ...divisao, listaContas, listaSalarios,
+    // Com perfil, o salário se digita e se vê no Balanço: a lista de salários só fica no aparelho sem perfil.
+    cabecalho, voltarAoAtual, total, ...divisao, listaContas, !visto && listaSalarios,
   ].filter(Boolean));
 
   // ---------- folhas ----------
