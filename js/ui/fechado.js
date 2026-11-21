@@ -3,7 +3,9 @@
 import { aviso, botao } from './dom.js';
 import { reabrirMes } from '../core/pagamentos.js';
 
-export const AVISO_FECHADO = 'Mês fechado: tudo pago. Reabra o mês para editar.';
+export const AVISO_FECHADO = 'Mês fechado. Reabra o mês para editar.';
+
+export const AVISO_ANTIGO = 'Mês antigo: travado, não pode mais ser editado.';
 
 export function avisoMesFechado({ ctx, mes }) {
   return aviso('info', '🔒 Mês fechado: tudo pago. Para editar, reabra o mês. ',

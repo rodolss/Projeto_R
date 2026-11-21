@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { marcarPago, estaPago, tudoPago, contasPagas, mesEmFoco, marcaDaConta, marcaDoCartao, mesFechado, reabrirMes } from '../../js/core/pagamentos.js';
+import { marcarPago, estaPago, tudoPago, contasPagas, mesEmFoco, marcaDaConta, marcaDoCartao, mesFechado, reabrirMes, estadoDoMes, fecharMes } from '../../js/core/pagamentos.js';
 import { migrarCasa, salvarValor } from '../../js/core/casa.js';
 import { anotarCompra } from '../../js/core/cartao.js';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
@@ -87,4 +87,19 @@ test('mês fechado: tudo pago e não reaberto; reabrir libera; marcar pago de no
   casa = marcar(marcar(casa, '2026-12', 'c1', false), '2026-12', 'c1');
   assert.equal('reabertos' in casa, false);
   assert.equal(mesFechado(casa, '2026-12', 'p1'), true);
+});
+
+test('meses travados: o mês-1 destrava; do mês-2 para trás é definitivo; do atual em diante vale o tudo pago', () => {
+  const hoje = '2026-11-21';
+  let casa = casaBase();
+  assert.equal(estadoDoMes(casa, '2026-09', 'p1', hoje), 'definitivo');
+  assert.equal(estadoDoMes(casa, '2025-01', null, hoje), 'definitivo');
+  assert.equal(estadoDoMes(casa, '2026-10', 'p1', hoje), 'fechado'); // mês-1: travado sem nem estar pago
+  casa = reabrirMes(casa, '2026-10');
+  assert.equal(estadoDoMes(casa, '2026-10', 'p1', hoje), 'livre');
+  assert.equal(estadoDoMes(fecharMes(casa, '2026-10'), '2026-10', 'p1', hoje), 'fechado');
+  casa = reabrirMes(casa, '2026-09'); // reabertura antiga não destrava o definitivo
+  assert.equal(estadoDoMes(casa, '2026-09', 'p1', hoje), 'definitivo');
+  assert.equal(estadoDoMes(casaBase(), '2026-11', 'p1', hoje), 'livre'); // atual: só fecha com tudo pago
+  assert.equal(estadoDoMes(casaBase(), '2027-01', 'p1', hoje), 'livre');
 });

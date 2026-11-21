@@ -311,6 +311,7 @@ details.detalhes[open] > summary::after { content: "−"; }
 .passos i.feito { background: var(--destaque); }
 .cartao:has(> .cadeado-mes) { position: relative; }
 .cadeado-mes { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; cursor: pointer; }
+.cadeado-mes.definitivo { display: grid; place-items: center; cursor: default; }
 .cadeado-svg { display: block; overflow: visible; }
 .cadeado-svg .haste { stroke: var(--destaque); transform-origin: 21.5px 14.5px; transform: translateY(-3px) rotate(32deg); }
 .cadeado-svg .corpo rect:first-child { fill: var(--destaque); }
