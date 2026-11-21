@@ -10,6 +10,7 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
+import { estaPago, marcarPago, tudoPago, mesEmFoco } from '../core/pagamentos.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -28,10 +29,14 @@ export function estadoDaTela({ casa, conectado, casaSincronizada, erroCasa = nul
   return erroCasa ? 'erro' : 'carregando';
 }
 
-export function mesDaTela(hash, hoje) {
+// `padrao`: o mês quando o endereço não diz (com "já paguei": o seguinte, se tudo do atual já está pago).
+export function mesDaTela(hash, hoje, padrao = null) {
   const mes = parametroDoHash(hash, 'mes');
-  return mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? mes : hoje.slice(0, 7);
+  return mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? mes : padrao ?? hoje.slice(0, 7);
 }
+
+// O mês em foco para quem vê a casa (um perfil): ver js/core/pagamentos.js.
+export const mesPadraoDaCasa = (ctx) => mesEmFoco(ctx.casa, ctx.hoje, ctx.perfil?.visto?.id ?? null);
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico (some a entrada criada).
 let abertaAqui = false;
@@ -112,7 +117,7 @@ function telaDeComeco(ctx) {
 function desenharMes(container, ctx) {
   const { casa, hoje } = ctx;
   const mesAtual = hoje.slice(0, 7);
-  const mes = mesDaTela(location.hash, hoje);
+  const mes = mesDaTela(location.hash, hoje, mesPadraoDaCasa(ctx));
   const r = resumoDoMes(casa, mes);
   const nome = nomeDoMes(mes);
 
@@ -188,9 +193,30 @@ function desenharMes(container, ctx) {
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
-  const linhasContas = r.contas.map((c) => linha({
+  // "Já paguei": quem vê a casa como um perfil marca as contas que já pagou; com tudo pago, abre o mês seguinte.
+  const marcarPagamento = async (contaId, pago) => {
+    const nova = marcarPago(casa, { mes, pessoaId: visto.id, contaId, pago });
+    await ctx.salvarCasa((c) => marcarPago(c, { mes, pessoaId: visto.id, contaId, pago }));
+    if (pago && tudoPago(nova, mes, visto.id)) {
+      ctx.aviso(`Tudo pago em ${nome}! Mostrando ${nomeDoMes(somarMeses(mes, 1))}.`, 'ok', 3500);
+      irPara(somarMeses(mes, 1));
+    } else {
+      ctx.rerender();
+    }
+  };
+  const comPago = (conta, botaoLinha) => {
+    if (!visto) return botaoLinha;
+    const pago = estaPago(casa, mes, visto.id, conta.id);
+    return h('div', { class: `linha-paga${pago ? ' paga' : ''}` },
+      h('button', {
+        type: 'button', class: `marca-paga${pago ? ' feita' : ''}`, 'aria-pressed': pago ? 'true' : 'false',
+        'aria-label': `${pago ? 'Desmarcar' : 'Marcar'} já paguei: ${conta.nome}`, onclick: () => marcarPagamento(conta.id, !pago),
+      }, h('span', { class: 'bola-paga', 'aria-hidden': 'true' }, pago ? '✓' : '')),
+      botaoLinha);
+  };
+  const linhasContas = r.contas.map((c) => comPago(c.conta, linha({
     titulo: c.conta.nome, detalhe: detalheConta(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
-  }));
+  })));
   const semValor = r.semValor.length
     ? (verSemValor
       ? r.semValor.map((conta) => linha({ titulo: conta.nome, detalhe: 'sem valor neste mês', valor: '—', vazio: true, aoTocar: tocarConta(conta) }))
@@ -201,6 +227,7 @@ function desenharMes(container, ctx) {
     : [];
   const listaContas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Contas'),
+    visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Toque no círculo para marcar o que você já pagou.'),
     h('div', {}, ...linhasContas, ...semValor),
     !casa.contas.some((c) => !c.arquivada) && h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma conta cadastrada. Cadastre em Ajustes.'));
 
