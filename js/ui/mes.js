@@ -156,8 +156,8 @@ function desenhar(container, ctx) {
         : aviso('info', `Digite seu salário de ${nome} no Balanço: é o único lugar, e ele vale para tudo.`),
       h('p', { class: 'suave pequeno' }, 'O salário se digita só no Balanço; aqui, nas contas da casa e nos Ajustes ele aparece sozinho.'),
       h('div', { class: 'botoes' },
-        botao(doBalanco.pronto ? 'Mudar no Balanço' : 'Digitar no Balanço', () => location.replace(nomeDoBalanco)),
-        botao('Fechar', fechar, { secundario: true })),
+        botao('Fechar', fechar, { secundario: true }),
+        botao(doBalanco.pronto ? 'Mudar no Balanço' : 'Digitar no Balanço', () => location.replace(nomeDoBalanco))),
     ];
   }
 
@@ -186,13 +186,13 @@ function desenhar(container, ctx) {
       }),
       extra,
       h('div', { class: 'botoes' },
+        botao('Fechar', fechar, { secundario: true }),
         botao('Salvar', () => {
           if (r.recebido == null) { ctx.aviso('Digite quanto caiu na conta.', 'atencao', 3000); return; }
           r.feito.salario = true;
           guardar();
           fechar();
-        }),
-        botao('Fechar', fechar, { secundario: true })),
+        })),
     ];
   }
 
@@ -211,13 +211,13 @@ function desenhar(container, ctx) {
         onclick: () => { r.proventos = 0; campo.input.value = '0,00'; guardar(); },
       }, 'Não caiu nada')),
       h('div', { class: 'botoes' },
+        botao('Fechar', fechar, { secundario: true }),
         botao('Salvar', () => {
           r.proventos ??= 0;
           r.feito.proventos = true;
           guardar();
           fechar();
-        }),
-        botao('Fechar', fechar, { secundario: true })),
+        })),
     ];
   }
 
@@ -228,8 +228,8 @@ function desenhar(container, ctx) {
       h('p', { class: 'suave' }, 'Copie antes de aplicar o dinheiro deste mês. Deixa a divisão mais precisa.'),
       h('div', {}, ...camposSaldos(r.saldos, guardar)),
       h('div', { class: 'botoes' },
-        listaSaldos.length > 0 && botao('Usar estes saldos', () => { salvarRascunho(escolherSaldos(r, 'usar')); fechar(); }),
-        botao('Pular', () => { salvarRascunho(escolherSaldos(r, 'pular')); fechar(); }, { secundario: listaSaldos.length > 0 })),
+        botao('Pular', () => { salvarRascunho(escolherSaldos(r, 'pular')); fechar(); }, { secundario: listaSaldos.length > 0 }),
+        listaSaldos.length > 0 && botao('Usar estes saldos', () => { salvarRascunho(escolherSaldos(r, 'usar')); fechar(); })),
     ];
   }
 
@@ -248,7 +248,7 @@ function desenhar(container, ctx) {
       h('h2', { 'data-sem-recarregar': '' }, 'Atualizar saldos'), // valores digitados aqui não vão para o rascunho
       h('p', { class: 'suave' }, `Copie os valores como estão na corretora agora. O registro de ${nome} não muda.`),
       h('div', {}, ...camposSaldos(edicoes, () => {})),
-      h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), salvar),
     ];
   }
 
@@ -327,8 +327,8 @@ function desenhar(container, ctx) {
     const temAlgo = destinos.length > 0;
     const confirmacao = h('div');
     blocos.push(h('div', { class: 'botoes' },
-      botao(temAlgo ? 'Já apliquei' : 'Registrar este mês', () => abrirConfirmacao(rr, temAlgo, confirmacao)),
-      botao('Fechar', fechar, { secundario: true })));
+      botao('Fechar', fechar, { secundario: true }),
+      botao(temAlgo ? 'Já apliquei' : 'Registrar este mês', () => abrirConfirmacao(rr, temAlgo, confirmacao))));
     blocos.push(confirmacao);
     return blocos;
   }
@@ -370,7 +370,7 @@ function desenhar(container, ctx) {
       temAlgo && h('p', { class: 'suave pequeno' }, 'Se aplicou um valor diferente do sugerido, corrija aqui.'),
       ...aplicado.map((a) => h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: a.nome, valor: a.valor, aoMudar: (v) => { a.valor = v; } }))),
       transferencia.valor > 0 && h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: 'Transferido da caixa de oportunidade', valor: transferencia.valor, aoMudar: (v) => { transferencia.valor = v; } })),
-      h('div', { class: 'botoes', style: 'margin-top:12px' }, confirmar, botao('Cancelar', () => confirmacao.replaceChildren(), { secundario: true })))));
+      h('div', { class: 'botoes', style: 'margin-top:12px' }, botao('Cancelar', () => confirmacao.replaceChildren(), { secundario: true }), confirmar))));
     confirmacao.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 

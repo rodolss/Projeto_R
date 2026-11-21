@@ -79,7 +79,7 @@ export function render(container, ctx) {
       cartao(
         h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Chave do GitHub'), token),
         h('label', { class: 'campo', style: 'margin-top:12px' }, h('span', { class: 'campo-rotulo' }, 'Seu usuário do GitHub'), dono),
-        h('div', { class: 'botoes', style: 'margin-top:12px' }, testar, botao('Continuar sem sincronizar', () => ir(1), { secundario: true })),
+        h('div', { class: 'botoes', style: 'margin-top:12px' }, botao('Continuar sem sincronizar', () => ir(1), { secundario: true }), testar),
         msg),
       cartao(
         h('h2', {}, 'Só quer as contas da casa?'),

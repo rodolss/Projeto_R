@@ -246,8 +246,8 @@ export function render(container, ctx) {
     msgBackup.replaceChildren(aviso('atencao',
       `Substituir todos os dados por este backup (${importado.meses?.length ?? 0} meses registrados)? `,
       h('div', { class: 'botoes', style: 'margin-top:8px' },
-        botao('Substituir', () => salvarComAviso(() => importado, 'Backup importado.'), { perigo: true }),
-        botao('Cancelar', () => msgBackup.replaceChildren(), { secundario: true }))));
+        botao('Cancelar', () => msgBackup.replaceChildren(), { secundario: true }),
+        botao('Substituir', () => salvarComAviso(() => importado, 'Backup importado.'), { perigo: true }))));
   });
   const msgRefazer = h('div');
   const cartaoBackup = cartao(h('h2', {}, 'Backup e recomeço'),

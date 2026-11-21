@@ -66,8 +66,8 @@ function cartaoDoPlano(ctx, b) {
     pede && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
     texto && h('p', {}, texto),
     h('div', { class: 'botoes' },
-      h('a', { class: 'botao', href: '#/mes' }, 'Dia de pagamento'),
-      h('a', { class: 'botao secundario', href: '#/inicio' }, 'Ver o plano')));
+      h('a', { class: 'botao secundario', href: '#/inicio' }, 'Ver o plano'),
+      h('a', { class: 'botao', href: '#/mes' }, 'Dia de pagamento')));
 }
 
 // De quem é o balanço: o perfil visto; sem perfis, a pessoa do endereço (se for da casa), senão a primeira.
@@ -267,7 +267,7 @@ function desenhar(container, ctx) {
         aoMudar: (v) => { novo.extra = v; },
       }),
       proximoRegistrado && h('p', { class: 'suave pequeno' }, `O Dia de pagamento de ${nomeDoMes(proximo)} já foi registrado: um a mais digitado agora não entra mais nele.`),
-      h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), salvar),
       tirar,
     ];
   }
