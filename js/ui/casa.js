@@ -11,7 +11,7 @@ import {
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
 import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago, mesFechado, contasPagas, reabrirMes, fecharMes } from '../core/pagamentos.js';
-import { AVISO_FECHADO } from './fechado.js';
+import { AVISO_FECHADO, cadeadoSvg } from './fechado.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
@@ -172,7 +172,7 @@ function desenharMes(container, ctx) {
   const quitado = perfilVisto ? tudoPago(casa, mes, perfilVisto.id) : contasPagas(casa, mes);
   // O cadeado no canto do card: 🔒 mês fechado (toque reabre); 🔓 tudo pago mas reaberto (toque fecha de novo).
   const cadeado = perfilVisto && quitado && h('button', {
-    type: 'button', class: 'cadeado-mes', title: mesFechado(casa, mes, perfilVisto.id) ? 'Mês fechado: toque para reabrir' : 'Mês reaberto: toque para fechar',
+    type: 'button', class: 'cadeado-mes', html: cadeadoSvg(mesFechado(casa, mes, perfilVisto.id)), title: mesFechado(casa, mes, perfilVisto.id) ? 'Mês fechado: toque para reabrir' : 'Mês reaberto: toque para fechar',
     'aria-label': mesFechado(casa, mes, perfilVisto.id) ? 'Mês fechado: tudo pago. Tocar para reabrir' : 'Mês reaberto. Tocar para fechar',
     onclick: async (e) => {
       const fecha = !mesFechado(casa, mes, perfilVisto.id);
@@ -181,7 +181,7 @@ function desenharMes(container, ctx) {
       ctx.aviso(fecha ? 'Mês fechado.' : 'Mês reaberto.', 'ok', 2500);
       ctx.rerender();
     },
-  }, mesFechado(casa, mes, perfilVisto.id) ? '🔒' : '🔓');
+  });
   const total = cartao(
     cadeado,
     h('div', { class: 'rotulo' }, 'Contas da casa'),
