@@ -405,7 +405,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       })))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
-    h('h2', {}, 'Todo mês'),
+    // A soma das assinaturas e contas fixas desta fatura, ao lado do título: quanto vai todo mês de cara.
+    h('h2', { class: 'titulo-com-soma' }, 'Todo mês', h('span', { class: 'soma-fixas', title: 'Soma de tudo que se repete todo mês neste cartão' }, formatarBRL(Math.round(f.fixas.reduce((t, x) => t + x.valor, 0) * 100) / 100))),
     h('div', {}, ...f.fixas.map((x) => linhaItem({
       titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, aoTocar: () => (travado ? avisarTravado() : abrir(`fixa-${x.id}`)),
     }))));

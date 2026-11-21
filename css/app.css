@@ -355,6 +355,8 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-pessoa .rotulo { overflow-wrap: anywhere; }
 .casa-lista { padding: 0; overflow: hidden; }
 .casa-lista > h2 { padding: 14px 16px 6px; margin: 0; }
+.titulo-com-soma { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.soma-fixas { font-size: 15px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; }
 .casa-linha { display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 12px 13px 16px; border: 0; border-top: 1px solid var(--borda);
   background: none; color: var(--texto); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .casa-linha:active { background: var(--cartao-2); }
