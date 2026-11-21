@@ -11,6 +11,7 @@ import {
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
 import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago } from '../core/pagamentos.js';
+import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -157,10 +158,18 @@ function desenharMes(container, ctx) {
   const situacaoTotal = r.aConfirmar
     ? h('span', { class: 'selo' }, `${plural(r.aConfirmar, 'valor', 'valores')} a confirmar`)
     : r.contas.length ? h('span', { class: 'selo ok' }, 'Tudo confirmado ✓') : h('span', { class: 'suave' }, 'Nenhuma conta neste mês');
+  // Média do que a casa paga por mês (até 12 meses antes) e quanto este mês está acima ou abaixo dela.
+  const media = mediaDasContas(casa, mes);
+  const textoDaMedia = (m) => {
+    const pct = m.diferenca == null ? null : Math.round(Math.abs(m.diferenca) * 1000) / 10;
+    const quanto = pct == null ? '' : pct === 0 ? ' · igual à média' : ` · ${formatarPct(pct / 100, 1)} ${m.diferenca > 0 ? 'acima' : 'abaixo'} da média`;
+    return `Média de ${m.meses === 12 ? '12 meses' : plural(m.meses, 'mês', 'meses')}: ${formatarBRL(m.media)}${quanto}`;
+  };
   const total = cartao(
     h('div', { class: 'rotulo' }, 'Contas da casa'),
     h('div', { class: 'valor-grande' }, formatarBRL(r.total)),
-    h('div', { style: 'margin-top:4px' }, situacaoTotal));
+    h('div', { style: 'margin-top:4px' }, situacaoTotal),
+    media && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia(media)));
   const divisao = r.divide
     ? [
       h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('section', { class: 'cartao casa-pessoa' },
