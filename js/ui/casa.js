@@ -10,8 +10,8 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
-import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago, estadoDoMes, contasPagas, reabrirMes, fecharMes } from '../core/pagamentos.js';
-import { AVISO_FECHADO, AVISO_ANTIGO, cadeadoSvg } from './fechado.js';
+import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago } from '../core/pagamentos.js';
+import { travaDoMes } from './fechado.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
@@ -167,29 +167,9 @@ function desenharMes(container, ctx) {
   const textoDaMedia = pct > 0
     ? `${formatarPct(pct / 100, 1)} ${media.diferenca > 0 ? 'mais' : 'menos'} que a média dos meses anteriores`
     : media?.diferenca === 0 ? 'Igual à média dos meses anteriores' : null;
-  // Tudo pago (contas e, com perfil, os cartões de quem vê): um selo verde no total, mesmo com o mês reaberto.
+  // Tudo pago: selo verde no total; o cadeado do mês vem de fechado.js (igual nas telas da casa).
   const perfilVisto = ctx.perfil?.visto ?? null;
-  const quitado = perfilVisto ? tudoPago(casa, mes, perfilVisto.id) : contasPagas(casa, mes);
-  // O cadeado no canto do card (🔒 fechado, 🔓 aberto): meses passados (o anterior destrava; os mais antigos são
-  // definitivos, só o cadeado, sem toque) e, do mês atual em diante, quando tudo está pago.
-  const estadoMes = estadoDoMes(casa, mes, perfilVisto?.id ?? null, hoje);
-  const ehAnterior = mes === somarMeses(hoje.slice(0, 7), -1);
-  const fechadoAgora = estadoMes !== 'livre';
-  const textoCadeado = estadoMes === 'definitivo' ? 'Mês antigo: travado, não pode mais ser editado'
-    : fechadoAgora ? 'Mês fechado: toque para reabrir' : 'Mês reaberto: toque para fechar';
-  const cadeado = estadoMes === 'definitivo'
-    ? h('span', { class: 'cadeado-mes definitivo', role: 'img', title: textoCadeado, 'aria-label': textoCadeado, html: cadeadoSvg(true) })
-    : (ehAnterior || (perfilVisto && quitado)) && h('button', {
-      type: 'button', class: 'cadeado-mes', html: cadeadoSvg(fechadoAgora), title: textoCadeado, 'aria-label': textoCadeado,
-      onclick: async (e) => {
-        const fecha = !fechadoAgora;
-        e.currentTarget.disabled = true;
-        e.currentTarget.querySelector('svg')?.classList.toggle('fechado', fecha); // anima já; a tela se redesenha depois
-        await ctx.salvarCasa((c) => (fecha ? fecharMes(c, mes) : reabrirMes(c, mes)));
-        ctx.aviso(fecha ? 'Mês fechado.' : 'Mês reaberto.', 'ok', 2500);
-        ctx.rerender();
-      },
-    });
+  const { estado: estadoMes, travado: fechadoAgora, quitado, cadeado, avisarTravado } = travaDoMes({ ctx, mes });
   const total = cartao(
     cadeado,
     h('div', { class: 'rotulo' }, 'Contas da casa'),
@@ -227,7 +207,7 @@ function desenharMes(container, ctx) {
   // Conta ligada a um cartão: para todos, a folha com as compras da casa daquela fatura (desenho
   // 2026-11-20-detalhe-cartao-no-mes); quem vê o cartão abre o Cartão por ela. As outras: a folha da conta.
   const tocarConta = (conta) => () => {
-    if (fechado && aoTocarConta(casa, conta.id, visto) !== 'parte') { ctx.aviso(estadoMes === 'definitivo' ? AVISO_ANTIGO : AVISO_FECHADO, 'info', 3000); return; }
+    if (fechado && aoTocarConta(casa, conta.id, visto) !== 'parte') { avisarTravado(); return; }
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
@@ -262,7 +242,7 @@ function desenharMes(container, ctx) {
         : p.situacaoSalario === 'vazio' ? 'Falta preencher' : null,
       valor: p.situacaoSalario === 'vazio' ? '—' : formatarBRL(p.salario),
       aConfirmar: p.situacaoSalario === 'a-confirmar',
-      aoTocar: () => (fechado ? ctx.aviso(estadoMes === 'definitivo' ? AVISO_ANTIGO : AVISO_FECHADO, 'info', 3000) : abrir(`salario-${p.pessoa.id}`)),
+      aoTocar: () => (fechado ? avisarTravado() : abrir(`salario-${p.pessoa.id}`)),
     }))));
 
   container.replaceChildren(...[
