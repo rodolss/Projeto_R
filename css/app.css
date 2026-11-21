@@ -467,17 +467,26 @@ details.detalhes[open] > summary::after { content: "−"; }
 /* Ana paga / Leo paga: tocar copia o valor (o cartão pisca em verde). */
 .casa-pessoas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .casa-pessoa { position: relative; padding: 14px; min-width: 0; border-radius: 20px; transition: transform 140ms ease, box-shadow 220ms ease; }
-.casa-pessoa .rotulo { overflow-wrap: anywhere; }
 .casa-pessoa.copiavel { text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
 .casa-pessoa.copiavel:active { background: var(--cartao-2); transform: scale(0.97); }
-.casa-pessoa .copiar-icone { position: absolute; top: 12px; right: 12px; color: var(--suave); opacity: 0.7; }
 .casa-pessoa .copiar-icone svg { width: 18px; height: 18px; display: block; }
 .casa-pessoa.copiado { box-shadow: 0 0 0 2px var(--ok), var(--sombra); }
 .casa-pessoa.copiado .copiar-icone { color: var(--ok); opacity: 1; animation: menu-pop 380ms cubic-bezier(.2, 1.4, .4, 1) both; }
-.dica-copiar { margin-top: 4px; }
-.valor-com-parte { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.valor-com-parte .valor { white-space: nowrap; overflow-wrap: normal; font-size: 19px; }
-.parte-das-contas { flex: none; padding: 1px 7px; border-radius: 99px; background: var(--destaque-suave); color: var(--destaque); font-size: 12.5px; font-weight: 700; }
+/* Cards "X paga": avatar e nome, valor em destaque, fatia do total em barra e o que sobra. */
+.casa-pessoa { --cor: var(--destaque); }
+.casa-pessoa.cor-1 { --cor: var(--cat-conexao); }
+.pessoa-topo { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pessoa-topo .avatar { width: 26px; height: 26px; font-size: 12px; }
+.pessoa-nome { flex: 1; min-width: 0; font-size: 13.5px; color: var(--suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pessoa-nome b { color: var(--texto); font-weight: 600; }
+.casa-pessoa .copiar-icone { flex: none; color: var(--suave); opacity: 0.7; }
+.pessoa-valor { white-space: nowrap; overflow-wrap: normal; font-size: 22px; }
+.pessoa-fatia { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; }
+.pessoa-fatia b { flex: none; font-size: 13px; color: var(--cor); font-variant-numeric: tabular-nums; }
+.pessoa-barra { flex: 1; height: 7px; border-radius: 99px; background: color-mix(in srgb, var(--cor) 16%, transparent); overflow: hidden; }
+.pessoa-barra i { display: block; height: 100%; border-radius: 99px; background: var(--cor); transform-origin: left center; animation: crescer-x 900ms 250ms cubic-bezier(.16, 1, .3, 1) both; }
+.tela.sem-entrada .pessoa-barra i { animation: none; }
+.pessoa-sobra b { color: var(--texto); font-weight: 600; font-variant-numeric: tabular-nums; }
 .casa-lista { padding: 0; overflow: hidden; }
 .casa-lista > h2 { padding: 16px 16px 8px; margin: 0; }
 .titulo-com-soma { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
