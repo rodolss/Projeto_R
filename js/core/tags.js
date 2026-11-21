@@ -95,7 +95,8 @@ export function opcoesDeTag(tags, texto, limite = 5) {
   const exata = todas.find((n) => chaveDaTag(n) === chave) ?? null;
   const resto = todas.filter((n) => n !== exata);
   const comeca = resto.filter((n) => chaveDaTag(n).startsWith(chave));
-  const meio = resto.filter((n) => !chaveDaTag(n).startsWith(chave) && chaveDaTag(n).includes(chave));
+  // O meio da palavra só a partir de 3 letras: com "ra", "Água Mineral" e "Suco de Laranja" só atrapalham.
+  const meio = chave.length < 3 ? [] : resto.filter((n) => !chaveDaTag(n).startsWith(chave) && chaveDaTag(n).includes(chave));
   return { achadas: [...(exata ? [exata] : []), ...comeca, ...meio].slice(0, limite), exata, nova: exata || ehLigacao(trecho) || trecho.includes(' ') ? null : corrigirPalavra(trecho) }; // expressão nova: só pela lista dos Ajustes
 }
 

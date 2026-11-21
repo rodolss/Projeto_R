@@ -6,12 +6,12 @@
 // folha), #/casa-cartao?novo=1 para criar outro cartão e &tela=cofrinho para a tela do Cofrinho (casa-cofrinho.js).
 import { h, campoMoeda, campoTag, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL } from '../core/formato.js';
-import { somarMeses } from '../core/meses.js';
+import { somarMeses, diffMeses } from '../core/meses.js';
 import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js';
 import { estaPago, marcarPago, marcaDoCartao, tudoPago, estadoDoMes } from '../core/pagamentos.js';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
-  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, nomesUsados, primeiraFatura,
+  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, mudarDataDaParcelada, nomesUsados, primeiraFatura,
   acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
 import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
@@ -467,7 +467,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   function escolhaPara(inicial, aoEscolher) {
     let opcoes = opcoesPara(casa, cfg.id);
     let atual = inicial;
-    const caixa = h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Para quem'));
+    const caixa = h('div', { class: 'campo linha-unica' }, h('span', { class: 'campo-rotulo' }, 'Para quem'));
     const area = h('div');
     const outra = { nome: '' };
     const desenharChips = () => {
@@ -540,13 +540,14 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     const mostrarTotal = () => {
       totalTexto.textContent = nova.valor ? `Total: ${formatarBRL(nova.valor * nova.vezes)} em ${nova.vezes} vezes.` : '';
     };
-    const valorCampo = campoMoeda({ rotulo: 'Valor', dica: 'Parcelado? O valor de cada parcela.', aoMudar: (v) => { nova.valor = v; mostrarTotal(); } });
+    const valorCampo = campoMoeda({ rotulo: 'Valor', aoMudar: (v) => { nova.valor = v; mostrarTotal(); } });
     const dataCampo = h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
       h('input', {
         class: 'entrada', type: 'date', value: nova.data,
         onchange: (e) => { if (e.target.value) { nova.data = e.target.value; mostrarFatura(); } },
-      }),
-      faturaTexto);
+      }));
+    // Valor e data lado a lado, com a fatura embaixo: a folha cabe na tela sem rolar (desenho 2026-11-21-anotar-sem-rolar).
+    const valorEData = h('div', { class: 'campos-lado' }, valorCampo, dataCampo);
 
     const vezesTexto = h('output', { class: 'casa-vezes' });
     const mostrarVezes = () => { vezesTexto.textContent = `${nova.vezes} vezes`; mostrarTotal(); };
@@ -558,12 +559,12 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         vezesTexto,
         h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Mais parcelas', onclick: () => mudarVezes(1) }, '+')),
       totalTexto,
-      h('span', { class: 'campo-dica' }, 'As próximas parcelas aparecem sozinhas nas faturas seguintes.'));
+      h('span', { class: 'campo-dica' }, 'O valor acima é o de cada parcela. As próximas aparecem sozinhas nas faturas seguintes.'));
     const todoMes = h('span', { class: 'campo-dica' }, 'Assinaturas e contas fixas: aparece sozinha em toda fatura, até você parar.');
     const detalheForma = h('div');
     const mostrarForma = () => detalheForma.replaceChildren(...(nova.forma === 'parcelado' ? [parcelas] : nova.forma === 'todoMes' ? [todoMes] : []));
     mostrarForma();
-    const forma = h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Como foi'),
+    const forma = h('div', { class: 'campo linha-unica' }, h('span', { class: 'campo-rotulo' }, 'Como foi'),
       chips([{ id: 'vista', nome: 'À vista' }, { id: 'parcelado', nome: 'Parcelado' }, { id: 'todoMes', nome: 'Todo mês' }], nova.forma,
         (id) => { nova.forma = id; mostrarForma(); mostrarJa(); }, 'Como foi'),
       detalheForma);
@@ -589,8 +590,9 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
 
     return [
       titulo('Anotar compra'),
-      blocoDoNome, valorCampo, dataCampo, para, forma, caixaJa,
-      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), anotarBotao),
+      blocoDoNome, valorEData, faturaTexto, para, forma, caixaJa,
+      // Os botões ficam presos no pé da folha: anotar a próxima compra não pede rolar.
+      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true }), anotarBotao),
     ];
   }
 
@@ -638,7 +640,23 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     const vezesAntes = parcela?.de ?? (ehParcela ? parcelas.at(-1).n : 1);
     const minimoDeVezes = Math.max(nDaEditada, ...parcelas.filter((p) => estadoDoMes(casa, p.mes, quemVe, hoje) !== 'livre').map((p) => p.n));
     editado.vezes = vezesAntes;
-    const faturaDaParcela = (n) => somarMeses(parcelas[0].mes, n - parcelas[0].n);
+    // A data da parcelada: a 1ª parcela vai para a fatura da data nova e as outras andam junto (nunca para trás, nem
+    // tirando parcela de uma fatura travada ou levando para uma).
+    const primeiraAntes = somarMeses(parcelas[0].mes, 1 - parcelas[0].n);
+    editado.passo = 0;
+    const dicaDaData = h('span', { class: 'campo-dica' });
+    const mostrarDataDaParcela = () => {
+      dicaDaData.textContent = `A 1ª parcela fica na fatura de ${nomeDaFatura(somarMeses(primeiraAntes, editado.passo), hoje)}.${editado.passo ? ' As outras andam junto.' : ''}`;
+    };
+    mostrarDataDaParcela();
+    const travadoEm = (m) => estadoDoMes(casa, m, quemVe, hoje) !== 'livre';
+    const motivoDaData = (passo) => {
+      if (passo < 0) return 'Só dá para mandar a compra para a mesma fatura ou para as seguintes.';
+      if (passo > 0 && parcelas.some((p) => travadoEm(p.mes))) return 'Uma das parcelas já está num mês travado: a compra não pode mudar de fatura.';
+      if (passo > 0 && parcelas.some((p) => travadoEm(somarMeses(p.mes, passo)))) return 'A data nova levaria parcelas para uma fatura travada.';
+      return null;
+    };
+    const faturaDaParcela = (n) => somarMeses(parcelas[0].mes, n - parcelas[0].n + editado.passo);
     const vezesTexto = h('output', { class: 'casa-vezes' });
     const dicaDasVezes = h('span', { class: 'campo-dica' });
     const menos = h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Menos parcelas', onclick: () => mudarVezes(-1) }, '−');
@@ -667,13 +685,16 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       if (editado.valor == null || editado.valor <= 0) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
       salvar.disabled = true;
       const mudouVezes = editado.vezes !== vezesAntes;
-      const destino = !ehParcela && editado.fatura > fatura ? editado.fatura : fatura;
+      const mudouData = ehParcela && Boolean(editado.data) && editado.data !== compra.data;
+      // Onde a compra fica depois da edição (à vista: a fatura escolhida; parcelada: andou junto com a data).
+      const destino = ehParcela ? somarMeses(fatura, editado.passo) : editado.fatura > fatura ? editado.fatura : fatura;
       await ctx.salvarCasa((c) => {
-        const editada = editarCompraDoCartao(c, {
+        let r = editarCompraDoCartao(c, {
           fatura, compraId: compra.id, nome: editado.nome, valor: editado.valor, para: editado.para,
           data: editado.data ?? undefined, novaFatura: ehParcela ? undefined : editado.fatura,
         });
-        return mudouVezes ? mudarParcelas(editada, { fatura: destino, compraId: compra.id, vezes: editado.vezes }) : editada;
+        if (mudouData) r = mudarDataDaParcelada(r, { fatura, compraId: compra.id, data: editado.data, cartaoId: cfg.id });
+        return mudouVezes ? mudarParcelas(r, { fatura: destino, compraId: compra.id, vezes: editado.vezes }) : r;
       });
       ctx.aviso(mudouVezes ? `Salvo. Agora ${editado.vezes === 1 ? 'à vista' : `em ${editado.vezes} vezes`}.`
         : destino !== fatura ? `Salvo. Foi para a fatura de ${nomeDaFatura(destino, hoje)}.` : 'Salvo.', 'ok', 3000);
@@ -695,6 +716,21 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       campoTag({ rotulo: 'O que foi', valor: compra.nome, tags: etiquetasDosNomes(nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), juntasDaCasa(casa)), juntas: juntasDaCasa(casa), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: ehParcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
       campoDasVezes,
+      ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
+        h('input', {
+          class: 'entrada', type: 'date', value: compra.data ?? '',
+          onchange: (e) => {
+            if (!e.target.value) return;
+            const passo = diffMeses(primeiraAntes, faturaDaCompra(e.target.value, cfg));
+            const motivo = motivoDaData(passo);
+            if (motivo) { ctx.aviso(motivo, 'atencao', 3500); e.target.value = editado.data ?? ''; return; } // volta para a data de antes
+            editado.data = e.target.value;
+            editado.passo = passo;
+            mostrarDataDaParcela();
+            mostrarVezes();
+          },
+        }),
+        dicaDaData),
       !ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
         h('input', {
           class: 'entrada', type: 'date', value: compra.data ?? '',
@@ -715,7 +751,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         h('span', { class: 'campo-dica' }, 'O app calcula pela data. Mude só se o banco colocou a compra em outra fatura.')),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), salvar),
+      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true }), salvar),
       apagar,
     ];
   }
@@ -753,7 +789,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       campoMoeda({ rotulo: 'Valor por mês', valor: fixa.valor, aoMudar: (v) => { editado.valor = v; } }),
       escolhaPara(editado.para, (id) => { editado.para = id; jaTenho?.paraEscolhido(id); }),
       jaTenho,
-      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), salvar),
+      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true }), salvar),
       parar,
       apagar,
       !podeApagar && h('p', { class: 'suave pequeno' }, 'Ela começou numa fatura travada: só dá para parar de repetir.'),

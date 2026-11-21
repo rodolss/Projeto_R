@@ -5,7 +5,7 @@
 // contas fixas) ficam no próprio cartão e valem em toda fatura até parar. As outras pessoas valem para todos.
 // "Já tenho" (desenho 2026-11-20-ja-tenho): a compra cujo dinheiro já está guardado no cofrinho leva `jaTenho: true`;
 // a de todo mês leva `jaTenhoEm: { 'AAAA-MM': true }` (cada fatura marcada à parte). Nunca nas da Casa.
-import { somarMeses } from './meses.js';
+import { somarMeses, diffMeses } from './meses.js';
 import { centavos, comMes, adicionarCompra, acompanharFatura, fixasNoMes, compraDaCasa } from './casa.js';
 
 // "Quem ainda te deve" começa nesta fatura: antes dela nada foi marcado, e o histórico não é dívida.
@@ -326,6 +326,31 @@ export function mudarParcelas(casa, { fatura, compraId, vezes, novoId = idPadrao
     resultado = comMes(resultado, somarMeses(ultima.mes, n - ultima.n), (r) => {
       r.compras.push(nova);
       acompanharFatura(r, nova.contaId);
+    });
+  }
+  return resultado;
+}
+
+// Mudar a data de uma compra parcelada: a 1ª parcela vai para a fatura da data nova e as outras andam junto (todas com a
+// data nova). Nunca para uma fatura anterior (a regra de editar compra); a tela confere as faturas travadas.
+export function mudarDataDaParcelada(casa, { fatura, compraId, data, cartaoId }) {
+  const cartao = acharCartao(casa, cartaoId);
+  const parcelas = parcelasDaCompra(casa, { fatura, compraId });
+  if (!cartao || !parcelas.length || !data) return casa;
+  const primeiraAntes = somarMeses(parcelas[0].mes, 1 - parcelas[0].n);
+  const passo = diffMeses(primeiraAntes, faturaDaCompra(data, cartao));
+  if (passo < 0) return casa;
+  let resultado = casa;
+  for (const { mes, compra } of parcelas) {
+    resultado = comMes(resultado, mes, (r) => {
+      r.compras = r.compras.filter((c) => c.id !== compra.id);
+      acompanharFatura(r, compra.contaId);
+    });
+  }
+  for (const { mes, compra } of parcelas) {
+    resultado = comMes(resultado, somarMeses(mes, passo), (r) => {
+      r.compras.push({ ...compra, data });
+      acompanharFatura(r, compra.contaId);
     });
   }
   return resultado;

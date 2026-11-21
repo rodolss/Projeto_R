@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
   adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao, donaDaPessoa, pessoasDe,
-  editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
+  editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, mudarDataDaParcelada, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
 import { somarMeses } from '../../js/core/meses.js';
@@ -554,4 +554,23 @@ test('mudar parcelas: à vista vira parcelada, e parcelada em 1 vez vira à vist
   const sozinha = avista.meses.find((m) => m.mes === fat).compras[0];
   assert.equal('grupo' in sozinha || 'parcela' in sozinha, false);
   assert.equal(avista.meses.some((m) => m.mes === somarMeses(fat, 1) && (m.compras ?? []).length), false);
+});
+
+test('mudar a data da parcelada: a 1ª vai para a fatura da data nova e as outras andam junto; para trás, não', () => {
+  let n = 0;
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'TV', valor: 200, para: 'casa', vezes: 3, novoId: () => `t${++n}` });
+  const fat = faturaDaCompra('2026-11-19', casa.cartoes[0]); // dezembro
+  const segunda = casa.meses.find((m) => m.mes === somarMeses(fat, 1)).compras[0];
+  // Pela 2ª parcela: a compra foi em 10/12, não 19/11 — vai uma fatura para frente.
+  const depois = mudarDataDaParcelada(casa, { fatura: somarMeses(fat, 1), compraId: segunda.id, data: '2026-12-10', cartaoId: K });
+  const ps = parcelasDaCompra(depois, { fatura: somarMeses(fat, 2), compraId: segunda.id });
+  assert.deepEqual(ps.map((p) => [p.mes, p.compra.parcela.n, p.compra.data]),
+    [[somarMeses(fat, 1), 1, '2026-12-10'], [somarMeses(fat, 2), 2, '2026-12-10'], [somarMeses(fat, 3), 3, '2026-12-10']]);
+  assert.equal(depois.meses.some((m) => m.mes === fat && (m.compras ?? []).length), false); // dezembro ficou sem ela
+  // Outra data na mesma fatura: só a data muda.
+  const mesma = mudarDataDaParcelada(casa, { fatura: fat, compraId: casa.meses.find((m) => m.mes === fat).compras[0].id, data: '2026-11-25', cartaoId: K });
+  assert.deepEqual(parcelasDaCompra(mesma, { fatura: fat, compraId: casa.meses.find((m) => m.mes === fat).compras[0].id }).map((p) => [p.mes, p.compra.data]),
+    [[fat, '2026-11-25'], [somarMeses(fat, 1), '2026-11-25'], [somarMeses(fat, 2), '2026-11-25']]);
+  // Para uma fatura anterior: nada muda.
+  assert.equal(mudarDataDaParcelada(casa, { fatura: fat, compraId: casa.meses.find((m) => m.mes === fat).compras[0].id, data: '2026-10-20', cartaoId: K }), casa);
 });
