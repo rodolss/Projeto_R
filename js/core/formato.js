@@ -38,6 +38,26 @@ export function parseBRL(texto) {
   return Number.isFinite(valor) ? valor : null;
 }
 
+// Campo de reais (desenho 2026-11-21-mascara-reais): só se digitam números e a máscara põe o ponto e a vírgula, como
+// no caixa do banco (digitou 1, 2, 3, 4, 5 → "123,45"). Vírgula e ponto digitados não entram.
+// REGEX_REAIS é o formato final: milhares com ponto e sempre dois decimais ("0,05", "1.234,56").
+export const REGEX_REAIS = /^\d{1,3}(\.\d{3})*,\d{2}$/;
+const MAX_DIGITOS_REAIS = 13; // até 99.999.999.999,99
+
+// Do que está no campo (qualquer texto) para o texto mascarado. Só zeros ou nada: '' (campo vazio, sem valor).
+export function mascararReais(texto) {
+  const digitos = String(texto ?? '').replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_DIGITOS_REAIS);
+  if (digitos === '') return '';
+  const cheio = digitos.padStart(3, '0');
+  const inteira = cheio.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${inteira},${cheio.slice(-2)}`;
+}
+
+// O valor (em reais) de um texto já mascarado; null se vazio ou fora do formato.
+export function valorDosReais(texto) {
+  return REGEX_REAIS.test(texto ?? '') ? Number(texto.replace(/\./g, '').replace(',', '.')) : null;
+}
+
 // "21 anos e 3 meses", "1 ano", "8 meses". null = além do horizonte de 50 anos da projeção.
 export function formatarDuracao(meses) {
   if (meses === null || meses === undefined) return 'mais de 50 anos';
