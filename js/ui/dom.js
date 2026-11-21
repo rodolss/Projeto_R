@@ -108,7 +108,19 @@ export function campoTag({ rotulo, placeholder, valor = '', tags = [], juntas = 
     }
     baloes.replaceChildren(...lista);
   };
-  input.addEventListener('input', () => { criada = null; desenhar(); aoMudar(nomeDaEtiqueta(tags, input.value, juntas)); });
+  // Os acentos se corrigem no campo quando a palavra termina (espaço) e ao sair dele; o nome final já vai corrigido sempre.
+  const corrigirNoCampo = () => {
+    const certo = nomeDaEtiqueta(tags, input.value, juntas);
+    if (certo === input.value.trim().replace(/\s+/g, ' ')) return;
+    input.value = certo + (/\s$/.test(input.value) ? ' ' : '');
+  };
+  input.addEventListener('input', (e) => {
+    criada = null;
+    if (/\s$/.test(input.value) && input.selectionStart === input.value.length && e.inputType !== 'deleteContentBackward') corrigirNoCampo();
+    desenhar();
+    aoMudar(nomeDaEtiqueta(tags, input.value, juntas));
+  });
+  input.addEventListener('blur', () => { corrigirNoCampo(); desenhar(); });
   desenhar();
   const campo = h('div', { class: 'campo' },
     h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, rotulo), input),

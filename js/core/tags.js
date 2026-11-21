@@ -2,7 +2,9 @@
 // nome é uma etiqueta, menos as de ligação: "Ração da Nami" tem duas, "Ração" e "Nami". As expressões da lista de
 // "etiquetas compostas" ("Pão de Queijo") valem como uma etiqueta só. Ao digitar, as que já existem aparecem como
 // balões; se nenhuma é igual, nasce uma nova. Com uma grafia só por etiqueta ("Nami" e "nami" são a mesma), dá para
-// somar depois quanto se gastou com cada coisa. As etiquetas saem do nome: nada a migrar.
+// somar depois quanto se gastou com cada coisa. As etiquetas saem do nome: nada a migrar. Palavras sem acento que o app
+// conhece são corrigidas ("aviao" → "avião", ortografia.js).
+import { corrigirPalavra } from './ortografia.js';
 
 export const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
 
@@ -72,7 +74,7 @@ export function tagsDoNome(nome, juntas = []) {
   for (let i = 0; i < palavras.length;) {
     const achada = casaCom(frases, chaves, i);
     if (achada) { saida.push(achada.texto); i += achada.chaves.length; continue; }
-    if (!ehLigacao(palavras[i])) saida.push(palavras[i]);
+    if (!ehLigacao(palavras[i])) saida.push(corrigirPalavra(palavras[i]));
     i++;
   }
   return etiquetasUnicas(saida);
@@ -94,7 +96,7 @@ export function opcoesDeTag(tags, texto, limite = 5) {
   const resto = todas.filter((n) => n !== exata);
   const comeca = resto.filter((n) => chaveDaTag(n).startsWith(chave));
   const meio = resto.filter((n) => !chaveDaTag(n).startsWith(chave) && chaveDaTag(n).includes(chave));
-  return { achadas: [...(exata ? [exata] : []), ...comeca, ...meio].slice(0, limite), exata, nova: exata || ehLigacao(trecho) || trecho.includes(' ') ? null : trecho }; // expressão nova: só pela lista dos Ajustes
+  return { achadas: [...(exata ? [exata] : []), ...comeca, ...meio].slice(0, limite), exata, nova: exata || ehLigacao(trecho) || trecho.includes(' ') ? null : corrigirPalavra(trecho) }; // expressão nova: só pela lista dos Ajustes
 }
 
 // O trecho que está sendo digitado e o que vem antes dele. Em geral é a última palavra (se o texto não termina em
@@ -134,7 +136,9 @@ export function nomeDaEtiqueta(tags, texto, juntas = []) {
     }
     const palavra = limpar(tokens[i]);
     const existente = palavra && !ehLigacao(palavra) ? porChave.get(chaveDaTag(palavra)) : null;
-    saida.push(existente ? tokens[i].replace(palavra, existente) : tokens[i]);
+    // A etiqueta que já existe manda na grafia; senão, a palavra com os acentos corrigidos.
+    const certa = palavra && !ehLigacao(palavra) ? corrigirPalavra(existente ?? palavra) : palavra;
+    saida.push(certa && certa !== palavra ? tokens[i].replace(palavra, certa) : tokens[i]);
     i++;
   }
   return saida.join(' ');
