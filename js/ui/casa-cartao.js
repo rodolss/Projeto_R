@@ -8,6 +8,7 @@ import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
 import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js';
+import { estaPago, marcarPago, marcaDoCartao, tudoPago } from '../core/pagamentos.js';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
   anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
@@ -350,10 +351,11 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     aberta: h('span', { class: 'suave pequeno' }, `Aberta até ${dataCurta(periodo.ate)}`),
     futura: h('span', { class: 'suave pequeno' }, `Começa em ${dataCurta(periodo.de)}`),
   }[situacao];
+  const pago = estaPago(casa, fatura, marcaDoCartao(cfg.id));
   const total = cartao(
     h('div', { class: 'rotulo' }, `Cartão de ${dona?.nome ?? '—'}`),
     h('div', { class: 'valor-grande' }, formatarBRL(f.total)),
-    h('div', { style: 'margin-top:4px' }, selo));
+    h('div', { style: 'margin-top:4px' }, selo, pago && ' ', pago && h('span', { class: 'selo ok' }, 'Paga ✓')));
 
   // ---------- de quem é ----------
   // A Casa leva às contas da casa; as outras pessoas (e a dona) mostram o total, quanto já tem e quanto falta.
@@ -407,6 +409,19 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     }, { secundario: true })),
     h('p', { class: 'nota' }, 'Use quando a fatura fechar e o total bater com o app do banco.'));
 
+  // ---------- pago ----------
+  // "Já paguei" (desenho 2026-11-21-ja-paguei): a marca é da casa (vale para os dois) e aparece como "Pago" no Balanço.
+  const botaoPago = temItens && h('div', { class: 'cartao-conferir' },
+    h('div', { class: 'botoes' }, botao(pago ? 'Fatura paga ✓ (desfazer)' : 'Pago', async (e) => {
+      e.currentTarget.disabled = true;
+      const nova = marcarPago(casa, { mes: fatura, marca: marcaDoCartao(cfg.id), pago: !pago });
+      await ctx.salvarCasa((c) => marcarPago(c, { mes: fatura, marca: marcaDoCartao(cfg.id), pago: !pago }));
+      const tudo = !pago && cfg.donaId && tudoPago(nova, fatura, cfg.donaId);
+      ctx.aviso(pago ? 'Marca de pago tirada.' : tudo ? `Tudo pago em ${nomeDoMes(fatura)}!` : 'Fatura marcada como paga.', 'ok', 3000);
+      ctx.rerender();
+    }, { secundario: pago })),
+    !pago && h('p', { class: 'nota' }, 'Use depois de pagar a fatura: o Balanço mostra como paga.'));
+
   // ---------- cofrinho ----------
   const cofrinho = cofrinhoDoCartao(casa, cfg.id, hoje);
   const botaoCofrinho = cofrinho && botaoDoCofrinho({
@@ -432,7 +447,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
     }));
   } else {
-    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, outroCartao()].filter(Boolean));
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao()].filter(Boolean));
   }
 
   // ---------- folhas ----------

@@ -1,4 +1,4 @@
-// O switch "já paguei" (desenho 2026-11-21-ja-paguei), usado no Mês da casa (contas) e no Balanço (cartões): muda na
+// O switch "já paguei" (desenho 2026-11-21-ja-paguei) das contas do Mês da casa: muda na
 // hora e grava em segundo plano (não espera o GitHub; se falhar, volta com um aviso). Quando o último item do mês é
 // marcado, abre o mês seguinte. `irPara(mês)` leva à tela do mês; `visto` é o perfil de quem marca.
 import { h } from './dom.js';
@@ -11,7 +11,7 @@ export function criarMarcador({ ctx, casa, mes, visto, irPara }) {
   // `marca`: o id que se grava; `rotulo`: o nome para leitores de tela; `botaoLinha`: a linha que ganha o switch.
   return function comPago(marca, rotulo, botaoLinha) {
     if (!visto) return botaoLinha;
-    let pago = estaPago(casa, mes, visto.id, marca);
+    let pago = estaPago(casa, mes, marca);
     const linhaPaga = h('div', { class: 'linha-paga' });
     const chave = h('button', { type: 'button', class: 'sw-pago', role: 'switch', 'aria-label': `Já paguei: ${rotulo}` }, h('span', { class: 'sw-trilho', 'aria-hidden': 'true' }));
     const mostrar = () => {
@@ -22,7 +22,7 @@ export function criarMarcador({ ctx, casa, mes, visto, irPara }) {
       const antes = pago;
       pago = !pago;
       mostrar();
-      const grava = (c) => marcarPago(c, { mes, pessoaId: visto.id, contaId: marca, pago });
+      const grava = (c) => marcarPago(c, { mes, marca, pago });
       casaAgora = grava(casaAgora);
       const acabou = pago && tudoPago(casaAgora, mes, visto.id);
       ctx.salvarCasa(grava).catch((erro) => {

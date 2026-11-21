@@ -1,44 +1,45 @@
-// "Já paguei" (desenho 2026-11-21-ja-paguei): cada pessoa marca, mês a mês, as contas que já pagou (água, luz, a
-// fatura do cartão... — o cartão é uma conta). Fica no topo do casa.json, `pagos[mês][pessoa][conta] = true`, fora
-// de `meses` (um app antigo que regrava o mês não o apaga). Quando tudo do mês está pago, a tela abre no mês seguinte.
+// "Já paguei" (desenho 2026-11-21-ja-paguei): as contas e as faturas de cartão pagas em cada mês. A marca é da casa:
+// quem marcar (eu ou a outra pessoa), vale para os dois. Fica no topo do casa.json, `pagamentos[mês][marca] = true`,
+// fora de `meses` (um app antigo que regrava o mês não o apaga). Quando tudo do mês está pago, a tela abre no seguinte.
 import { resumoDoMes } from './casa.js';
 import { faturaDoCartao } from './cartao.js';
 import { somarMeses } from './meses.js';
 
-export const estaPago = (casa, mes, pessoaId, contaId) => Boolean(casa?.pagos?.[mes]?.[pessoaId]?.[contaId]);
+export const estaPago = (casa, mes, marca) => Boolean(casa?.pagamentos?.[mes]?.[marca]);
 
-export function marcarPago(casa, { mes, pessoaId, contaId, pago }) {
-  const { pagos = {}, ...resto } = casa;
-  const { [mes]: doMes = {}, ...outrosMeses } = pagos;
-  const { [pessoaId]: daPessoa = {}, ...outrasPessoas } = doMes;
-  const { [contaId]: _antes, ...outrasContas } = daPessoa;
-  const contas = pago ? { ...outrasContas, [contaId]: true } : outrasContas;
-  const novoDoMes = Object.keys(contas).length ? { ...outrasPessoas, [pessoaId]: contas } : outrasPessoas;
-  const novos = Object.keys(novoDoMes).length ? { ...outrosMeses, [mes]: novoDoMes } : outrosMeses;
-  return Object.keys(novos).length ? { ...resto, pagos: novos } : resto;
+export function marcarPago(casa, { mes, marca, pago }) {
+  const { pagamentos = {}, ...resto } = casa;
+  const { [mes]: doMes = {}, ...outrosMeses } = pagamentos;
+  const { [marca]: _antes, ...outras } = doMes;
+  const marcas = pago ? { ...outras, [marca]: true } : outras;
+  const novos = Object.keys(marcas).length ? { ...outrosMeses, [mes]: marcas } : outrosMeses;
+  return Object.keys(novos).length ? { ...resto, pagamentos: novos } : resto;
 }
 
-// O que se paga com a marca: o id de uma conta; o cartão de quem paga tem a marca própria (a fatura inteira), e a conta
-// ligada a ele usa a mesma marca (é a mesma fatura). Cartão de outra pessoa: a conta comum (a parte da casa).
+// A marca de uma fatura de cartão (o botão "Pago" da tela Cartão). A conta ligada ao cartão de quem vê é a mesma fatura
+// (mesma marca); um cartão de outra pessoa entra como conta comum (a parte da casa).
 export const marcaDoCartao = (cartaoId) => `cartao-${cartaoId}`;
 export function marcaDaConta(casa, contaId, pessoaId) {
   const dele = (casa.cartoes ?? []).find((c) => c.contaId === contaId && c.donaId === pessoaId);
   return dele ? marcaDoCartao(dele.id) : contaId;
 }
 
-// O que há para pagar no mês: as contas com valor e a fatura de cada cartão da pessoa (com compras), sem repetir.
-function marcasDoMes(casa, mes, pessoaId) {
-  const marcas = resumoDoMes(casa, mes).contas.map((c) => marcaDaConta(casa, c.conta.id, pessoaId));
-  for (const cartao of casa.cartoes ?? []) {
-    if (cartao.donaId === pessoaId && faturaDoCartao(casa, cartao.id, mes).total > 0) marcas.push(marcaDoCartao(cartao.id));
-  }
-  return [...new Set(marcas)];
+// As contas com valor no mês, como marcas (sem repetir).
+const marcasDasContas = (casa, mes, pessoaId) => [...new Set(resumoDoMes(casa, mes).contas.map((c) => marcaDaConta(casa, c.conta.id, pessoaId)))];
+// A fatura de cada cartão da pessoa, se tiver compras no mês.
+const marcasDosCartoes = (casa, mes, pessoaId) => (casa.cartoes ?? [])
+  .filter((c) => c.donaId === pessoaId && faturaDoCartao(casa, c.id, mes).total > 0).map((c) => marcaDoCartao(c.id));
+
+// Todas as contas do mês pagas (o selo "Pago" das contas da casa no Balanço). Sem contas: não.
+export function contasPagas(casa, mes, pessoaId) {
+  const marcas = marcasDasContas(casa, mes, pessoaId);
+  return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
-// Mês sem nada para pagar não conta como pago.
+// Tudo pago: contas e cartões da pessoa. Mês sem nada para pagar não conta como pago.
 export function tudoPago(casa, mes, pessoaId) {
-  const marcas = marcasDoMes(casa, mes, pessoaId);
-  return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, pessoaId, m));
+  const marcas = [...new Set([...marcasDasContas(casa, mes, pessoaId), ...marcasDosCartoes(casa, mes, pessoaId)])];
+  return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
 // O mês que a tela abre: o atual, ou o seguinte (e o seguinte...) enquanto tudo já estiver pago. Sem perfil, o atual.
