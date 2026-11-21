@@ -199,7 +199,7 @@ function desenharMes(container, ctx) {
       r.total > 0 && h('div', { class: 'parte-das-contas' }, `${formatarPct(p.paga / r.total, 0)} das contas`),
       h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`),
       h('div', { class: 'suave pequeno dica-copiar' }, 'Toque para copiar')))),
-      h('p', { class: 'nota' }, `Quem ganha mais paga mais: cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),
+      h('p', { class: 'nota' }, `Cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),
     ]
     : [aviso('info', perfilVisto ? 'Preencha o salário de cada um no Balanço para o app dividir as contas.' : 'Preencha os salários lá embaixo para o app dividir as contas.')];
 
