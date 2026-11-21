@@ -1,7 +1,7 @@
 // Contas da casa · Mês (desenho de 2026-11-19): total das contas, quanto cada um paga e quanto sobra,
 // a lista das contas e os salários. Tocar num valor abre uma folha com um campo só (#/casa?mes=…&folha=…);
 // o voltar do celular fecha a folha. Feita para quem tem receio de coisas complicadas: pouco texto, nada de jargão.
-import { h, campoMoeda, cartao, botao, aviso, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
+import { h, campoMoeda, cartao, botao, aviso, copiarTexto, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
@@ -179,10 +179,18 @@ function desenharMes(container, ctx) {
     textoDaMedia && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia));
   const divisao = r.divide
     ? [
-      h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('section', { class: 'cartao casa-pessoa' },
-        h('div', { class: 'rotulo' }, `${p.pessoa.nome} paga`),
-        h('div', { class: 'valor' }, formatarBRL(p.paga)),
-        h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`)))),
+      // Tocar no quanto cada um paga copia o valor (só os números, como "1234,56") para colar no app do banco.
+      h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('button', {
+        type: 'button', class: 'cartao casa-pessoa copiavel', 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
+        onclick: async () => {
+          const ok = await copiarTexto(p.paga.toFixed(2).replace('.', ','));
+          ctx.aviso(ok ? `Copiado: ${formatarBRL(p.paga)}` : 'Não deu para copiar neste aparelho.', ok ? 'ok' : 'atencao', 2500);
+        },
+      },
+      h('div', { class: 'rotulo' }, `${p.pessoa.nome} paga`),
+      h('div', { class: 'valor' }, formatarBRL(p.paga)),
+      h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`),
+      h('div', { class: 'suave pequeno dica-copiar' }, 'Toque para copiar')))),
       h('p', { class: 'nota' }, `Quem ganha mais paga mais: cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),
     ]
     : [aviso('info', 'Preencha os salários lá embaixo para o app dividir as contas.')];

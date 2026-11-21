@@ -353,6 +353,9 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-pessoas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .casa-pessoa { padding: 14px; min-width: 0; }
 .casa-pessoa .rotulo { overflow-wrap: anywhere; }
+.casa-pessoa.copiavel { text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
+.casa-pessoa.copiavel:active { background: var(--cartao-2); }
+.dica-copiar { margin-top: 4px; }
 .casa-lista { padding: 0; overflow: hidden; }
 .casa-lista > h2 { padding: 14px 16px 6px; margin: 0; }
 .titulo-com-soma { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
