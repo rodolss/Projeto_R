@@ -20,3 +20,15 @@ perguntas.
   - "+ Adicionar conta": a mesma folha, vazia.
 - **Contas paradas** numa linha recolhida ("Contas que não usa mais (2)"), cada uma com "Voltar a usar".
 - **"Como a divisão funciona"** vira uma nota curta no fim da gaveta. Versão do site 62.
+
+## Depois (versão 63, pedido do usuário: "pode aplicar em cartões e compras")
+
+A gaveta **Cartões e compras** no mesmo padrão:
+- **Cartão(ões):** uma linha por cartão ("Cartão de Ana · vira dia 3 · vence dia 10"); tocar abre a folha com os dois
+  dias (Cancelar | Salvar) e "Tirar este cartão" (dois toques; com compras anotadas, uma nota explica que ele fica).
+  A última linha é "+ Adicionar outro cartão" (ou "Configurar o cartão", sem nenhum).
+- **Para quem também compro** (as outras pessoas): uma linha por pessoa; a folha tem o nome e "Não compro mais para
+  {nome}" (dois toques). Uma nota lembra que se acrescenta alguém com "+ Outra pessoa" ao anotar uma compra; as que
+  saíram ficam recolhidas, com "Voltar a usar".
+- **Etiquetas:** uma linha só, "Palavras que andam juntas" (antes "Etiquetas compostas"), com exemplo; a folha tem a
+  explicação, as expressões da casa (Tirar), o campo para acrescentar e as do app recolhidas.
