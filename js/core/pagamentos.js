@@ -26,6 +26,7 @@ const tirarReaberto = (casa, mes) => {
   return Object.keys(outros).length ? { ...resto, reabertos: outros } : resto;
 };
 export const reabrirMes = (casa, mes) => ({ ...casa, reabertos: { ...(casa.reabertos ?? {}), [mes]: true } });
+export const fecharMes = tirarReaberto; // o cadeado da tela Contas: tudo pago e reaberto volta a fechar
 
 // A marca de uma fatura de cartão (o botão "Pago" da tela Cartão). A conta da casa ligada a um cartão é a mesma fatura:
 // tem a mesma marca para qualquer pessoa (marcou a dona, a outra pessoa também vê pago).
