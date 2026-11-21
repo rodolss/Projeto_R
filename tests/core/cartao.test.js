@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
-  adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao,
+  adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao, donaDaPessoa, pessoasDe,
   editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
@@ -486,4 +486,32 @@ test('apagar de todo mês: some a série inteira; inicioDaFixa diz onde ela come
   const sem = apagarFixa(casa, { cartaoId: K, fixaId: 'f2' }); // pelo trecho novo: apaga os dois
   assert.deepEqual(sem.cartoes[0].fixas.map((f) => f.id), ['f9']); // a outra fixa fica
   assert.equal(apagarFixa(casa, { cartaoId: K, fixaId: 'nao' }), casa);
+});
+
+test('para quem de cada um: a outra pessoa é de quem compra para ela; o Pai dela não aparece no cartão dele', () => {
+  let casa = casaBase({ cartoes: [
+    { id: K, contaId: K, donaId: 'p2', viraNoDia: 3, venceNoDia: 10, fixas: [] },
+    { id: 'c9', contaId: 'c9', donaId: 'p1', viraNoDia: 3, venceNoDia: 10, fixas: [] },
+  ] });
+  casa = { ...casa, contas: [...casa.contas, { id: 'c9', nome: 'Cartão Ana', compraPorCompra: true, arquivada: false }] };
+  const tem = (cartaoId, id) => opcoesPara(casa, cartaoId).some((o) => o.id === id);
+  // A Mãe (antiga, sem dona) ainda sem compra: vale para os dois cartões.
+  assert.ok(tem(K, 'q1') && tem('c9', 'q1'));
+  // O Leo compra para a Mãe: ela passa a ser dele, e some do cartão da Ana.
+  casa = anotarCompra(casa, { cartaoId: K, data: '2026-11-19', nome: 'Remédio', valor: 30, para: 'q1', novoId: () => 'x1' });
+  assert.equal(donaDaPessoa(casa, casa.outrasPessoas[0]), 'p2');
+  assert.ok(tem(K, 'q1'));
+  assert.equal(tem('c9', 'q1'), false);
+  // A Ana cria o Pai no cartão dela: só aparece para ela.
+  casa = adicionarPessoaDoCartao(casa, { nome: 'Pai', donaId: 'p1', novoId: () => 'q2' }).casa;
+  assert.ok(tem('c9', 'q2'));
+  assert.equal(tem(K, 'q2'), false);
+  assert.deepEqual(pessoasDe(casa, 'p1').map((p) => p.id), ['q2']);
+  // O Leo cria um "pai" no dele: é outra pessoa; "PAI" de novo no da Ana é o mesmo dela.
+  const doLeo = adicionarPessoaDoCartao(casa, { nome: 'pai', donaId: 'p2', novoId: () => 'q3' });
+  assert.equal(doLeo.id, 'q3');
+  assert.equal(adicionarPessoaDoCartao(doLeo.casa, { nome: 'PAI', donaId: 'p1', novoId: () => 'nao' }).id, 'q2');
+  // O nome de qualquer "para quem" continua aparecendo nas compras antigas.
+  assert.equal(nomeDoPara(doLeo.casa, 'q2'), 'Pai');
+  assert.equal(nomeDoPara(doLeo.casa, 'q3'), 'pai');
 });
