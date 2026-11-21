@@ -11,6 +11,8 @@ import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER }
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
+import { criarMarcador } from './pago.js';
+import { marcaDoCartao } from '../core/pagamentos.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
@@ -168,6 +170,7 @@ function desenhar(container, ctx) {
       : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'),
     editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.'));
 
+  const comPago = criarMarcador({ ctx, casa, mes, visto: visto && pessoaId === visto.id ? visto : null, irPara });
   const c = b.contas;
   const linhasSaiu = [
     c && linha({
@@ -177,7 +180,7 @@ function desenhar(container, ctx) {
       valor: c.valor == null ? '—' : formatarBRL(c.valor),
       aoTocar: irAoMes,
     }),
-    ...b.cartoes.map((k) => linha({
+    ...b.cartoes.map((k) => comPago(marcaDoCartao(k.cartaoId), k.nome, linha({
       titulo: k.nome,
       // A fatura do mês (a mesma do Cartão); o vencimento diz o dia.
       detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ',
@@ -186,7 +189,7 @@ function desenhar(container, ctx) {
         k.adiantado > 0 && ` + ${formatarBRL(k.adiantado)} que ainda faltam te devolverem`],
       valor: formatarBRL(k.seu + k.adiantado),
       aoTocar: irAoCartao(k),
-    })),
+    }))),
   ].filter(Boolean);
   const temParteDaCasa = b.cartoes.some((k) => k.daCasa > 0);
   const saiu = h('section', { class: 'cartao casa-lista' },
