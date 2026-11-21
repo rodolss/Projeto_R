@@ -10,6 +10,7 @@ import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
 import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS, visaoUnica, mostraTopo } from './ui/rotas.js';
 import { escalonar } from './ui/movimento.js';
+import { enfeitar } from './ui/enfeite.js';
 import { noApp, reagendar, lerConfig, agoraLocal, enviarAoApp } from './ui/nativo.js';
 import { iniciarAtualizacao } from './ui/atualizacao.js';
 import { VERSAO } from './versao.js';
@@ -280,6 +281,7 @@ async function renderizar() {
     if (nome === telaDesenhada && modulo.atualizar) {
       tela.classList.add('sem-entrada');
       modulo.atualizar(tela, contexto());
+      enfeitar(tela);
       return;
     }
     esconderFolha();
@@ -287,6 +289,7 @@ async function renderizar() {
     tela.replaceChildren();
     modulo.render(tela, contexto());
     escalonar(tela);
+    enfeitar(tela, { abriu: true }); // ícones dos títulos e os valores do cartão herói contando
     window.scrollTo(0, 0);
     telaDesenhada = nome;
   } catch (erro) {

@@ -21,6 +21,8 @@ import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
 import { graficoDasEtiquetas } from './casa-etiquetas.js';
+import { categoriaDe } from '../core/categorias.js';
+import { iconeCategoria } from './icones.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -368,6 +370,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('div', { class: 'rotulo' }, `Cartão de ${dona?.nome ?? '—'}`),
     h('div', { class: 'valor-grande' }, formatarBRL(f.total)),
     h('div', { style: 'margin-top:4px' }, selo, pago && ' ', pago && h('span', { class: 'selo ok' }, 'Paga ✓')));
+  total.classList.add('heroi'); // o número principal da tela: cartão em degradê (facelift)
 
   // ---------- de quem é ----------
   // A Casa leva às contas da casa; as outras pessoas (e a dona) mostram o total, quanto já tem e quanto falta.
@@ -391,7 +394,9 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('div', {}, ...f.porPessoa.map(linhaPessoa)));
 
   // ---------- compras ----------
-  const linhaItem = ({ titulo, detalhe, valor, jaTenho, aoTocar }) => h('button', { type: 'button', class: 'casa-linha', onclick: aoTocar },
+  // O selo colorido conforme o nome (mercado, farmácia, assinatura...): só enfeite, nada de conta depende dele.
+  const linhaItem = ({ titulo, detalhe, valor, jaTenho, aoTocar, padrao = 'sacola' }) => h('button', { type: 'button', class: 'casa-linha', onclick: aoTocar },
+    iconeCategoria(categoriaDe(titulo), padrao),
     h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe, jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
     h('span', { class: 'quanto' }, formatarBRL(valor)),
     h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
@@ -410,7 +415,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     // A soma das assinaturas e contas fixas desta fatura, ao lado do título: quanto vai todo mês de cara.
     h('h2', { class: 'titulo-com-soma' }, 'Todo mês', h('span', { class: 'soma-fixas', title: 'Soma de tudo que se repete todo mês neste cartão' }, formatarBRL(Math.round(f.fixas.reduce((t, x) => t + x.valor, 0) * 100) / 100))),
     h('div', {}, ...f.fixas.map((x) => linhaItem({
-      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, aoTocar: () => (travado ? avisarTravado() : abrir(`fixa-${x.id}`)),
+      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, padrao: 'repetir', aoTocar: () => (travado ? avisarTravado() : abrir(`fixa-${x.id}`)),
     }))));
 
   const conferir = temItens && !f.conferida && !travado && h('div', { class: 'cartao-conferir' },

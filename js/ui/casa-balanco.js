@@ -13,6 +13,7 @@ import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
 import { estaPago, marcaDoCartao, contasPagas } from '../core/pagamentos.js';
 import { travaDoMes } from './fechado.js';
+import { iconeCategoria } from './icones.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
@@ -131,11 +132,13 @@ function desenhar(container, ctx) {
     h('div', { style: 'margin-top:6px' }, b.previsao
       ? h('span', { class: 'selo' }, 'Previsão: ainda pode mudar')
       : h('span', { class: 'selo ok' }, 'Tudo confirmado ✓')));
+  sobra.classList.add('heroi'); // o número principal da tela: cartão em degradê (facelift)
 
   // ---------- listas ----------
-  const linha = ({ titulo, detalhe, valor, aoTocar }) => h(aoTocar ? 'button' : 'div', {
+  const linha = ({ titulo, detalhe, valor, aoTocar, cat = null }) => h(aoTocar ? 'button' : 'div', {
     type: aoTocar ? 'button' : null, class: `casa-linha${aoTocar ? '' : ' estatica'}`, onclick: aoTocar,
   },
+  cat && iconeCategoria(cat),
   h('span', { class: 'texto' }, h('b', {}, titulo), detalhe && h('small', {}, ...[detalhe].flat())),
   h('span', { class: 'quanto' }, valor),
   aoTocar && h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
@@ -162,14 +165,14 @@ function desenhar(container, ctx) {
     s
       ? h('div', {},
         linha({
-          titulo: 'Salário',
+          titulo: 'Salário', cat: 'salario',
           detalhe: s.situacao === 'a-confirmar' ? [selo('a confirmar'), ` igual a ${quando(s.deOnde, mes)}`]
             : s.situacao === 'vazio' ? (editavel && !trava.travado ? 'Toque para digitar' : 'Falta preencher no Mês') : null,
           valor: s.situacao === 'vazio' ? '—' : formatarBRL(s.valor),
           aoTocar: editavel ? (trava.travado ? trava.avisarTravado : abrirSalario) : irAoMes,
         }),
         s.extra > 0 && linha({
-          titulo: 'A mais neste mês', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? (trava.travado ? trava.avisarTravado : abrirSalario) : null,
+          titulo: 'A mais neste mês', cat: 'extra', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? (trava.travado ? trava.avisarTravado : abrirSalario) : null,
         }))
       : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'),
     editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, ctx.unica ? 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.' : 'Seu salário se digita só aqui: ele vale para as contas da casa e para o seu balanço.'));
@@ -177,14 +180,14 @@ function desenhar(container, ctx) {
   const c = b.contas;
   const linhasSaiu = [
     c && linha({
-      titulo: 'Contas da casa',
+      titulo: 'Contas da casa', cat: 'casa',
       detalhe: c.valor == null ? 'Faltam os salários deste mês para dividir as contas.'
         : [contasPagas(casa, mes, pessoaId) && seloPago(), ' ', c.aConfirmar && selo('a confirmar'), c.aConfirmar && ' ', `sua parte do total de ${formatarBRL(c.total)} (${formatarPct(c.fatia, 0)} do salário)`],
       valor: c.valor == null ? '—' : formatarBRL(c.valor),
       aoTocar: irAoMes,
     }),
     ...b.cartoes.map((k) => linha({
-      titulo: k.nome,
+      titulo: k.nome, cat: 'cartao',
       // A fatura do mês (a mesma do Cartão); o vencimento diz o dia.
       detalhe: [estaPago(casa, mes, marcaDoCartao(k.cartaoId)) && seloPago(), ' ', k.aberta && selo('fatura aberta'), k.aberta && ' ',
         k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`,
@@ -204,7 +207,7 @@ function desenhar(container, ctx) {
   const outras = comOutras.length > 0 && h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Para outras pessoas'),
     h('div', {}, ...comOutras.map((k) => linha({
-      titulo: b.cartoes.length > 1 ? `No ${k.nome}` : 'No seu cartão',
+      titulo: b.cartoes.length > 1 ? `No ${k.nome}` : 'No seu cartão', cat: 'presente',
       detalhe: k.outras.falta <= 0 ? 'Já tenho tudo ✓' : `Já tenho ${formatarBRL(k.outras.jaTenho)} · falta ${formatarBRL(k.outras.falta)}`,
       valor: formatarBRL(k.outras.valor),
       aoTocar: irAoCartao(k),

@@ -3,6 +3,8 @@
 // o voltar do celular fecha a folha. Feita para quem tem receio de coisas complicadas: pouco texto, nada de jargão.
 import { h, campoMoeda, campoTag, cartao, botao, aviso, copiarTexto, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
 import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
+import { categoriaDaConta } from '../core/categorias.js';
+import { icone, iconeCategoria } from './icones.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
@@ -178,16 +180,20 @@ function desenharMes(container, ctx) {
     h('div', { style: 'margin-top:4px' }, situacaoTotal),
     quitado && h('div', { style: 'margin-top:8px' }, h('span', { class: 'selo ok' }, 'Tudo pago ✓')),
     textoDaMedia && h('p', { class: 'suave pequeno', style: 'margin:8px 0 0' }, textoDaMedia));
+  total.classList.add('heroi'); // o número principal da tela: cartão em degradê (facelift)
   const divisao = r.divide
     ? [
       // Tocar no quanto cada um paga copia o valor (só os números, como "1234,56") para colar no app do banco.
       h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('button', {
         type: 'button', class: 'cartao casa-pessoa copiavel', 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
-        onclick: async () => {
+        onclick: async (e) => {
+          const cartaoPessoa = e.currentTarget;
           const ok = await copiarTexto(p.paga.toFixed(2).replace('.', ','));
+          if (ok) { cartaoPessoa.classList.add('copiado'); setTimeout(() => cartaoPessoa.classList.remove('copiado'), 1400); }
           ctx.aviso(ok ? `Copiado: ${formatarBRL(p.paga)}` : 'Não deu para copiar neste aparelho.', ok ? 'ok' : 'atencao', 2500);
         },
       },
+      h('span', { class: 'copiar-icone', 'aria-hidden': 'true' }, icone('copiar')),
       h('div', { class: 'rotulo' }, `${p.pessoa.nome} paga`),
       h('div', { class: 'valor' }, formatarBRL(p.paga)),
       h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`),
@@ -197,9 +203,10 @@ function desenharMes(container, ctx) {
     : [aviso('info', perfilVisto ? 'Preencha o salário de cada um no Balanço para o app dividir as contas.' : 'Preencha os salários lá embaixo para o app dividir as contas.')];
 
   // ---------- listas ----------
-  const linha = ({ titulo, detalhe, valor, aConfirmar, aoTocar, vazio = false }) => h('button', {
+  const linha = ({ titulo, detalhe, valor, aConfirmar, aoTocar, vazio = false, cat = null }) => h('button', {
     type: 'button', class: `casa-linha${aConfirmar ? ' a-confirmar' : ''}${vazio ? ' vazio' : ''}`, onclick: aoTocar,
   },
+  cat && iconeCategoria(cat),
   h('span', { class: 'texto' }, h('b', {}, titulo), detalhe && h('small', {}, ...[detalhe].flat())),
   h('span', { class: 'quanto' }, valor),
   h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
@@ -227,11 +234,11 @@ function desenharMes(container, ctx) {
   const linhasContas = r.contas.map((c) => linha({
     titulo: c.conta.nome,
     detalhe: pagaConta(c.conta) ? [h('span', { class: 'selo ok' }, 'Pago ✓'), ' ', ...[detalheConta(c)].flat()] : detalheConta(c),
-    valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
+    valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta), cat: categoriaDaConta(c.conta),
   }));
   const semValor = r.semValor.length
     ? (verSemValor
-      ? r.semValor.map((conta) => linha({ titulo: conta.nome, detalhe: 'sem valor neste mês', valor: '—', vazio: true, aoTocar: tocarConta(conta) }))
+      ? r.semValor.map((conta) => linha({ titulo: conta.nome, detalhe: 'sem valor neste mês', valor: '—', vazio: true, aoTocar: tocarConta(conta), cat: categoriaDaConta(conta) }))
       : [h('button', {
         type: 'button', class: 'botao-link casa-ver-mais',
         onclick: () => { verSemValor = true; ctx.rerender(); },
@@ -250,7 +257,7 @@ function desenharMes(container, ctx) {
       detalhe: p.situacaoSalario === 'a-confirmar' ? [h('span', { class: 'selo' }, 'a confirmar'), ' ', `igual a ${quando(p.deOnde, mes)}`]
         : p.situacaoSalario === 'vazio' ? 'Falta preencher' : null,
       valor: p.situacaoSalario === 'vazio' ? '—' : formatarBRL(p.salario),
-      aConfirmar: p.situacaoSalario === 'a-confirmar',
+      aConfirmar: p.situacaoSalario === 'a-confirmar', cat: 'salario',
       aoTocar: () => (fechado ? avisarTravado() : abrir(`salario-${p.pessoa.id}`)),
     }))));
 

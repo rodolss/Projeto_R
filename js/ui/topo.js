@@ -34,6 +34,15 @@ export async function reduzirFoto(arquivo, lado = 160) {
 
 let fecharMenuAberto = null;
 
+// A saudação do topo (facelift): "Boa noite, Ana" e o dia ("sábado, 21 de novembro").
+export function saudacao(nome, agora = new Date()) {
+  const hora = agora.getHours();
+  const oi = hora >= 5 && hora < 12 ? 'Bom dia' : hora >= 12 && hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const longa = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dia = longa[0].toUpperCase() + longa.slice(1); // "Sábado, 21 de novembro" (só a primeira letra)
+  return { oi: nome ? `${oi}, ${String(nome).trim().split(/\s+/)[0]}` : oi, dia };
+}
+
 export function desenharTopo(el, ctx) {
   fecharMenuAberto?.();
   const { visto, vinculado, admin, perfis } = ctx.perfil ?? {};
@@ -44,7 +53,8 @@ export function desenharTopo(el, ctx) {
   }
   el.hidden = false;
   const botao = h('button', { type: 'button', class: 'avatar-botao', 'aria-label': `Perfil de ${visto.nome}`, 'aria-haspopup': 'true' }, avatar(visto));
-  el.replaceChildren(botao);
+  const { oi, dia } = saudacao(visto.nome);
+  el.replaceChildren(h('div', { class: 'topo-saudacao' }, h('small', {}, dia), h('b', {}, oi)), botao);
 
   botao.addEventListener('click', (e) => {
     e.stopPropagation();

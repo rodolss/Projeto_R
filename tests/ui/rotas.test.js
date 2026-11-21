@@ -135,3 +135,15 @@ test('revisão: a foto do perfil aparece na casa e, na visão única, em todas a
   assert.equal(mostraTopo({ nome: 'inicio', daCasa: false, unica: false }), false);
   assert.equal(mostraTopo({ nome: 'boas-vindas', daCasa: false, unica: true }), false); // "Refazer mesmo assim"
 });
+
+test('facelift: a saudação do topo muda com a hora e a data só tem a primeira letra maiúscula', async () => {
+  globalThis.document ??= { createElement: () => ({ setAttribute() {}, append() {}, addEventListener() {} }) };
+  const { saudacao } = await import('../../js/ui/topo.js');
+  assert.equal(saudacao('Ana Maria', new Date(2026, 10, 21, 8)).oi, 'Bom dia, Ana');
+  assert.equal(saudacao('Leo', new Date(2026, 10, 21, 14)).oi, 'Boa tarde, Leo');
+  assert.equal(saudacao('Leo', new Date(2026, 10, 21, 22)).oi, 'Boa noite, Leo');
+  assert.equal(saudacao('Leo', new Date(2026, 10, 21, 3)).oi, 'Boa noite, Leo');
+  const { dia } = saudacao('Leo', new Date(2026, 10, 21, 10));
+  assert.match(dia, /^S/);
+  assert.match(dia, / de novembro$/);
+});
