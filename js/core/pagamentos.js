@@ -8,13 +8,24 @@ import { somarMeses } from './meses.js';
 export const estaPago = (casa, mes, marca) => Boolean(casa?.pagamentos?.[mes]?.[marca]);
 
 export function marcarPago(casa, { mes, marca, pago }) {
-  const { pagamentos = {}, ...resto } = casa;
+  // Marcar de novo como pago fecha outra vez um mês que estava reaberto.
+  const { pagamentos = {}, ...resto } = pago ? tirarReaberto(casa, mes) : casa;
   const { [mes]: doMes = {}, ...outrosMeses } = pagamentos;
   const { [marca]: _antes, ...outras } = doMes;
   const marcas = pago ? { ...outras, [marca]: true } : outras;
   const novos = Object.keys(marcas).length ? { ...outrosMeses, [mes]: marcas } : outrosMeses;
   return Object.keys(novos).length ? { ...resto, pagamentos: novos } : resto;
 }
+
+// Mês fechado (desenho 2026-11-21-mes-fechado): tudo pago (contas e cartões de quem vê) e não reaberto — não se edita
+// até reabrir. `reabertos[mês] = true` fica no topo do casa.json, junto de `pagamentos`.
+const tirarReaberto = (casa, mes) => {
+  if (!casa.reabertos?.[mes]) return casa;
+  const { [mes]: _, ...outros } = casa.reabertos;
+  const { reabertos: _velhos, ...resto } = casa;
+  return Object.keys(outros).length ? { ...resto, reabertos: outros } : resto;
+};
+export const reabrirMes = (casa, mes) => ({ ...casa, reabertos: { ...(casa.reabertos ?? {}), [mes]: true } });
 
 // A marca de uma fatura de cartão (o botão "Pago" da tela Cartão). A conta da casa ligada a um cartão é a mesma fatura:
 // tem a mesma marca para qualquer pessoa (marcou a dona, a outra pessoa também vê pago).
@@ -42,10 +53,12 @@ export function tudoPago(casa, mes, pessoaId) {
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
+export const mesFechado = (casa, mes, pessoaId) => Boolean(pessoaId) && !casa?.reabertos?.[mes] && tudoPago(casa, mes, pessoaId);
+
 // O mês que a tela abre: o atual, ou o seguinte (e o seguinte...) enquanto tudo já estiver pago. Sem perfil, o atual.
 export function mesEmFoco(casa, hoje, pessoaId) {
   const limite = somarMeses(hoje.slice(0, 7), 12);
   let mes = hoje.slice(0, 7);
-  while (pessoaId && mes < limite && tudoPago(casa, mes, pessoaId)) mes = somarMeses(mes, 1);
+  while (pessoaId && mes < limite && mesFechado(casa, mes, pessoaId)) mes = somarMeses(mes, 1);
   return mes;
 }

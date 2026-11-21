@@ -10,7 +10,8 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
-import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago } from '../core/pagamentos.js';
+import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago, mesFechado } from '../core/pagamentos.js';
+import { avisoMesFechado, AVISO_FECHADO } from './fechado.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
@@ -197,9 +198,11 @@ function desenharMes(container, ctx) {
     return compras;
   };
   const visto = ctx.perfil?.visto ?? null;
+  const fechado = mesFechado(casa, mes, visto?.id); // tudo pago: sem editar até reabrir (a folha da parte do cartão só mostra)
   // Conta ligada a um cartão: para todos, a folha com as compras da casa daquela fatura (desenho
   // 2026-11-20-detalhe-cartao-no-mes); quem vê o cartão abre o Cartão por ela. As outras: a folha da conta.
   const tocarConta = (conta) => () => {
+    if (fechado && aoTocarConta(casa, conta.id, visto) !== 'parte') { ctx.aviso(AVISO_FECHADO, 'info', 3000); return; }
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
@@ -234,11 +237,11 @@ function desenharMes(container, ctx) {
         : p.situacaoSalario === 'vazio' ? 'Falta preencher' : null,
       valor: p.situacaoSalario === 'vazio' ? '—' : formatarBRL(p.salario),
       aConfirmar: p.situacaoSalario === 'a-confirmar',
-      aoTocar: () => abrir(`salario-${p.pessoa.id}`),
+      aoTocar: () => (fechado ? ctx.aviso(AVISO_FECHADO, 'info', 3000) : abrir(`salario-${p.pessoa.id}`)),
     }))));
 
   container.replaceChildren(...[
-    cabecalho, voltarAoAtual, total, ...divisao, listaContas, listaSalarios,
+    cabecalho, voltarAoAtual, fechado && avisoMesFechado({ ctx, mes }), total, ...divisao, listaContas, listaSalarios,
   ].filter(Boolean));
 
   // ---------- folhas ----------
@@ -460,7 +463,8 @@ function desenharMes(container, ctx) {
   const [tipo, id] = aberta ? [aberta.split('-')[0], aberta.slice(aberta.indexOf('-') + 1)] : [];
   const conta = casa.contas.find((c) => c.id === id);
   const pessoa = casa.pessoas.find((p) => p.id === id);
-  const conteudo = tipo === 'parte' && conta && (casa.cartoes ?? []).some((c) => c.contaId === conta.id) ? folhaParte(conta)
+  const conteudo = fechado && tipo !== 'parte' ? null
+    : tipo === 'parte' && conta && (casa.cartoes ?? []).some((c) => c.contaId === conta.id) ? folhaParte(conta)
     : tipo === 'conta' && conta ? folhaConta(conta, aberta)
     : tipo === 'cartao' && conta ? folhaCartao(conta, aberta)
       : tipo === 'salario' && pessoa ? folhaSalario(pessoa, aberta) : null;

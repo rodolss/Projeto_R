@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { marcarPago, estaPago, tudoPago, contasPagas, mesEmFoco, marcaDaConta, marcaDoCartao } from '../../js/core/pagamentos.js';
+import { marcarPago, estaPago, tudoPago, contasPagas, mesEmFoco, marcaDaConta, marcaDoCartao, mesFechado, reabrirMes } from '../../js/core/pagamentos.js';
 import { migrarCasa, salvarValor } from '../../js/core/casa.js';
 import { anotarCompra } from '../../js/core/cartao.js';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
@@ -73,4 +73,18 @@ test('já paguei: marcas de dois aparelhos se juntam', () => {
   const base = casaBase();
   const r = mesclarCasa({ base, local: marcar(base, '2026-12', 'c1'), remoto: marcar(base, '2026-12', 'c2') });
   assert.deepEqual(r.pagamentos, { '2026-12': { c1: true, c2: true } });
+});
+
+test('mês fechado: tudo pago e não reaberto; reabrir libera; marcar pago de novo fecha outra vez', () => {
+  let casa = marcar(marcar(casaBase(), '2026-12', 'c1'), '2026-12', 'c2');
+  assert.equal(mesFechado(casa, '2026-12', 'p1'), true);
+  assert.equal(mesFechado(casa, '2026-12', null), false); // sem perfil: nunca fechado
+  assert.equal(mesFechado(casaBase(), '2026-12', 'p1'), false);
+  casa = reabrirMes(casa, '2026-12');
+  assert.equal(mesFechado(casa, '2026-12', 'p1'), false);
+  assert.equal(mesEmFoco(casa, '2026-12-10', 'p1'), '2026-12'); // reaberto: a tela volta a abrir nele
+  // Desmarcar e marcar de novo uma conta fecha de novo (a marca de reaberto sai).
+  casa = marcar(marcar(casa, '2026-12', 'c1', false), '2026-12', 'c1');
+  assert.equal('reabertos' in casa, false);
+  assert.equal(mesFechado(casa, '2026-12', 'p1'), true);
 });
