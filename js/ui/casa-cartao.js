@@ -400,6 +400,30 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     h('span', { class: 'texto' }, h('b', {}, titulo), h('small', {}, detalhe, jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
     h('span', { class: 'quanto' }, formatarBRL(valor)),
     h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
+  // Os itens agrupados por "De quem é" (na ordem dessa lista), cada grupo reduzido: nome, quantidade e subtotal; tocar abre.
+  function gruposPorPessoa({ chave, itens, ordenar = null, linha, um, varios }) {
+    return h('div', {}, ...f.porPessoa.flatMap((p) => {
+      const deles = itens.filter((x) => x.para === p.para);
+      if (ordenar) deles.sort(ordenar);
+      if (!deles.length) return [];
+      const id = `${chave}:${p.para}`;
+      const aberto = gruposAbertos.has(id);
+      const corpo = h('div', { class: 'grupo-corpo', inert: !aberto }, h('div', { class: 'grupo-dentro' }, ...deles.map(linha)));
+      const topo = h('button', {
+        type: 'button', class: 'grupo-titulo', 'aria-expanded': String(aberto),
+        onclick: () => {
+          const abre = !gruposAbertos.has(id);
+          if (abre) gruposAbertos.add(id); else gruposAbertos.delete(id);
+          grupo.classList.toggle('aberto', abre);
+          topo.setAttribute('aria-expanded', String(abre));
+          corpo.inert = !abre;
+        },
+      }, h('span', { class: 'grupo-nome' }, p.nome, h('small', {}, plural(deles.length, um, varios))),
+      h('span', { class: 'grupo-valor' }, formatarBRL(deles.reduce((s, x) => s + x.valor, 0)), h('span', { class: 'grupo-seta', 'aria-hidden': 'true' }, icone('chevron'))));
+      const grupo = h('div', { class: `grupo${aberto ? ' aberto' : ''}` }, topo, corpo);
+      return [grupo];
+    }));
+  }
   const perfilDaOrdem = ctx.perfil?.visto?.id ?? null;
   const ordemDasCompras = lerOrdem(perfilDaOrdem); // a mesma ordem da lista de cada pessoa (guardada por perfil)
   const textoDaOrdem = ordemDasCompras ? 'Mais novas primeiro (tocar: mais antigas primeiro)' : 'Mais antigas primeiro (tocar: mais novas primeiro)';
@@ -413,38 +437,22 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       f.compras.length > 1 && botaoDeOrdem),
     f.compras.length
       // Agrupadas por "De quem é" (na ordem dessa lista), reduzidas: tocar no grupo abre as compras dele.
-      ? h('div', {}, ...f.porPessoa.flatMap((p) => {
-        const deles = f.compras.filter((c) => c.para === p.para).sort(compararPorData(ordemDasCompras));
-        if (!deles.length) return [];
-        const aberto = gruposAbertos.has(p.para);
-        const corpo = h('div', { class: 'grupo-corpo', inert: !aberto }, h('div', { class: 'grupo-dentro' }, ...deles.map((c) => linhaItem({
-            titulo: c.nome,
-            detalhe: [c.data && dataCurta(c.data), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
-            valor: c.valor,
-            jaTenho: c.jaTenho,
-            aoTocar: () => abrir(`compra-${c.id}`),
-          }))));
-        const topo = h('button', {
-          type: 'button', class: 'grupo-titulo', 'aria-expanded': String(aberto),
-          onclick: () => {
-            const abre = !gruposAbertos.has(p.para);
-            if (abre) gruposAbertos.add(p.para); else gruposAbertos.delete(p.para);
-            grupo.classList.toggle('aberto', abre);
-            topo.setAttribute('aria-expanded', String(abre));
-            corpo.inert = !abre;
-          },
-        }, h('span', { class: 'grupo-nome' }, p.nome, h('small', {}, plural(deles.length, 'compra', 'compras'))),
-        h('span', { class: 'grupo-valor' }, formatarBRL(deles.reduce((s, c) => s + c.valor, 0)), h('span', { class: 'grupo-seta', 'aria-hidden': 'true' }, icone('chevron'))));
-        const grupo = h('div', { class: `grupo${aberto ? ' aberto' : ''}` }, topo, corpo);
-        return [grupo];
-      }))
+      ? gruposPorPessoa({
+        chave: 'c', itens: f.compras, ordenar: compararPorData(ordemDasCompras), um: 'compra', varios: 'compras',
+        linha: (c) => linhaItem({
+          titulo: c.nome,
+          detalhe: [c.data && dataCurta(c.data), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
+          valor: c.valor, jaTenho: c.jaTenho, aoTocar: () => abrir(`compra-${c.id}`),
+        }),
+      })
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
     // A soma das assinaturas e contas fixas desta fatura, ao lado do título: quanto vai todo mês de cara.
     h('h2', { class: 'titulo-com-soma' }, 'Todo mês', h('span', { class: 'soma-fixas', title: 'Soma de tudo que se repete todo mês neste cartão' }, formatarBRL(Math.round(f.fixas.reduce((t, x) => t + x.valor, 0) * 100) / 100))),
-    h('div', {}, ...f.fixas.map((x) => linhaItem({
-      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, padrao: 'repetir', aoTocar: () => abrir(`fixa-${x.id}`),
-    }))));
+    gruposPorPessoa({
+      chave: 'f', itens: f.fixas, um: 'assinatura', varios: 'assinaturas',
+      linha: (x) => linhaItem({ titulo: x.nome, detalhe: 'todo mês', valor: x.valor, jaTenho: x.jaTenho, padrao: 'repetir', aoTocar: () => abrir(`fixa-${x.id}`) }),
+    }));
 
   const conferir = temItens && !f.conferida && !travado && h('div', { class: 'cartao-conferir' },
     h('div', { class: 'botoes' }, botao('Pronto, fatura conferida', async (e) => {
