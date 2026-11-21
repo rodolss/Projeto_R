@@ -40,13 +40,16 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
       seu: somar(de((p) => p.para === pessoaId).map((p) => p.valor)),
       daCasa: somar(de((p) => p.para === 'casa').map((p) => p.valor)),
       outras: { valor: somar(outras.map((p) => p.valor)), jaTenho: somar(outras.map((p) => p.jaTenho)), falta: somar(outras.map((p) => p.falta)) },
+      adiantado: somar(outras.map((p) => p.falta)),
       // Ainda dá para entrar compra nesta fatura.
       aberta: Boolean(periodo) && hoje <= periodo.ate,
       conferida: f.conferida,
     };
   });
   const entrou = centavos((salario?.valor ?? 0) + (salario?.extra ?? 0));
-  const saiu = somar([contas?.valor, ...cartoes.map((c) => c.seu)]);
+  // Você paga a fatura inteira: o que já está no cofrinho ("já tenho") não pesa; o que ainda falta as pessoas devolverem
+  // conta como saída até chegar (`adiantado`).
+  const saiu = somar([contas?.valor, ...cartoes.map((c) => c.seu + c.adiantado)]);
   const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
   return { mes, pessoaId, salario, contas, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
 }
