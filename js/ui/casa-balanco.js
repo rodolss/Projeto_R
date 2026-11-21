@@ -142,7 +142,7 @@ function desenhar(container, ctx) {
 
   // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário de quem administra se
   // digita aqui (o único lugar); nos outros casos a linha leva ao Mês, como antes.
-  const editavel = Boolean(ctx.unica && visto && pessoaId === visto.id);
+  const editavel = Boolean(visto && pessoaId === visto.id); // todo perfil digita o próprio salário aqui
   const fechar = () => {
     if (abertaAqui) {
       abertaAqui = false;
@@ -168,7 +168,7 @@ function desenhar(container, ctx) {
           titulo: 'A mais neste mês', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? abrirSalario : null,
         }))
       : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'),
-    editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.'));
+    editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, ctx.unica ? 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.' : 'Seu salário se digita só aqui: ele vale para as contas da casa e para o seu balanço.'));
 
   const c = b.contas;
   const linhasSaiu = [
@@ -237,7 +237,7 @@ function desenhar(container, ctx) {
     const salvar = botao('Salvar', () => {
       if (!(novo.salario > 0)) { ctx.aviso('Digite o salário do mês.', 'atencao', 3000); return; }
       gravar((c) => definirSalario(c, { mes, pessoaId, salario: novo.salario, extra: novo.extra }),
-        'Salário salvo. Vale para as contas da casa, o Dia de pagamento e o plano.', salvar);
+        ctx.unica ? 'Salário salvo. Vale para as contas da casa, o Dia de pagamento e o plano.' : 'Salário salvo. Vale para as contas da casa e para o seu balanço.', salvar);
     });
     const tirar = atual.situacao === 'confirmado' && h('button', {
       type: 'button', class: 'botao-link',
@@ -251,12 +251,12 @@ function desenhar(container, ctx) {
       atual.situacao === 'a-confirmar' && h('p', { class: 'suave' }, `Previsão: igual a ${quando(atual.deOnde, mes)}. Confira e salve o valor certo.`),
       campoMoeda({
         rotulo: 'Salário do mês', valor: novo.salario, grande: true, id: 'salario-do-mes',
-        dica: 'O salário líquido de todo mês. É o único lugar onde ele se digita: vale para as contas da casa, o Dia de pagamento e o plano.',
+        dica: `O salário líquido de todo mês. É o único lugar onde ele se digita: vale para as contas da casa${ctx.unica ? ', o Dia de pagamento e o plano' : ' e para o seu balanço'}.`,
         aoMudar: (v) => { novo.salario = v; },
       }),
       campoMoeda({
         rotulo: 'A mais neste mês (se veio)', valor: novo.extra, id: 'a-mais-do-mes',
-        dica: '13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra e é investido no próximo Dia de pagamento. Férias: o adiantamento não conta aqui — no mês seguinte, digite o salário de sempre.',
+        dica: `13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra${ctx.unica ? ' e é investido no próximo Dia de pagamento' : ''}. Férias: o adiantamento não conta aqui — no mês seguinte, digite o salário de sempre.`,
         aoMudar: (v) => { novo.extra = v; },
       }),
       proximoRegistrado && h('p', { class: 'suave pequeno' }, `O Dia de pagamento de ${nomeDoMes(proximo)} já foi registrado: um a mais digitado agora não entra mais nele.`),
