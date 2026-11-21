@@ -1,7 +1,8 @@
 // Mês fechado (desenho 2026-11-21-mes-fechado): com tudo pago, o mês não se edita até reabrir. O aviso fica no topo das
 // telas (Contas, Balanço, Cartão) com o botão "Reabrir mês".
-import { aviso, botao } from './dom.js';
-import { reabrirMes } from '../core/pagamentos.js';
+import { h, aviso, botao } from './dom.js';
+import { reabrirMes, fecharMes, estadoDoMes, tudoPago, contasPagas } from '../core/pagamentos.js';
+import { somarMeses } from '../core/meses.js';
 
 export const AVISO_FECHADO = 'Mês fechado. Reabra o mês para editar.';
 
