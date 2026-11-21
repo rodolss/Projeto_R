@@ -207,8 +207,6 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
 let abertaAqui = false;
-// A ordem da lista de compras de uma pessoa (vale até fechar o app).
-let ordemMaisNovas = true;
 // O mesmo para a tela do Cofrinho: "Voltar para a fatura" = voltar no histórico.
 let cofrinhoAbertoAqui = false;
 
@@ -227,6 +225,11 @@ export function atualizar(container, ctx) {
 const CHAVE_CARTAO = 'projetoR.cartao'; // o último cartão aberto neste aparelho
 const lerLembrado = () => { try { return localStorage.getItem(CHAVE_CARTAO); } catch { return null; } };
 const lembrar = (id) => { try { localStorage.setItem(CHAVE_CARTAO, id); } catch { /* sem armazenamento: só não lembra */ } };
+// A ordem da lista de compras de uma pessoa: a última que cada perfil deixou neste aparelho (cada um tem a sua: um
+// gosta das mais novas primeiro, o outro das mais antigas). Sem nada guardado: mais novas primeiro.
+export const chaveDaOrdem = (perfilId) => `projetoR.ordemCompras${perfilId ? `.${perfilId}` : ''}`;
+const lerOrdem = (perfilId) => { try { return localStorage.getItem(chaveDaOrdem(perfilId)) !== 'antigas'; } catch { return true; } };
+const gravarOrdem = (perfilId, maisNovas) => { try { localStorage.setItem(chaveDaOrdem(perfilId), maisNovas ? 'novas' : 'antigas'); } catch { /* sem armazenamento: só não lembra */ } };
 
 // Botões no topo para trocar de cartão (só com dois ou mais).
 function trocaDeCartao(casa, atualId) {
@@ -620,7 +623,12 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     const compras = f.compras.filter((c) => c.para === para);
     const fixas = f.fixas.filter((x) => x.para === para);
     const lista = h('div', { class: 'cartao casa-compras' });
-    const botaoOrdem = h('button', { type: 'button', class: 'botao-icone', onclick: () => { ordemMaisNovas = !ordemMaisNovas; desenharLista(); } });
+    const perfilId = ctx.perfil?.visto?.id ?? null;
+    let ordemMaisNovas = lerOrdem(perfilId);
+    const botaoOrdem = h('button', {
+      type: 'button', class: 'botao-icone',
+      onclick: () => { ordemMaisNovas = !ordemMaisNovas; gravarOrdem(perfilId, ordemMaisNovas); desenharLista(); },
+    });
     const linha = (x, detalhe, rota) => h('button', { type: 'button', class: 'casa-compra tocavel', onclick: () => abrir(rota) },
       h('span', { class: 'texto' }, h('span', {}, x.nome), h('small', {}, detalhe, x.jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
       h('span', { class: 'quanto' }, formatarBRL(x.valor)),
