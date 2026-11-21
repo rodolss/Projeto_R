@@ -2,7 +2,7 @@
 // a lista das contas e os salários. Tocar num valor abre uma folha com um campo só (#/casa?mes=…&folha=…);
 // o voltar do celular fecha a folha. Feita para quem tem receio de coisas complicadas: pouco texto, nada de jargão.
 import { h, campoMoeda, campoTag, cartao, botao, aviso, copiarTexto, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
-import { etiquetasUnicas } from '../core/tags.js';
+import { etiquetasDosNomes } from '../core/tags.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
@@ -345,7 +345,7 @@ function desenharMes(container, ctx) {
   function folhaCartao(conta, folha) {
     const v = valorDaConta(casa, mes, conta.id);
     const nova = { nome: '', valor: null, vezes: 1 };
-    const tagsDaConta = etiquetasUnicas([...casa.meses].sort((a, b) => (a.mes < b.mes ? 1 : -1))
+    const tagsDaConta = etiquetasDosNomes([...casa.meses].sort((a, b) => (a.mes < b.mes ? 1 : -1))
       .flatMap((m) => (m.compras ?? []).filter((c) => c.contaId === conta.id).map((c) => c.nome)));
     const vezesTexto = h('output', { class: 'casa-vezes' });
     const mostrarVezes = () => { vezesTexto.textContent = nova.vezes === 1 ? '1 vez' : `${nova.vezes} vezes`; };

@@ -423,6 +423,8 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .cartao-sugestoes:empty { display: none; }
 .tag-baloes { margin-top: 8px; }
+.tag-escolhidas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.tag-escolhidas:empty { display: none; }
 .chip.tag { background: var(--destaque-suave); border-color: var(--destaque-suave); color: var(--destaque); font-weight: 600; }
 .chip.tag.ativo { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-texto); }
 .chip.tag.nova { background: transparent; border: 1px dashed var(--destaque); }
