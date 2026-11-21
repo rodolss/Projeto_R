@@ -9,7 +9,7 @@ const comFeito = (mudancas) => ({ ...rascunhoVazio('2026-11'), ...mudancas });
 
 test('situacao: nada feito ainda', () => {
   assert.deepEqual(situacao({ registrado: false, rascunho: null }), {
-    modo: 'novo', feitas: { salario: false, proventos: false, saldos: false, investir: false }, quantas: 0, podeInvestir: false,
+    modo: 'novo', feitas: { salario: false, proventos: false, saldos: false, investir: false }, quantas: 0, total: 4, podeInvestir: false,
   });
 });
 
@@ -120,4 +120,19 @@ test('revisão: "Pular" depois de "Usar estes saldos" pula, sem apagar os valore
   const pulado = escolherSaldos(copiado, 'pular');
   assert.equal(pulado.saldosModo, 'pulados');
   assert.deepEqual(pulado.saldos, { a: { valor: 10, cotas: null } });
+});
+
+// ---------- Dia de pagamento sem a etapa do salário (visão única: o salário vem do Balanço) ----------
+test('sem a etapa do salário: 3 etapas, o investir libera com proventos e saldos', () => {
+  const vazio = { ...rascunhoVazio('2026-12'), recebido: 6000, feito: { salario: true, proventos: false } };
+  const s0 = situacao({ registrado: false, rascunho: vazio, semSalario: true });
+  assert.deepEqual([s0.total, s0.quantas, s0.podeInvestir], [3, 0, false]);
+  const pronto = { ...vazio, saldosModo: 'pulados', feito: { salario: true, proventos: true } };
+  const s1 = situacao({ registrado: false, rascunho: pronto, semSalario: true });
+  assert.deepEqual([s1.total, s1.quantas, s1.podeInvestir], [3, 2, true]);
+  assert.equal(situacao({ registrado: true, rascunho: null, semSalario: true }).quantas, 3);
+  assert.equal(situacao({ registrado: false, rascunho: pronto }).total, 4); // fora da visão única, como antes
+  // O cartão do Início conta do mesmo jeito: só o salário não é "pela metade".
+  assert.deepEqual(cartaoDoPagamento({ entrada: null, rascunho: vazio, semSalario: true }), { tipo: 'abrir' });
+  assert.deepEqual(cartaoDoPagamento({ entrada: null, rascunho: pronto, semSalario: true }), { tipo: 'continuar', quantas: 2, total: 3 });
 });

@@ -22,9 +22,9 @@ function cartaoPagamento(estado, hoje, ctx) {
   const entrada = estado.meses.find((m) => m.mes === mes);
   const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
   const rascunho = visto && !entrada
-    ? rascunhoComBalanco(lerRascunho(mes) ?? rascunhoVazio(mes), salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id }))
+    ? rascunhoComBalanco(lerRascunho(mes) ?? rascunhoVazio(mes), salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id }), estado.config.salario)
     : lerRascunho(mes);
-  const c = cartaoDoPagamento({ entrada, rascunho });
+  const c = cartaoDoPagamento({ entrada, rascunho, semSalario: Boolean(visto) });
   if (c.tipo === 'registrado') {
     const nome = nomeDoMes(mes);
     return h('section', { class: 'cartao acao registrado' },
@@ -34,7 +34,7 @@ function cartaoPagamento(estado, hoje, ctx) {
       h('a', { class: 'botao secundario', href: '#/mes' }, 'Ver'));
   }
   return h('section', { class: 'cartao acao' },
-    h('div', {}, h('h3', {}, c.tipo === 'continuar' ? `Dia de pagamento? · ${c.quantas} de 4 feitos` : 'Dia de pagamento?'),
+    h('div', {}, h('h3', {}, c.tipo === 'continuar' ? `Dia de pagamento? · ${c.quantas} de ${c.total ?? 4} feitos` : 'Dia de pagamento?'),
       h('p', { class: 'suave' }, 'Veja quanto investir este mês e onde.')),
     h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar' : 'Abrir'));
 }

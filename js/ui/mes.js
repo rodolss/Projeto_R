@@ -65,15 +65,17 @@ function desenhar(container, ctx) {
     apagarRascunho();
     rascunho = null;
   }
-  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, "Salário que caiu" só mostra o
-  // salário (e o a mais) do Balanço deste mês, e fica feito quando ele está confirmado lá. Recalculado a cada desenho.
-  // Num mês já registrado, o salário do registro fica (só leitura). Casa ainda carregando: espera, sem campo.
+  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, a etapa "Salário que caiu" some —
+  // o salário (e o a mais) vem do Balanço deste mês (ainda não confirmado: a previsão; sem nada: o do plano),
+  // recalculado a cada desenho, e aparece só como informação no topo. Num mês já registrado, fica o do registro.
   const visto = ctx.unica ? ctx.perfil?.visto ?? null : null;
   const doBalanco = !visto ? null
     : ctx.casa ? salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id })
       : { carregando: true, pronto: false, salario: null, extra: 0, recebido: null };
-  if (doBalanco && !existente) rascunho = rascunhoComBalanco(rascunho ?? rascunhoVazio(mes), doBalanco);
-  const sit = situacao({ registrado: Boolean(existente), rascunho });
+  if (doBalanco && !existente) rascunho = rascunhoComBalanco(rascunho ?? rascunhoVazio(mes), doBalanco, estado.config.salario);
+  const semSalario = Boolean(doBalanco);
+  const sit = situacao({ registrado: Boolean(existente), rascunho, semSalario });
+  const antesDeInvestir = semSalario ? 'as tarefas 1 e 2' : 'as tarefas 1 a 3';
   const r = rascunho ?? rascunhoVazio(mes);
   const guardar = () => salvarRascunho(r);
   const nome = nomeDoMes(mes);
@@ -281,7 +283,7 @@ function desenhar(container, ctx) {
 
   function folhaInvestir() {
     if (!sit.podeInvestir) {
-      return [h('h2', {}, 'Investir'), aviso('info', 'Faça as tarefas 1 a 3 antes.'), h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }))];
+      return [h('h2', {}, 'Investir'), aviso('info', `Faça ${antesDeInvestir} antes.`), h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }))];
     }
     const rr = resposta();
     const blocos = [];
@@ -378,7 +380,7 @@ function desenhar(container, ctx) {
 
   function situacaoInvestir() {
     if (registrado) return `${formatarBRL(totalAplicado(existente))} aplicados`;
-    if (!sit.podeInvestir) return 'Libera depois das tarefas 1 a 3';
+    if (!sit.podeInvestir) return `Libera depois d${antesDeInvestir}`;
     const rr = resposta();
     if (rr.semAporte) return pelaSobra ? semSobraTexto() : rr.motivo === 'custo-de-vida' ? 'O seu dia a dia vem primeiro' : 'Este mês não sobra nada para investir';
     return `Separe ${formatarBRL(rr.excedente)}`;
@@ -396,23 +398,27 @@ function desenhar(container, ctx) {
   const proventos = registrado ? existente.proventos ?? 0 : r.proventos;
 
   const tarefas = [
-    {
-      n: 1, chave: 'salario', titulo: 'Salário que caiu',
-      // Na visão única, o salário vem do Balanço (só lá se digita).
-      detalhe: sit.feitas.salario ? formatarBRL(recebido) : doBalanco?.carregando ? 'Carregando o Balanço…' : doBalanco && !registrado ? 'Digite seu salário no Balanço' : 'Falta preencher',
+    !semSalario && {
+      chave: 'salario', titulo: 'Salário que caiu', detalhe: sit.feitas.salario ? formatarBRL(recebido) : 'Falta preencher',
     },
     {
-      n: 2, chave: 'proventos', titulo: 'Proventos desde o último registro',
+      chave: 'proventos', titulo: 'Proventos desde o último registro',
       detalhe: sit.feitas.proventos ? formatarBRL(proventos ?? 0) : ultimoRegistro ? `Desde ${dataCurta(ultimoRegistro)}` : 'Desde que você começou',
     },
-    { n: 3, chave: 'saldos', titulo: 'Saldos da corretora', detalhe: situacaoSaldos() },
-    { n: 4, chave: 'investir', titulo: 'Investir', detalhe: situacaoInvestir(), bloqueada: !registrado && !sit.podeInvestir },
-  ];
+    { chave: 'saldos', titulo: 'Saldos da corretora', detalhe: situacaoSaldos() },
+    { chave: 'investir', titulo: 'Investir', detalhe: situacaoInvestir(), bloqueada: !registrado && !sit.podeInvestir },
+  ].filter(Boolean).map((t, k) => ({ ...t, n: k + 1 }));
+  // Na visão única, o salário do mês só como informação (vem do Balanço, o único lugar onde se digita).
+  const salarioDoMes = semSalario && !registrado && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
+    doBalanco.carregando ? 'Carregando o salário do Balanço…'
+      : doBalanco.pronto ? `Salário de ${nome}: ${formatarBRL(doBalanco.recebido)}, do Balanço. `
+        : `Seu salário de ${nome} ainda não está no Balanço${doBalanco.recebido != null ? ` (previsão: ${formatarBRL(doBalanco.recebido)})` : ''}. `,
+    !doBalanco.carregando && h('a', { href: `#/casa-balanco?mes=${mes}&folha=salario` }, doBalanco.pronto ? 'Ver no Balanço' : 'Digitar no Balanço'));
   const linhaTarefa = (t) => h('button', {
     type: 'button', class: 'tarefa', disabled: t.bloqueada,
     onclick: () => {
       if (t.chave === 'saldos' && sit.modo !== 'novo') { abrir('so-saldos'); return; }
-      if (registrado && !(t.chave === 'salario' && doBalanco)) entrarEmEdicao(); // o salário só se vê (vem do Balanço)
+      if (registrado) entrarEmEdicao();
       abrir(t.chave);
     },
   },
@@ -420,7 +426,7 @@ function desenhar(container, ctx) {
   h('span', { class: 'texto' }, h('b', {}, t.titulo), h('small', {}, t.detalhe)),
   h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
 
-  const passos = h('div', { class: 'passos', 'aria-hidden': 'true' }, ...[0, 1, 2, 3].map((k) => h('i', { class: k < sit.quantas ? 'feito' : '' })));
+  const passos = h('div', { class: 'passos', 'aria-hidden': 'true' }, ...tarefas.map((_, k) => h('i', { class: k < sit.quantas ? 'feito' : '' })));
   const painel = calcularPainel({ estado, hoje });
   const cabecalho = registrado
     ? h('section', { class: 'cartao registrado' },
@@ -430,8 +436,9 @@ function desenhar(container, ctx) {
       passos)
     : cartao(
       h('h1', {}, `Dia de pagamento de ${nome}`),
-      h('p', { class: 'suave' }, `${sit.quantas} de 4 feitos`),
+      h('p', { class: 'suave' }, `${sit.quantas} de ${sit.total} feitos`),
       passos,
+      salarioDoMes,
       h('p', { class: 'suave', style: 'margin-top:12px' }, painel.faltam !== null
         ? `Faltam ${formatarDuracao(painel.faltam)} para a renda plena.`
         : 'No ritmo de hoje, a renda plena fica a mais de 50 anos.'));

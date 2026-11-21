@@ -54,11 +54,12 @@ test('Dia de pagamento: o salário (e o a mais) do Balanço; pronto só com o sa
   assert.deepEqual(salarioParaODia({ casa: casaBase(), mes: '2026-12', pessoaId: 'p1' }), { pronto: false, salario: null, extra: 0, recebido: null });
 });
 
-test('revisão: o rascunho do Dia de pagamento segue o Balanço (o mesmo para a tela e para o cartão do Início)', () => {
-  const base = { mes: '2026-12', editando: false, recebido: 999, tipoExtra: 'plr', proventos: 10, saldos: null, saldosModo: null, feito: { salario: true, proventos: true } };
-  assert.deepEqual(rascunhoComBalanco(base, { pronto: true, salario: 6000, extra: 100, recebido: 6100 }),
+test('Dia de pagamento sem a etapa do salário: o rascunho já vem com o salário do Balanço (ou a previsão, ou o do plano)', () => {
+  const base = { mes: '2026-12', editando: false, recebido: 999, tipoExtra: 'plr', proventos: 10, saldos: null, saldosModo: null, feito: { salario: false, proventos: true } };
+  assert.deepEqual(rascunhoComBalanco(base, { pronto: true, salario: 6000, extra: 100, recebido: 6100 }, 5000),
     { ...base, recebido: 6100, tipoExtra: null, feito: { salario: true, proventos: true } });
-  // Tirado no Balanço: volta a faltar (mesmo que o rascunho guardado diga que estava feito).
-  assert.deepEqual(rascunhoComBalanco(base, { pronto: false, salario: 6000, extra: 0, recebido: 6000 }),
-    { ...base, recebido: null, tipoExtra: null, feito: { salario: false, proventos: true } });
+  // Ainda não confirmado no Balanço: a previsão (igual ao mês anterior); sem nada na casa: o salário do plano.
+  assert.equal(rascunhoComBalanco(base, { pronto: false, salario: 6000, extra: 0, recebido: 6000 }, 5000).recebido, 6000);
+  assert.deepEqual(rascunhoComBalanco(base, { pronto: false, salario: null, extra: 0, recebido: null }, 5000).feito, { salario: true, proventos: true });
+  assert.equal(rascunhoComBalanco(base, { pronto: false, salario: null, extra: 0, recebido: null }, 5000).recebido, 5000);
 });
