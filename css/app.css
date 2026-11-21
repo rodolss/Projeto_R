@@ -645,6 +645,23 @@ a.barra-item:active { background: var(--cartao-2); }
 .detalhe-linha span { color: var(--suave); font-size: 14px; flex: none; }
 .detalhe-linha b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* As compras de uma pessoa (desenho 2026-11-21-compras-de-quem): os nomes de "De quem é" abrem a lista; um ícone ordena. */
+.ja-pessoa.tocavel { width: 100%; border: 0; border-top: 1px solid var(--borda); background: none; color: var(--texto); font: inherit; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 160ms ease; }
+.ja-pessoa.tocavel:active { background: var(--cartao-2); }
+.ja-pessoa-valor { display: inline-flex; align-items: baseline; gap: 10px; }
+.ja-pessoa-valor .seta { color: var(--suave); font-size: 22px; line-height: 1; opacity: 0.55; }
+.casa-compra.tocavel { width: 100%; border: 0; border-top: 1px solid var(--borda); background: none; color: var(--texto); font: inherit;
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.casa-compra.tocavel:first-child { border-top: 0; }
+.casa-compra.tocavel:active { background: var(--cartao-2); }
+.casa-compra .seta { color: var(--suave); font-size: 20px; line-height: 1; opacity: 0.55; }
+.folha-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.botao-icone { flex: none; width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--borda); background: var(--cartao); color: var(--destaque);
+  display: grid; place-items: center; cursor: pointer; box-shadow: var(--sombra); transition: transform 140ms ease, background 200ms ease; }
+.botao-icone:active { transform: scale(0.92); background: var(--cartao-2); }
+.botao-icone svg { width: 22px; height: 22px; }
+
 /* ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ---------- */
 .ja-etiqueta { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 99px; background: var(--amarelo); color: var(--amarelo-tinta);
   font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.6; vertical-align: 1px; white-space: nowrap; }

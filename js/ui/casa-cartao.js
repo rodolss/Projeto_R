@@ -22,7 +22,7 @@ import { cartoesVisiveis } from '../core/perfis.js';
 import { etiquetasDosNomes, juntasDaCasa, semAcento, tagsDoNome } from '../core/tags.js';
 import { graficoDasEtiquetas } from './casa-etiquetas.js';
 import { categoriaDe } from '../core/categorias.js';
-import { iconeCategoria } from './icones.js';
+import { icone, iconeCategoria } from './icones.js';
 
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 // A dona de um cartão: uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
@@ -207,6 +207,8 @@ export function formularioDoCartao(ctx, { cartaoId = null, aoSalvar, aoCancelar 
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
 let abertaAqui = false;
+// A ordem da lista de compras de uma pessoa (vale até fechar o app).
+let ordemMaisNovas = true;
 // O mesmo para a tela do Cofrinho: "Voltar para a fatura" = voltar no histórico.
 let cofrinhoAbertoAqui = false;
 
@@ -364,14 +366,14 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   // A Casa leva às contas da casa; as outras pessoas (e a dona) mostram o total, quanto já tem e quanto falta.
   const linhaPessoa = (p) => {
     if (p.para === 'casa') {
-      return h('button', { type: 'button', class: 'casa-linha', onclick: () => ctx.navegar(`#/casa?mes=${fatura}`) },
+      return h('button', { type: 'button', class: 'casa-linha', onclick: () => abrir('pessoa-casa') },
         h('span', { class: 'texto' }, h('b', {}, p.nome), h('small', {}, `Entra nas contas da casa de ${nomeDoMes(fatura)}`)),
         h('span', { class: 'quanto' }, formatarBRL(p.valor)),
         h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
     }
     const fracao = p.valor > 0 ? Math.min(1, Math.max(0, p.jaTenho / p.valor)) : 0;
-    return h('div', { class: 'ja-pessoa' },
-      h('div', { class: 'ja-pessoa-cima' }, h('b', {}, p.nome), h('b', {}, formatarBRL(p.valor))),
+    return h('button', { type: 'button', class: 'ja-pessoa tocavel', onclick: () => abrir(`pessoa-${p.para}`) },
+      h('div', { class: 'ja-pessoa-cima' }, h('b', {}, p.nome), h('span', { class: 'ja-pessoa-valor' }, h('b', {}, formatarBRL(p.valor)), h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'))),
       h('div', { class: 'ja-pessoa-barra', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(fracao * 100)}%` })),
       h('div', { class: 'ja-pessoa-baixo' },
         h('span', {}, `Já tenho ${formatarBRL(p.jaTenho)}`),
@@ -608,6 +610,51 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     caixa.paraEscolhido = (id) => { caixa.style.display = id === 'casa' ? 'none' : ''; };
     return caixa;
   };
+
+  // ---------- as compras de uma pessoa nesta fatura (desenho 2026-11-21-compras-de-quem) ----------
+  // Tocar num nome em "De quem é" (a Casa também) abre a lista das compras dela nesta fatura, com as de todo mês no fim.
+  // Um ícone troca a ordem (mais novas primeiro ↔ mais antigas primeiro); tocar numa compra abre os detalhes dela.
+  function folhaDaPessoa(para) {
+    const pessoa = f.porPessoa.find((p) => p.para === para);
+    if (!pessoa) return null;
+    const compras = f.compras.filter((c) => c.para === para);
+    const fixas = f.fixas.filter((x) => x.para === para);
+    const lista = h('div', { class: 'cartao casa-compras' });
+    const botaoOrdem = h('button', { type: 'button', class: 'botao-icone', onclick: () => { ordemMaisNovas = !ordemMaisNovas; desenharLista(); } });
+    const linha = (x, detalhe, rota) => h('button', { type: 'button', class: 'casa-compra tocavel', onclick: () => abrir(rota) },
+      h('span', { class: 'texto' }, h('span', {}, x.nome), h('small', {}, detalhe, x.jaTenho && h('span', { class: 'ja-etiqueta' }, 'Já tenho'))),
+      h('span', { class: 'quanto' }, formatarBRL(x.valor)),
+      h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
+    const detalheDaCompra = (c) => [c.data ? dataCurta(c.data) : 'sem data', c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · ');
+    // Sem data (veio da planilha) fica sempre no fim.
+    const porData = (a, b) => {
+      if (!a.data || !b.data) return !a.data && !b.data ? 0 : !a.data ? 1 : -1;
+      return ordemMaisNovas ? b.data.localeCompare(a.data) : a.data.localeCompare(b.data);
+    };
+    const desenharLista = () => {
+      const texto = ordemMaisNovas ? 'Mais novas primeiro (tocar: mais antigas primeiro)' : 'Mais antigas primeiro (tocar: mais novas primeiro)';
+      botaoOrdem.replaceChildren(icone(ordemMaisNovas ? 'maisNovas' : 'maisAntigas'));
+      botaoOrdem.setAttribute('aria-label', texto);
+      botaoOrdem.title = texto;
+      lista.replaceChildren(
+        ...[...compras].sort(porData).map((c) => linha(c, detalheDaCompra(c), `compra-${c.id}`)),
+        ...fixas.map((x) => linha(x, 'todo mês', `fixa-${x.id}`)));
+    };
+    desenharLista();
+    const resumo = para === 'casa'
+      ? `${plural(compras.length + fixas.length, 'compra', 'compras')} · entra nas contas da casa de ${nomeDoMes(fatura)}`
+      : `${plural(compras.length + fixas.length, 'compra', 'compras')} · já tenho ${formatarBRL(pessoa.jaTenho)} · ${pessoa.falta <= 0 ? 'já tem tudo ✓' : `falta ${formatarBRL(pessoa.falta)}`}`;
+    return [
+      h('div', { class: 'folha-topo' },
+        h('div', {}, h('h2', {}, pessoa.nome), h('p', { class: 'suave pequeno', style: 'margin:2px 0 0' }, `Fatura de ${nome}`)),
+        botaoOrdem),
+      h('div', { class: 'detalhe-topo' }, h('div', { class: 'valor-grande' }, formatarBRL(pessoa.valor))),
+      h('p', { class: 'suave pequeno', style: 'margin:0' }, resumo),
+      lista,
+      para === 'casa' && h('button', { type: 'button', class: 'botao-link', style: 'align-self:flex-start;padding:4px 0', onclick: () => ctx.navegar(`#/casa?mes=${fatura}`) }, `Ver as contas da casa de ${nomeDoMes(fatura)}`),
+      h('div', { class: 'botoes botoes-fixos' }, botao('Fechar', fechar, { secundario: true })),
+    ];
+  }
 
   // ---------- detalhes de uma compra / de uma de todo mês (desenho 2026-11-21-detalhes-da-compra) ----------
   // Tocar abre os detalhes, só para ver; "Editar" abre o formulário (salvar ou cancelar volta para cá). Num mês travado,
@@ -860,7 +907,9 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const compra = tipo === 'compra' || tipo === 'editarcompra' ? f.compras.find((c) => c.id === id) : null;
   const fixa = tipo === 'fixa' || tipo === 'editarfixa' ? f.fixas.find((x) => x.id === id) : null;
   // Detalhes abrem sempre (num mês travado, só para ver); anotar e editar, só com a fatura livre.
-  const conteudo = tipo === 'anotar' ? (travado ? null : folhaAnotar(aberto))
+  const pessoaAberta = tipo === 'pessoa' ? f.porPessoa.find((p) => p.para === id) : null;
+  const conteudo = pessoaAberta ? folhaDaPessoa(id)
+    : tipo === 'anotar' ? (travado ? null : folhaAnotar(aberto))
     : compra ? (tipo === 'editarcompra' ? (travado ? null : folhaCompra(compra, aberto)) : folhaDetalheCompra(compra))
       : fixa ? (tipo === 'editarfixa' ? (travado ? null : folhaFixa(fixa, aberto)) : folhaDetalheFixa(fixa)) : null;
   if (!conteudo) {
@@ -869,7 +918,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     esconderFolha();
     return;
   }
-  const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: compra?.nome ?? fixa?.nome ?? 'Anotar compra' });
+  const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: compra?.nome ?? fixa?.nome ?? pessoaAberta?.nome ?? 'Anotar compra' });
   const alvo = tipo === 'anotar' ? painel.querySelector('input') : painel;
   setTimeout(() => alvo.focus({ preventScroll: true }), 50);
 }
