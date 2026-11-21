@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
   adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao, donaDaPessoa, pessoasDe,
-  editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
+  editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
 import { somarMeses } from '../../js/core/meses.js';
@@ -514,4 +514,44 @@ test('para quem de cada um: a outra pessoa é de quem compra para ela; o Pai del
   // O nome de qualquer "para quem" continua aparecendo nas compras antigas.
   assert.equal(nomeDoPara(doLeo.casa, 'q2'), 'Pai');
   assert.equal(nomeDoPara(doLeo.casa, 'q3'), 'pai');
+});
+
+test('mudar parcelas: digitou 10 em vez de 12 — as que faltam entram nas faturas seguintes; as que sobram saem', () => {
+  let n = 0;
+  const id = () => `p${++n}`;
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Geladeira', valor: 250, para: 'casa', vezes: 10, novoId: id });
+  const fat = faturaDaCompra('2026-11-19', casa.cartoes[0]);
+  const primeira = casa.meses.find((m) => m.mes === fat).compras[0];
+  const doGrupo = (c) => c.meses.flatMap((m) => (m.compras ?? []).filter((x) => x.grupo === primeira.grupo).map((x) => [m.mes, x.parcela.n, x.parcela.de]));
+  // 10 → 12: duas novas no fim, todas viram "de 12"
+  const doze = mudarParcelas(casa, { fatura: fat, compraId: primeira.id, vezes: 12, novoId: id });
+  const p12 = doGrupo(doze);
+  assert.equal(p12.length, 12);
+  assert.ok(p12.every(([, , de]) => de === 12));
+  assert.deepEqual(p12.at(-1), [somarMeses(fat, 11), 12, 12]);
+  // 12 → 3: ficam as três primeiras
+  const tres = mudarParcelas(doze, { fatura: fat, compraId: primeira.id, vezes: 3 });
+  assert.deepEqual(doGrupo(tres), [[fat, 1, 3], [somarMeses(fat, 1), 2, 3], [somarMeses(fat, 2), 3, 3]]);
+  // a mesma quantidade: nada muda
+  assert.equal(mudarParcelas(casa, { fatura: fat, compraId: primeira.id, vezes: 10 }), casa);
+  // pela 3ª parcela não dá para ficar com menos de 3 (ela não some)
+  const terceira = casa.meses.find((m) => m.mes === somarMeses(fat, 2)).compras.find((c) => c.grupo === primeira.grupo);
+  const pelaTerceira = mudarParcelas(casa, { fatura: somarMeses(fat, 2), compraId: terceira.id, vezes: 2 });
+  assert.equal(parcelasDaCompra(pelaTerceira, { fatura: fat, compraId: primeira.id }).length, 3);
+});
+
+test('mudar parcelas: à vista vira parcelada, e parcelada em 1 vez vira à vista; o valor da conta acompanha', () => {
+  let n = 0;
+  const id = () => `v${++n}`;
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Sofá', valor: 300, para: 'casa', novoId: id });
+  const fat = faturaDaCompra('2026-11-19', casa.cartoes[0]);
+  const compra = casa.meses.find((m) => m.mes === fat).compras[0];
+  casa = mudarParcelas(casa, { fatura: fat, compraId: compra.id, vezes: 3, novoId: id });
+  const ps = parcelasDaCompra(casa, { fatura: fat, compraId: compra.id });
+  assert.deepEqual(ps.map((p) => [p.mes, p.compra.parcela.n, p.compra.valor]), [[fat, 1, 300], [somarMeses(fat, 1), 2, 300], [somarMeses(fat, 2), 3, 300]]);
+  assert.equal(valorDaConta(casa, somarMeses(fat, 2), K).valor, 300); // a parte da casa entra nas faturas seguintes
+  const avista = mudarParcelas(casa, { fatura: fat, compraId: compra.id, vezes: 1 });
+  const sozinha = avista.meses.find((m) => m.mes === fat).compras[0];
+  assert.equal('grupo' in sozinha || 'parcela' in sozinha, false);
+  assert.equal(avista.meses.some((m) => m.mes === somarMeses(fat, 1) && (m.compras ?? []).length), false);
 });

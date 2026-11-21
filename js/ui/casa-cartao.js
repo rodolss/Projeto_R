@@ -11,7 +11,7 @@ import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js
 import { estaPago, marcarPago, marcaDoCartao, tudoPago, estadoDoMes } from '../core/pagamentos.js';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
-  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, nomesUsados, primeiraFatura,
+  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, mudarParcelas, parcelasDaCompra, nomesUsados, primeiraFatura,
   acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
 import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
@@ -631,15 +631,52 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       mostrarFatura();
     };
 
+    // Parcelas (desenho 2026-11-21-mudar-parcelas): digitou o número errado? Muda aqui. A compra continua começando na
+    // mesma fatura; não dá para tirar a parcela aberta nem as de faturas travadas.
+    const parcelas = parcelasDaCompra(casa, { fatura, compraId: compra.id });
+    const nDaEditada = parcelas.find((p) => p.compra.id === compra.id)?.n ?? 1;
+    const vezesAntes = parcela?.de ?? (ehParcela ? parcelas.at(-1).n : 1);
+    const minimoDeVezes = Math.max(nDaEditada, ...parcelas.filter((p) => estadoDoMes(casa, p.mes, quemVe, hoje) !== 'livre').map((p) => p.n));
+    editado.vezes = vezesAntes;
+    const faturaDaParcela = (n) => somarMeses(parcelas[0].mes, n - parcelas[0].n);
+    const vezesTexto = h('output', { class: 'casa-vezes' });
+    const dicaDasVezes = h('span', { class: 'campo-dica' });
+    const menos = h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Menos parcelas', onclick: () => mudarVezes(-1) }, '−');
+    const mais = h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Mais parcelas', onclick: () => mudarVezes(1) }, '+');
+    const mostrarVezes = () => {
+      const v = editado.vezes;
+      vezesTexto.textContent = v === 1 ? '1 vez' : `${v} vezes`;
+      menos.disabled = v <= minimoDeVezes;
+      mais.disabled = v >= 48;
+      const diferenca = Math.abs(v - vezesAntes);
+      const ultima = v > 1 ? ` A última fica na fatura de ${nomeDaFatura(faturaDaParcela(v), hoje)}.` : '';
+      dicaDasVezes.textContent = v === vezesAntes
+        ? (ehParcela ? `Esta é a ${nDaEditada}ª de ${v}.${ultima}` : 'À vista. Para parcelar, aumente as vezes: o valor acima vira o de cada parcela.')
+        : v > vezesAntes
+          ? `${diferenca === 1 ? 'Entra 1 parcela' : `Entram ${diferenca} parcelas`} nas faturas seguintes.${ultima}`
+          : `${diferenca === 1 ? 'Sai 1 parcela' : `Saem ${diferenca} parcelas`} do fim.${v === 1 ? ' A compra fica à vista.' : ultima}`;
+    };
+    const mudarVezes = (d) => { editado.vezes = Math.min(48, Math.max(minimoDeVezes, editado.vezes + d)); mostrarVezes(); };
+    mostrarVezes();
+    const campoDasVezes = h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Parcelas'),
+      h('div', { class: 'casa-passo' }, menos, vezesTexto, mais),
+      dicaDasVezes);
+
     const salvar = botao('Salvar', async () => {
       if (!editado.nome.trim()) { ctx.aviso('Escreva o que foi comprado.', 'atencao', 3000); return; }
       if (editado.valor == null || editado.valor <= 0) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
       salvar.disabled = true;
-      await ctx.salvarCasa((c) => editarCompraDoCartao(c, {
-        fatura, compraId: compra.id, nome: editado.nome, valor: editado.valor, para: editado.para,
-        data: editado.data ?? undefined, novaFatura: ehParcela ? undefined : editado.fatura,
-      }));
-      ctx.aviso(!ehParcela && editado.fatura !== fatura ? `Salvo. Foi para a fatura de ${nomeDaFatura(editado.fatura, hoje)}.` : 'Salvo.', 'ok', 3000);
+      const mudouVezes = editado.vezes !== vezesAntes;
+      const destino = !ehParcela && editado.fatura > fatura ? editado.fatura : fatura;
+      await ctx.salvarCasa((c) => {
+        const editada = editarCompraDoCartao(c, {
+          fatura, compraId: compra.id, nome: editado.nome, valor: editado.valor, para: editado.para,
+          data: editado.data ?? undefined, novaFatura: ehParcela ? undefined : editado.fatura,
+        });
+        return mudouVezes ? mudarParcelas(editada, { fatura: destino, compraId: compra.id, vezes: editado.vezes }) : editada;
+      });
+      ctx.aviso(mudouVezes ? `Salvo. Agora ${editado.vezes === 1 ? 'à vista' : `em ${editado.vezes} vezes`}.`
+        : destino !== fatura ? `Salvo. Foi para a fatura de ${nomeDaFatura(destino, hoje)}.` : 'Salvo.', 'ok', 3000);
       terminar(folha);
     });
     const apagar = botaoDoisToques('Apagar compra', ehParcela ? 'Toque de novo para apagar (e as próximas parcelas)' : 'Toque de novo para apagar', async () => {
@@ -657,6 +694,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         : compra.data ? `Comprada em ${dataComAno(compra.data)}.` : 'Veio da planilha, sem data.'),
       campoTag({ rotulo: 'O que foi', valor: compra.nome, tags: etiquetasDosNomes(nomesUsados(casaVisivel, cfg.id).map((s) => s.nome), juntasDaCasa(casa)), juntas: juntasDaCasa(casa), aoMudar: (v) => { editado.nome = v; } }),
       campoMoeda({ rotulo: ehParcela ? 'Valor da parcela' : 'Valor', valor: compra.valor, aoMudar: (v) => { editado.valor = v; } }),
+      campoDasVezes,
       !ehParcela && h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Data da compra'),
         h('input', {
           class: 'entrada', type: 'date', value: compra.data ?? '',
