@@ -248,7 +248,7 @@ function excedenteDefinido({ recebidoEfetivo, salario, tipoExtra, investir, laze
 // provisão nem anuais, que o Balanço já conta quando acontecem; a divisão entre reserva, carteira e caixa continua a
 // mesma. A resposta diz de onde veio (`origem`), e o registro do mês guarda isso.
 export function calcularMes({
-  estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje, investirDefinido = null, lazerPct = 0.1,
+  estado, recebido, tipoExtra = null, proventos = 0, saldosAtualizados = null, hoje, investirDefinido = null, lazerPct = 0.1, semExtra = false,
 }) {
   const cx = contexto(estado, hoje, saldosAtualizados, { excluirMes: hoje.slice(0, 7) });
   const { mes, custo, salario, grupo } = cx;
@@ -256,6 +256,7 @@ export function calcularMes({
   const anterior = estado.meses.find((m) => m.mes === somarMeses(mes, -1));
   const atual = estado.meses.find((m) => m.mes === mes);
   const contadores = somarAoCiclo(estado.contadoresAnuais, mes, -(atual?.paraAnuais ?? 0));
+  // semExtra (desenho 2026-11-21-salario-no-balanco): o a mais já entrou na sobra do Balanço; não se investe de novo.
   const exc = investirDefinido == null
     ? calcularExcedente({
       recebido,
@@ -266,7 +267,7 @@ export function calcularMes({
       tipoExtra,
       anuaisFaltando: anuaisFaltando({ anual: custo.anual, contadores, mes }),
     })
-    : excedenteDefinido({ recebidoEfetivo: recebido + (anterior?.guardarParaProximoMes ?? 0), salario, tipoExtra, investir: investirDefinido, lazerPct });
+    : excedenteDefinido({ recebidoEfetivo: semExtra ? salario : recebido + (anterior?.guardarParaProximoMes ?? 0), salario, tipoExtra: semExtra ? null : tipoExtra, investir: investirDefinido, lazerPct });
 
   const avisos = [];
   if (cx.diasDesdeAtualizacao > DIAS_SALDOS) avisos.push('saldos-desatualizados');

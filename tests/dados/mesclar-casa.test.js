@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
+import { definirSalario } from '../../js/core/salario.js';
 import { salvarValor, adicionarCompra, apagarCompra, editarConta, migrarCasa } from '../../js/core/casa.js';
 import { anotarCompra, adicionarCartao, configurarCartao, adicionarPessoaDoCartao, editarFixa, editarCompraDoCartao, marcarJaTenho } from '../../js/core/cartao.js';
 
@@ -162,4 +163,12 @@ test('revisão: um aparelho desmarca a única marca de uma de todo mês e o outr
   const remoto = marcarJaTenho(b, { cartaoId: K, fatura: '2027-01', fixaId: 'f1', jaTenho: true });
   const r = mesclarCasa({ base: b, local, remoto });
   assert.deepEqual(r.cartoes[0].fixas[0].jaTenhoEm, { '2027-01': true });
+});
+
+test('salário só no Balanço: cada aparelho guarda o a mais de um mês diferente: os dois ficam', () => {
+  const b = baseV3();
+  const local = definirSalario(b, { mes: '2026-11', pessoaId: 'p1', salario: 5000, extra: 1000 });
+  const remoto = definirSalario(b, { mes: '2026-12', pessoaId: 'p1', salario: 5000, extra: 5000 });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.extras, { '2026-11': { p1: 1000 }, '2026-12': { p1: 5000 } });
 });

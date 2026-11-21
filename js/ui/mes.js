@@ -11,8 +11,7 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
-import { salarioRegular, preencherRecebido, levarParaCasa } from '../core/salario.js';
-import { salarioNoMes, salvarSalario } from '../core/casa.js';
+import { salarioParaODia } from '../core/salario.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
   saldosParaGravar, dataCurta, nomeDoMes, escolherSaldos,
@@ -66,15 +65,13 @@ function desenhar(container, ctx) {
     apagarRascunho();
     rascunho = null;
   }
-  // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, o salário já confirmado no Mês
-  // da casa preenche "Salário que caiu" (se ainda não foi digitado neste mês).
+  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, "Salário que caiu" só mostra o
+  // salário (e o a mais) do Balanço deste mês, e fica feito quando ele está confirmado lá. Recalculado a cada desenho.
   const visto = ctx.unica && ctx.casa ? ctx.perfil?.visto ?? null : null;
-  if (visto) {
-    const pre = preencherRecebido({ rascunho: rascunho ?? rascunhoVazio(mes), registrado: Boolean(existente), salarioCasa: salarioNoMes(ctx.casa, mes, visto.id) });
-    if (pre) {
-      rascunho = pre;
-      salvarRascunho(pre);
-    }
+  const doBalanco = visto ? salarioParaODia({ casa: ctx.casa, mes, pessoaId: visto.id }) : null;
+  if (doBalanco && !existente) {
+    const base = rascunho ?? rascunhoVazio(mes);
+    rascunho = { ...base, recebido: doBalanco.pronto ? doBalanco.recebido : null, tipoExtra: null, feito: { ...base.feito, salario: doBalanco.pronto } };
   }
   const sit = situacao({ registrado: Boolean(existente), rascunho });
   const r = rascunho ?? rascunhoVazio(mes);
@@ -103,7 +100,7 @@ function desenhar(container, ctx) {
   const pelaSobra = Boolean(regra && !regra.semCasa && !regra.incompleto);
   const resposta = () => calcularMes({
     estado, recebido: r.recebido ?? 0, tipoExtra: r.tipoExtra, proventos: r.proventos ?? 0, saldosAtualizados: saldosDoRascunho(), hoje,
-    investirDefinido: pelaSobra ? regra.investir : null, lazerPct: LAZER,
+    investirDefinido: pelaSobra ? regra.investir : null, lazerPct: LAZER, semExtra: pelaSobra && Boolean(doBalanco),
   });
   // Pela sobra, o mesmo texto na lista e na folha quando não há o que investir.
   const semSobraTexto = () => `Em ${nomeDoMes(regra.mes)} não sobrou nada para investir.`;
@@ -134,24 +131,28 @@ function desenhar(container, ctx) {
     });
   }
 
-  // Salário digitado uma vez só: o salário de todo mês contido no que caiu (o efetivo, com o adiantamento das férias
-  // guardado) vale também para o Mês da casa — só se lá ainda for previsão. O salário do plano não muda. Editar um mês
-  // já registrado não mexe na casa. Grava depois de fechar a folha, sem segurar a tela.
-  async function levarSalario() {
-    if (!visto || r.editando) return;
-    const rr = resposta();
-    const regular = salarioRegular({ recebidoEfetivo: rr.recebidoEfetivo, tipoExtra: r.tipoExtra, pareceExtra: rr.perguntarExtra, salarioPlano: estado.config.salario });
-    if (!levarParaCasa({ salarioCasa: salarioNoMes(ctx.casa, mes, visto.id), regular })) return;
-    try {
-      await ctx.salvarCasa((c) => salvarSalario(c, { mes, pessoaId: visto.id, valor: regular }));
-      ctx.aviso('Salário salvo também nas contas da casa.', 'ok', 3000);
-    } catch (erro) {
-      console.warn('Não deu para levar o salário para as contas da casa', erro);
-    }
+  // Na visão única, o salário não se digita aqui: a folha mostra o do Balanço e leva até ele (troca a entrada do
+  // histórico: voltar do Balanço traz para o Mês).
+  function folhaSalarioDoBalanco() {
+    const nomeDoBalanco = `#/casa-balanco?mes=${mes}&folha=salario`;
+    return [
+      h('h2', {}, 'Salário que caiu'),
+      doBalanco.pronto
+        ? cartao(
+          h('div', { class: 'rotulo' }, `Do Balanço de ${nome}`),
+          h('div', { class: 'valor-grande' }, formatarBRL(doBalanco.recebido)),
+          doBalanco.extra > 0 && h('div', { class: 'suave' }, `${formatarBRL(doBalanco.salario)} de salário + ${formatarBRL(doBalanco.extra)} a mais (vai pela sobra, no próximo Dia de pagamento).`))
+        : aviso('info', `Digite seu salário de ${nome} no Balanço: é o único lugar, e ele vale para tudo.`),
+      h('p', { class: 'suave pequeno' }, 'O salário se digita só no Balanço; aqui, nas contas da casa e nos Ajustes ele aparece sozinho.'),
+      h('div', { class: 'botoes' },
+        botao(doBalanco.pronto ? 'Mudar no Balanço' : 'Digitar no Balanço', () => location.replace(nomeDoBalanco)),
+        botao('Fechar', fechar, { secundario: true })),
+    ];
   }
 
   // ---------- folhas ----------
   function folhaSalario() {
+    if (doBalanco && !existente) return folhaSalarioDoBalanco();
     const extra = h('div');
     const desenharExtra = () => {
       const pergunta = r.recebido != null && resposta().perguntarExtra;
@@ -179,7 +180,6 @@ function desenhar(container, ctx) {
           r.feito.salario = true;
           guardar();
           fechar();
-          levarSalario();
         }),
         botao('Fechar', fechar, { secundario: true })),
     ];
@@ -389,8 +389,8 @@ function desenhar(container, ctx) {
   const tarefas = [
     {
       n: 1, chave: 'salario', titulo: 'Salário que caiu',
-      // Preenchido pelo Mês da casa e ainda não confirmado: um toque confere.
-      detalhe: sit.feitas.salario ? formatarBRL(recebido) : recebido != null ? `Confira: ${formatarBRL(recebido)}` : 'Falta preencher',
+      // Na visão única, o salário vem do Balanço (só lá se digita).
+      detalhe: sit.feitas.salario ? formatarBRL(recebido) : doBalanco && !registrado ? 'Digite seu salário no Balanço' : 'Falta preencher',
     },
     {
       n: 2, chave: 'proventos', titulo: 'Proventos desde o último registro',

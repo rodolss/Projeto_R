@@ -258,18 +258,27 @@ function desenharMes(container, ctx) {
     });
   }
 
-  // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, o salário de quem administra no
-  // mês atual já abre o Dia de pagamento preenchido (para conferir). O salário do plano não muda por aqui.
+  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário de quem administra não
+  // se digita aqui — a folha mostra e leva ao Balanço (troca a entrada: voltar do Balanço traz para o Mês). O da outra
+  // pessoa continua editável aqui.
+  const salarioNoBalanco = (pessoa) => Boolean(ctx.unica && ctx.estado && pessoa.id === visto?.id);
   function folhaSalario(pessoa, folha) {
     const s = salarioNoMes(casa, mes, pessoa.id);
-    const abreODia = ctx.unica && ctx.estado && pessoa.id === visto?.id && mes === mesAtual
-      && !(ctx.estado.meses ?? []).some((m) => m.mes === mes);
+    if (salarioNoBalanco(pessoa)) {
+      return [
+        titulo(`Seu salário em ${nome}`),
+        h('div', { class: 'valor' }, s.situacao === 'vazio' ? '—' : formatarBRL(s.valor)),
+        h('p', { class: 'suave' }, 'Seu salário se digita só no Balanço: ele vale para as contas da casa, o Dia de pagamento e o plano.'),
+        h('div', { class: 'botoes' },
+          botao('Digitar no Balanço', () => location.replace(`#/casa-balanco?mes=${mes}&folha=salario`)),
+          botao('Fechar', fechar, { secundario: true })),
+      ];
+    }
     return folhaValor({
       folha, texto: `Salário de ${pessoa.nome} em ${nome}`, situacao: s.situacao, valorAtual: s.valor,
       anterior: salarioNoMes(casa, mesAnterior, pessoa.id), dica: 'O salário líquido que caiu na conta.',
       aoSalvar: (c, valor) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor }),
       aoTirar: (c) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor: null }),
-      depois: abreODia ? async () => 'Salvo. O Dia de pagamento já abre com esse valor para você conferir.' : null,
     });
   }
 

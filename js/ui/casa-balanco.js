@@ -2,13 +2,14 @@
 // o salário, a parte dela nas contas da casa e o que é dela nos cartões dela — e a sobra. O que ela passou no
 // cartão para outras pessoas aparece à parte (volta para ela). Com perfis, o balanço é o do perfil visto; sem
 // perfis, botões para escolher a pessoa. Endereço: #/casa-balanco?mes=AAAA-MM[&pessoa=pX].
-import { h, cartao } from './dom.js';
+import { h, cartao, botao, campoMoeda, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
-import { primeiroMes } from '../core/casa.js';
+import { primeiroMes, salarioNoMes } from '../core/casa.js';
+import { definirSalario, extraDoMes, salarioDoPlanoDepois } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
-import { parametroDoHash } from './rotas.js';
+import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes, mesDaTela } from './casa.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
@@ -74,6 +75,9 @@ export function pessoaDoBalanco({ hash, casa, visto }) {
   return ids.includes(pedida) ? pedida : ids[0] ?? null;
 }
 
+// A folha do salário foi aberta por um toque nesta sessão? Então fechar = voltar no histórico.
+let abertaAqui = false;
+
 export function render(container, ctx) {
   desenhar(container, ctx);
 }
@@ -134,18 +138,35 @@ function desenhar(container, ctx) {
   const irAoMes = () => ctx.navegar(`#/casa?mes=${mes}`);
   const irAoCartao = (c) => () => ctx.navegar(enderecoDaFatura(c.cartaoId, c.fatura));
 
+  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário de quem administra se
+  // digita aqui (o único lugar); nos outros casos a linha leva ao Mês, como antes.
+  const editavel = Boolean(ctx.unica && visto && pessoaId === visto.id);
+  const fechar = () => {
+    if (abertaAqui) {
+      abertaAqui = false;
+      history.back();
+    } else {
+      location.replace(endereco(mes));
+    }
+  };
+  const abrirSalario = () => { abertaAqui = true; location.hash = `${endereco(mes)}&folha=salario`; };
   const s = b.salario;
   const entrou = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Entrou'),
     s
-      ? h('div', {}, linha({
-        titulo: 'Salário',
-        detalhe: s.situacao === 'a-confirmar' ? [selo('a confirmar'), ` igual a ${quando(s.deOnde, mes)}`]
-          : s.situacao === 'vazio' ? 'Falta preencher no Mês' : null,
-        valor: s.situacao === 'vazio' ? '—' : formatarBRL(s.valor),
-        aoTocar: irAoMes,
-      }))
-      : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'));
+      ? h('div', {},
+        linha({
+          titulo: 'Salário',
+          detalhe: s.situacao === 'a-confirmar' ? [selo('a confirmar'), ` igual a ${quando(s.deOnde, mes)}`]
+            : s.situacao === 'vazio' ? (editavel ? 'Toque para digitar' : 'Falta preencher no Mês') : null,
+          valor: s.situacao === 'vazio' ? '—' : formatarBRL(s.valor),
+          aoTocar: editavel ? abrirSalario : irAoMes,
+        }),
+        s.extra > 0 && linha({
+          titulo: 'A mais neste mês', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? abrirSalario : null,
+        }))
+      : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'),
+    editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.'));
 
   const c = b.contas;
   const linhasSaiu = [
@@ -185,4 +206,57 @@ function desenhar(container, ctx) {
   // O plano só no mês atual, na visão única e no balanço de quem administra.
   const plano = ctx.unica && ctx.estado && mes === mesAtual && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
   container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, plano, entrou, saiu, outras].filter(Boolean));
+
+  // ---------- a folha do salário (o único lugar onde ele se digita) ----------
+  const terminar = () => {
+    const acao = depoisDeSalvar(location.hash, 'salario', 'casa-balanco');
+    if (acao === 'fechar') fechar();
+    else if (acao === 'redesenhar' && !folhaAberta(location.hash)) ctx.rerender();
+  };
+  function folhaSalario() {
+    const atual = salarioNoMes(casa, mes, pessoaId);
+    const novo = { salario: atual.situacao === 'vazio' ? null : atual.valor, extra: extraDoMes(casa, mes, pessoaId) || null };
+    const salvar = botao('Salvar', async () => {
+      if (!(novo.salario > 0)) { ctx.aviso('Digite o salário do mês.', 'atencao', 3000); return; }
+      salvar.disabled = true;
+      await ctx.salvarCasa((c) => definirSalario(c, { mes, pessoaId, salario: novo.salario, extra: novo.extra }));
+      // O salário do plano acompanha (do último mês já usado em diante); o a mais nunca entra nele.
+      if (ctx.estado && salarioDoPlanoDepois(ctx.estado.config, { mes, salario: novo.salario }) !== ctx.estado.config) {
+        await ctx.salvar((e) => ({ ...e, config: salarioDoPlanoDepois(e.config, { mes, salario: novo.salario }) }));
+      }
+      ctx.aviso('Salário salvo. Vale para as contas da casa, o Dia de pagamento e o plano.', 'ok', 3000);
+      terminar();
+    });
+    const tirar = atual.situacao === 'confirmado' && h('button', {
+      type: 'button', class: 'botao-link',
+      onclick: async () => {
+        await ctx.salvarCasa((c) => definirSalario(c, { mes, pessoaId, salario: null, extra: null }));
+        ctx.aviso('Salário tirado. O app volta a prever.', 'ok', 3000);
+        terminar();
+      },
+    }, 'Tirar o salário deste mês');
+    return [
+      h('h2', { 'data-sem-recarregar': '' }, `Seu salário de ${nomeDoMes(mes)}`),
+      atual.situacao === 'a-confirmar' && h('p', { class: 'suave' }, `Previsão: igual a ${quando(atual.deOnde, mes)}. Confira e salve o valor certo.`),
+      campoMoeda({
+        rotulo: 'Salário do mês', valor: novo.salario, grande: true, id: 'salario-do-mes',
+        dica: 'O salário líquido de todo mês. É o único lugar onde ele se digita: vale para as contas da casa, o Dia de pagamento e o plano.',
+        aoMudar: (v) => { novo.salario = v; },
+      }),
+      campoMoeda({
+        rotulo: 'A mais neste mês (se veio)', valor: novo.extra, id: 'a-mais-do-mes',
+        dica: '13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra e é investido no próximo Dia de pagamento. O adiantamento das férias não conta aqui.',
+        aoMudar: (v) => { novo.extra = v; },
+      }),
+      h('div', { class: 'botoes' }, salvar, botao('Cancelar', fechar, { secundario: true })),
+      tirar,
+    ];
+  }
+  if (folhaAberta(location.hash) === 'salario' && editavel) {
+    const painel = mostrarFolha({ conteudo: folhaSalario().filter(Boolean), aoFechar: fechar, rotulo: 'Seu salário' });
+    setTimeout(() => painel.querySelector('input')?.focus({ preventScroll: true }), 50);
+  } else {
+    abertaAqui = false;
+    esconderFolha();
+  }
 }

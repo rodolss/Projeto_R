@@ -6,6 +6,7 @@
 import { centavos, resumoDoMes } from './casa.js';
 import { faturaDoCartao, periodoDaFatura, cartaoPronto } from './cartao.js';
 import { somarMeses } from './meses.js';
+import { extraDoMes } from './salario.js';
 
 const somar = (lista) => centavos(lista.reduce((s, x) => s + (x ?? 0), 0));
 
@@ -13,7 +14,8 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
   const r = resumoDoMes(casa, mes);
   // Quem não é pessoa da casa (um perfil novo) não divide as contas: sem salário nem parte das contas.
   const daCasa = r.pessoas.find((p) => p.pessoa.id === pessoaId) ?? null;
-  const salario = daCasa && { valor: daCasa.salario, situacao: daCasa.situacaoSalario, deOnde: daCasa.deOnde };
+  // O a mais do mês (13º, férias, PLR: desenho 2026-11-21-salario-no-balanco) entra no que entrou, sem mudar a divisão.
+  const salario = daCasa && { valor: daCasa.salario, situacao: daCasa.situacaoSalario, deOnde: daCasa.deOnde, extra: extraDoMes(casa, mes, pessoaId) };
   const contas = daCasa && {
     valor: daCasa.paga, // null sem divisão (salários vazios)
     total: r.total,
@@ -43,7 +45,7 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
       conferida: f.conferida,
     };
   });
-  const entrou = centavos(salario?.valor ?? 0);
+  const entrou = centavos((salario?.valor ?? 0) + (salario?.extra ?? 0));
   const saiu = somar([contas?.valor, ...cartoes.map((c) => c.seu)]);
   const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
   return { mes, pessoaId, salario, contas, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
