@@ -195,7 +195,7 @@ function desenharMes(container, ctx) {
   };
   // "Já paguei" (desenho 2026-11-21-ja-paguei): o botão "Pago" fica no fim da folha de cada conta (como na tela Cartão) e
   // a lista mostra o selo. A marca é da casa (vale para os dois); a conta ligada ao cartão de quem vê é a fatura inteira.
-  const marcaDe = (conta) => marcaDaConta(casa, conta.id, visto?.id);
+  const marcaDe = (conta) => marcaDaConta(casa, conta.id);
   const pagaConta = (conta) => estaPago(casa, mes, marcaDe(conta));
   const linhasContas = r.contas.map((c) => linha({
     titulo: c.conta.nome,
