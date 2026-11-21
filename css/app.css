@@ -422,6 +422,17 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-outro { align-self: center; padding: 8px 4px; }
 .cartao-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .cartao-sugestoes:empty { display: none; }
+.top-periodo { margin: 0 0 12px; }
+.top-etiquetas { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.top-linha { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+.top-posicao { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--destaque-suave); color: var(--destaque); font-weight: 700; font-size: 14px; }
+.top-linha:first-child .top-posicao { background: var(--destaque); color: var(--destaque-texto); }
+.top-cima { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.top-nome { overflow-wrap: anywhere; }
+.top-valor { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.top-barra { height: 10px; border-radius: 99px; background: var(--cartao-2); margin: 6px 0 4px; overflow: hidden; }
+.top-barra i { display: block; height: 100%; border-radius: 99px; background: var(--destaque); }
+.top-nota { margin: 14px 0 0; }
 .tag-baloes { margin-top: 8px; }
 .tag-escolhidas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .tag-escolhidas:empty { display: none; }

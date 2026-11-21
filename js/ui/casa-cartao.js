@@ -20,6 +20,7 @@ import { nomeDoMes } from './casa.js';
 import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
+import { graficoDasEtiquetas } from './casa-etiquetas.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -460,7 +461,9 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
     }));
   } else {
-    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, somaNoCabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao()].filter(Boolean));
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, somaNoCabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao(),
+      // O fim da tela: as 5 etiquetas em que este cartão mais gastou nos últimos 12 meses (até a fatura aberta).
+      graficoDasEtiquetas({ casa, cartaoId: cfg.id, ate: aberta, juntas: juntasDaCasa(casa), dona: dona?.nome ?? null })].filter(Boolean));
   }
 
   // ---------- folhas ----------
