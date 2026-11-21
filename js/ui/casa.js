@@ -2,7 +2,7 @@
 // a lista das contas e os salários. Tocar num valor abre uma folha com um campo só (#/casa?mes=…&folha=…);
 // o voltar do celular fecha a folha. Feita para quem tem receio de coisas complicadas: pouco texto, nada de jargão.
 import { h, campoMoeda, campoTag, cartao, botao, aviso, copiarTexto, mostrarFolha, esconderFolha, textoConexao } from './dom.js';
-import { etiquetasDosNomes } from '../core/tags.js';
+import { etiquetasDosNomes, juntasDaCasa } from '../core/tags.js';
 import { formatarBRL, formatarPct } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
 import {
@@ -345,8 +345,9 @@ function desenharMes(container, ctx) {
   function folhaCartao(conta, folha) {
     const v = valorDaConta(casa, mes, conta.id);
     const nova = { nome: '', valor: null, vezes: 1 };
+    const juntas = juntasDaCasa(casa);
     const tagsDaConta = etiquetasDosNomes([...casa.meses].sort((a, b) => (a.mes < b.mes ? 1 : -1))
-      .flatMap((m) => (m.compras ?? []).filter((c) => c.contaId === conta.id).map((c) => c.nome)));
+      .flatMap((m) => (m.compras ?? []).filter((c) => c.contaId === conta.id).map((c) => c.nome)), juntas);
     const vezesTexto = h('output', { class: 'casa-vezes' });
     const mostrarVezes = () => { vezesTexto.textContent = nova.vezes === 1 ? '1 vez' : `${nova.vezes} vezes`; };
     mostrarVezes();
@@ -416,7 +417,7 @@ function desenharMes(container, ctx) {
       h('section', { class: 'cartao' },
         h('h3', {}, 'Anotar uma compra'),
         // O "O que foi" é uma etiqueta (desenho 2026-11-21-tags): as que já existem nesta conta viram balões; sem igual, cria.
-        campoTag({ rotulo: 'O que foi', placeholder: 'Ex.: farmácia, presente, gasolina', tags: tagsDaConta, aoMudar: (v) => { nova.nome = v; } }),
+        campoTag({ rotulo: 'O que foi', placeholder: 'Ex.: farmácia, presente, gasolina', tags: tagsDaConta, juntas, aoMudar: (v) => { nova.nome = v; } }),
         h('div', { style: 'margin-top:10px' }, campoMoeda({ rotulo: 'Valor', dica: 'Se for parcelado, o valor de cada parcela.', aoMudar: (x) => { nova.valor = x; } })),
         h('div', { class: 'campo', style: 'margin-top:10px' }, h('span', { class: 'campo-rotulo' }, 'Parcelas'),
           h('div', { class: 'casa-passo' },

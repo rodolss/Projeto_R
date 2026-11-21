@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  opcoesDeTag, nomeDaEtiqueta, etiquetasUnicas, chaveDaTag, tagsDoNome, etiquetasDosNomes, palavraAtual, trocarPalavraAtual, ehLigacao,
+  opcoesDeTag, nomeDaEtiqueta, etiquetasUnicas, chaveDaTag, tagsDoNome, etiquetasDosNomes, trechoAtual, trocarTrechoAtual, ehLigacao,
+  juntasDaCasa, adicionarJunta, removerJunta, JUNTAS_DO_APP,
 } from '../../js/core/tags.js';
 
 test('etiquetas: grafias do mesmo nome viram uma só (a primeira vence)', () => {
@@ -38,12 +39,12 @@ test('etiquetas: digitar mostra as que existem e, sem igual, oferece criar', () 
   assert.equal(opcoesDeTag(tags, 'c', 2).achadas.length, 2);
 });
 
-test('etiquetas: a palavra que está sendo digitada é a última; o balão a troca', () => {
-  assert.deepEqual(palavraAtual('Ração da na'), { antes: 'Ração da ', palavra: 'na' });
-  assert.deepEqual(palavraAtual('Ração '), { antes: 'Ração ', palavra: '' }); // terminou em espaço: nova palavra
-  assert.deepEqual(palavraAtual(''), { antes: '', palavra: '' });
-  assert.equal(trocarPalavraAtual('Ração da na', 'Nami'), 'Ração da Nami ');
-  assert.equal(trocarPalavraAtual('ra', 'Ração'), 'Ração ');
+test('etiquetas: o trecho que está sendo digitado é a última palavra; o balão a troca', () => {
+  assert.deepEqual(trechoAtual('Ração da na'), { antes: 'Ração da ', palavra: 'na' });
+  assert.deepEqual(trechoAtual('Ração '), { antes: 'Ração ', palavra: '' }); // terminou em espaço: nova palavra
+  assert.deepEqual(trechoAtual(''), { antes: '', palavra: '' });
+  assert.equal(trocarTrechoAtual('Ração da na', 'Nami'), 'Ração da Nami ');
+  assert.equal(trocarTrechoAtual('ra', 'Ração'), 'Ração ');
 });
 
 test('etiquetas: o nome que vai para a compra usa a grafia das etiquetas que já existem', () => {
@@ -53,4 +54,39 @@ test('etiquetas: o nome que vai para a compra usa a grafia das etiquetas que já
   assert.equal(nomeDaEtiqueta(tags, 'Pizzaria  Nova'), 'Pizzaria Nova'); // palavra nova fica como digitada
   assert.equal(nomeDaEtiqueta(tags, 'Nami, vacina'), 'Nami, vacina'); // a pontuação fica
   assert.equal(nomeDaEtiqueta(tags, '   '), '');
+});
+
+test('expressões: "Pão de Queijo" vale uma etiqueta só; o resto do nome segue por palavra', () => {
+  const juntas = juntasDaCasa({});
+  assert.ok(juntas.includes('Pão de Queijo') && juntas.length === JUNTAS_DO_APP.length);
+  assert.deepEqual(tagsDoNome('Pão de queijo da Nami', juntas), ['Pão de Queijo', 'Nami']);
+  assert.deepEqual(tagsDoNome('pao DE queijo', juntas), ['Pão de Queijo']); // sem acento nem maiúscula também vale
+  assert.deepEqual(tagsDoNome('Pão de queijo', []), ['Pão', 'queijo']); // sem a lista: por palavra, como antes
+  assert.deepEqual(tagsDoNome('Pão de forma e pão de queijo', juntas), ['Pão de Forma', 'Pão de Queijo']);
+  assert.deepEqual(tagsDoNome('Pão de', juntas), ['Pão']); // incompleta: não casa
+  assert.deepEqual(etiquetasDosNomes(['Pão de queijo'], ['Pão de Queijo']), ['Pão de Queijo']); // sem repetir
+  assert.equal(nomeDaEtiqueta([], 'pão de queijo, da nami', juntas), 'Pão de Queijo, da nami'); // grafia da lista, pontuação fica
+});
+
+test('expressões: ao digitar, o balão da expressão aparece e troca o trecho inteiro', () => {
+  const tags = etiquetasDosNomes([], ['Pão de Queijo', 'Café da Manhã']);
+  assert.deepEqual(trechoAtual('comprei pão de q', tags), { antes: 'comprei ', palavra: 'pão de q' });
+  assert.deepEqual(trechoAtual('comprei pão', tags), { antes: 'comprei ', palavra: 'pão' });
+  assert.deepEqual(trechoAtual('Ração da Nami', tags), { antes: 'Ração da ', palavra: 'Nami' }); // nenhuma expressão: a última palavra
+  assert.deepEqual(opcoesDeTag(tags, 'pão de q').achadas, ['Pão de Queijo']);
+  assert.equal(opcoesDeTag(tags, 'pão de q').nova, null); // expressão nova não se cria aqui: é pela lista dos Ajustes
+  assert.equal(trocarTrechoAtual('comprei pão de q', 'Pão de Queijo', tags), 'comprei Pão de Queijo ');
+});
+
+test('expressões da casa: acrescentar, não repetir, tirar; duas palavras ou mais', () => {
+  let casa = { meses: [] };
+  assert.equal(adicionarJunta(casa, 'Banho'), casa); // uma palavra só já é uma etiqueta
+  assert.equal(adicionarJunta(casa, 'pão de queijo'), casa); // já vem com o app
+  casa = adicionarJunta(casa, '  Banho   e Tosa ');
+  assert.deepEqual(casa.etiquetasJuntas, { 'banho e tosa': 'Banho e Tosa' });
+  assert.equal(adicionarJunta(casa, 'banho e tosa'), casa);
+  assert.ok(juntasDaCasa(casa).includes('Banho e Tosa'));
+  assert.deepEqual(tagsDoNome('banho e tosa da Nami', juntasDaCasa(casa)), ['Banho e Tosa', 'Nami']);
+  const sem = removerJunta(casa, 'banho e tosa');
+  assert.equal('etiquetasJuntas' in sem, false);
 });

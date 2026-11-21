@@ -1,6 +1,6 @@
 // Utilitários de interface: criação de elementos, campos e textos comuns.
 import { formatarBRL, parseBRL, mascararReais, valorDosReais, REGEX_REAIS } from '../core/formato.js';
-import { opcoesDeTag, nomeDaEtiqueta, tagsDoNome, palavraAtual, trocarPalavraAtual } from '../core/tags.js';
+import { opcoesDeTag, nomeDaEtiqueta, tagsDoNome, trechoAtual, trocarTrechoAtual } from '../core/tags.js';
 
 export function h(tag, atributos = {}, ...filhos) {
   const el = document.createElement(tag);
@@ -73,27 +73,28 @@ export function campoMoeda({ rotulo, valor = null, aoMudar, dica = null, grande 
 // Campo de etiquetas (desenho 2026-11-21-tags): o "O que foi" de uma compra. Cada palavra do nome é uma etiqueta
 // ("Ração da Nami" → Ração e Nami; as palavras de ligação não contam). Embaixo do campo aparecem as etiquetas do nome
 // e, para a palavra que está sendo digitada, as que já existem como balões para escolher; sem igual, "+ Criar …".
-// `tags` são as etiquetas que já existem. `aoMudar(nome)` recebe o nome final (cada palavra na grafia da etiqueta que
+// `tags` são as etiquetas que já existem e `juntas` as expressões que valem uma etiqueta só ("Pão de Queijo").
+// `aoMudar(nome)` recebe o nome final (cada palavra na grafia da etiqueta que
 // já existe). `aoEscolher(nome)` avisa que tocaram num balão. `campo.input` é o campo de texto.
-export function campoTag({ rotulo, placeholder, valor = '', tags = [], aoMudar, aoEscolher = () => {} }) {
+export function campoTag({ rotulo, placeholder, valor = '', tags = [], juntas = [], aoMudar, aoEscolher = () => {} }) {
   const input = h('input', { class: 'entrada cartao-nome', type: 'text', autocomplete: 'off', value: valor, placeholder });
   const escolhidas = h('div', { class: 'tag-escolhidas', 'aria-label': 'Etiquetas desta compra' });
   const baloes = h('div', { class: 'cartao-sugestoes tag-baloes', role: 'group', 'aria-label': 'Etiquetas para escolher' });
   let criada = null; // a palavra do balão "Criar …" que foi tocado
   const desenhar = () => {
-    const nome = nomeDaEtiqueta(tags, input.value);
-    const dele = tagsDoNome(nome);
+    const nome = nomeDaEtiqueta(tags, input.value, juntas);
+    const dele = tagsDoNome(nome, juntas);
     escolhidas.replaceChildren(...(dele.length
       ? [h('span', { class: 'suave pequeno' }, dele.length === 1 ? 'Etiqueta:' : 'Etiquetas:'), ...dele.map((t) => h('span', { class: 'chip pequeno tag ativo' }, t))]
       : []));
-    const o = opcoesDeTag(tags, palavraAtual(input.value).palavra);
+    const o = opcoesDeTag(tags, trechoAtual(input.value, tags).palavra);
     const lista = o.achadas.map((tag) => h('button', {
       type: 'button', class: `chip pequeno tag${tag === o.exata ? ' ativo' : ''}`, 'aria-pressed': String(tag === o.exata),
       onclick: () => {
-        input.value = trocarPalavraAtual(input.value, tag);
+        input.value = trocarTrechoAtual(input.value, tag, tags);
         criada = null;
         desenhar();
-        aoMudar(nomeDaEtiqueta(tags, input.value));
+        aoMudar(nomeDaEtiqueta(tags, input.value, juntas));
         input.focus(); // dá para seguir escrevendo a próxima palavra
         aoEscolher(tag);
       },
@@ -107,7 +108,7 @@ export function campoTag({ rotulo, placeholder, valor = '', tags = [], aoMudar, 
     }
     baloes.replaceChildren(...lista);
   };
-  input.addEventListener('input', () => { criada = null; desenhar(); aoMudar(nomeDaEtiqueta(tags, input.value)); });
+  input.addEventListener('input', () => { criada = null; desenhar(); aoMudar(nomeDaEtiqueta(tags, input.value, juntas)); });
   desenhar();
   const campo = h('div', { class: 'campo' },
     h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, rotulo), input),
