@@ -36,6 +36,8 @@ const TITULOS = [
   [/^Lembretes/, 'sino'],
   [/^(Atualizar saldos|Copie os saldos)/, 'moeda'],
   [/^Seu plano/, 'alvo'],
+  [/^Plano de aposentadoria/, 'investir', 'mercado'],
+  [/^De onde vem/, 'recibo'],
 ];
 
 function enfeitarTitulos(tela) {

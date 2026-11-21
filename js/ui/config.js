@@ -84,27 +84,23 @@ export function render(container, ctx) {
     ctx.rerender();
   };
 
-  // ---------- Renda ----------
+  // Visão única (desenho 2026-11-21-planejador-integrado): o salário e o custo de vida vêm do Balanço, e a chave do
+  // GitHub é a mesma das contas da casa (Ajustes). Aqui ficam só as premissas, a carteira e os investimentos do plano.
+  const unica = Boolean(ctx.unica && ctx.casa);
+
+  // ---------- Renda (fora da visão única) ----------
   const renda = { salario: estado.config.salario, recebe13: estado.config.recebe13, recebeFerias: estado.config.recebeFerias };
-  // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário aqui só aparece (vem do
-  // Balanço, o único lugar onde se digita); "recebo 13º" e "recebo férias" continuam editáveis.
-  const salarioNoBalanco = Boolean(ctx.unica && ctx.casa);
-  const campoSalario = salarioNoBalanco
-    ? h('div', { class: 'campo' },
-      h('span', { class: 'campo-rotulo' }, 'Salário líquido mensal'),
-      h('div', { class: 'valor' }, formatarBRL(estado.config.salario)),
-      h('span', { class: 'campo-dica' }, 'Vem do Balanço: é só lá que o salário se digita. ', h('a', { href: '#/casa-balanco?folha=salario' }, 'Digitar no Balanço')))
-    : campoMoeda({ rotulo: 'Salário líquido mensal', valor: renda.salario, dica: `Informado em ${formatarMes(estado.config.mesSalario)}. Atualize quando tiver aumento.`, aoMudar: (v) => { renda.salario = v; } });
-  const cartaoRenda = cartao(h('h2', {}, 'Renda'),
+  const campoSalario = campoMoeda({ rotulo: 'Salário líquido mensal', valor: renda.salario, dica: `Informado em ${formatarMes(estado.config.mesSalario)}. Atualize quando tiver aumento.`, aoMudar: (v) => { renda.salario = v; } });
+  const cartaoRenda = !unica && cartao(h('h2', {}, 'Renda'),
     campoSalario,
     h('label', { class: 'marcar' }, h('input', { type: 'checkbox', checked: renda.recebe13, onchange: (e) => { renda.recebe13 = e.target.checked; } }), 'Recebo 13º salário'),
     h('label', { class: 'marcar' }, h('input', { type: 'checkbox', checked: renda.recebeFerias, onchange: (e) => { renda.recebeFerias = e.target.checked; } }), 'Recebo férias com 1/3'),
     h('div', { class: 'botoes' }, botao('Salvar renda', () => {
       if (!(renda.salario > 0)) { ctx.aviso('Informe o salário.', 'atencao', 3000); return; }
-      const mudouSalario = !salarioNoBalanco && renda.salario !== estado.config.salario;
+      const mudouSalario = renda.salario !== estado.config.salario;
       salvarComAviso((e) => ({
         ...e,
-        config: { ...e.config, salario: salarioNoBalanco ? e.config.salario : renda.salario, recebe13: renda.recebe13, recebeFerias: renda.recebeFerias, mesSalario: mudouSalario ? mes : e.config.mesSalario },
+        config: { ...e.config, salario: renda.salario, recebe13: renda.recebe13, recebeFerias: renda.recebeFerias, mesSalario: mudouSalario ? mes : e.config.mesSalario },
       }), 'Renda salva.');
     })));
 
@@ -262,8 +258,11 @@ export function render(container, ctx) {
     msgRefazer);
 
   container.replaceChildren(...[
-    h('h1', {}, 'Ajustes'),
-    h('p', { class: 'suave' }, `Salário atual: ${formatarBRL(estado.config.salario)} · plano iniciado em ${formatarMes(estado.config.mesInicio)}.`),
-    cartaoRenda, cartaoPremissas, cartaoCarteira, cartaoAtivos, noApp() && cartaoLembretes(ctx), cartaoConexao, cartaoIpca, cartaoBackup,
+    unica && h('button', { type: 'button', class: 'botao-link cofrinho-voltar', onclick: () => ctx.navegar('#/casa-ajustes') }, '‹ Ajustes'),
+    h('h1', {}, unica ? 'Ajustes do plano' : 'Ajustes'),
+    h('p', { class: 'suave' }, unica
+      ? `Plano iniciado em ${formatarMes(estado.config.mesInicio)}. O salário e o custo de vida vêm do Balanço; a sincronização fica nos Ajustes.`
+      : `Salário atual: ${formatarBRL(estado.config.salario)} · plano iniciado em ${formatarMes(estado.config.mesInicio)}.`),
+    cartaoRenda, cartaoPremissas, cartaoCarteira, cartaoAtivos, noApp() && cartaoLembretes(ctx), !unica && cartaoConexao, cartaoIpca, cartaoBackup,
   ].filter(Boolean));
 }

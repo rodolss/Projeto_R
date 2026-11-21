@@ -6,6 +6,7 @@ import { buscarSerieIpca, precisaAtualizarIpca } from './dados/ipca-remoto.js';
 import { mesclarCasa } from './dados/mesclar-casa.js';
 import { migrarCasa } from './core/casa.js';
 import { salarioDoPlanoPelaCasa } from './core/salario.js';
+import { orcamentoPelaCasa } from './core/custo-de-vida.js';
 import { dataISO, somarMeses } from './core/meses.js';
 import { h, cartao, aviso, textoConexao, esconderFolha } from './ui/dom.js';
 import { resolverRota, abaDoMenu, ehDaCasa, podeAtualizarSozinho, espacoParaLembrar, LEMBRADAS, visaoUnica, mostraTopo } from './ui/rotas.js';
@@ -99,26 +100,31 @@ async function salvarCasa(mutacao) {
   const r = await app.armazemCasa.salvar(mutacao);
   app.casa = r.estado;
   if (r.aviso) avisoDeConexao(r.aviso);
-  await acompanharSalario();
+  await acompanharCasa();
   return r;
 }
 
-// Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário do plano é o do último mês
-// confirmado no Balanço até hoje. Confere depois de cada gravação da casa e a cada desenho (o mês vira, chegam dados
-// de outro aparelho). No desenho, só com os dois arquivos já lidos do GitHub (não grava a partir de cópia velha).
+// O plano acompanha a casa (desenhos 2026-11-21-salario-no-balanco e -planejador-integrado): na visão única, o salário
+// do plano é o do último mês confirmado no Balanço e o custo de vida é a média do que saiu nos últimos meses fechados.
+// Confere depois de cada gravação da casa e a cada desenho (o mês vira, chegam dados de outro aparelho). No desenho, só
+// com os dois arquivos já lidos do GitHub (não grava a partir de cópia velha).
 let acompanhando = false;
-async function acompanharSalario({ soSincronizado = false } = {}) {
+async function acompanharCasa({ soSincronizado = false } = {}) {
   const { visto } = perfilDoMomento();
   if (acompanhando || !app.estado || !app.casa || !visaoUnica({ visto, temEstado: true })) return false;
   if (soSincronizado && !(app.sincronizado && app.casaSincronizada)) return false;
-  const pelaCasa = (config) => salarioDoPlanoPelaCasa(config, { casa: app.casa, pessoaId: visto.id, hoje: dataISO(new Date()) });
-  if (pelaCasa(app.estado.config) === app.estado.config) return false;
+  const daCasa = { casa: app.casa, pessoaId: visto.id, hoje: dataISO(new Date()) };
+  const pelaCasa = (e) => {
+    const config = salarioDoPlanoPelaCasa(e.config, daCasa);
+    return orcamentoPelaCasa(config === e.config ? e : { ...e, config }, daCasa);
+  };
+  if (pelaCasa(app.estado) === app.estado) return false;
   acompanhando = true;
   try {
-    await salvar((e) => ({ ...e, config: pelaCasa(e.config) }));
+    await salvar(pelaCasa);
     return true;
   } catch (erro) {
-    console.warn('Não atualizei o salário do plano', erro);
+    console.warn('Não atualizei o plano pela casa', erro);
     return false;
   } finally {
     acompanhando = false;
@@ -248,7 +254,7 @@ async function renderizar() {
   const unica = visaoUnica({ visto: perfil.visto, temEstado: Boolean(app.estado) });
   // O salário do plano mudou (outro mês confirmado no Balanço): redesenha se não houver nada sendo digitado.
   if (unica) {
-    acompanharSalario({ soSincronizado: true }).then((mudou) => {
+    acompanharCasa({ soSincronizado: true }).then((mudou) => {
       if (mudou && podeAtualizarSozinho(location.hash, digitando())) renderizar();
     });
   }

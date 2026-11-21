@@ -397,6 +397,14 @@ details.detalhes[open] > summary::after { content: "−"; }
 .tarefa .seta { color: var(--suave); font-size: 22px; line-height: 1; }
 .passos i { height: 5px; border-radius: 3px; background: var(--cartao-2); }
 .passos i.feito { background: var(--grad-botao); }
+/* As tarefas do Dia de pagamento numa lista só, como as linhas das Contas e do Cartão. */
+.tarefas { gap: 0; background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); overflow: hidden; }
+.tarefas .tarefa { border: 0; border-top: 1px solid var(--borda); border-radius: 0; box-shadow: none; }
+.tarefas .tarefa:first-child { border-top: 0; }
+.tarefas .tarefa:not(:disabled):active { transform: none; }
+/* No herói, os passos ficam brancos. */
+.heroi .passos i, .heroi .passos span { background: rgba(255, 255, 255, 0.22); }
+.heroi .passos i.feito, .heroi .passos span.feito { background: #fff; }
 /* Cadeado do mês (fechado.js): no canto do cartão; no herói, branco e verde-claro. */
 .cartao:has(> .cadeado-mes) { position: relative; }
 .cadeado-mes { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; cursor: pointer; }
