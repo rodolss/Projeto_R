@@ -16,29 +16,29 @@ export function marcarPago(casa, { mes, marca, pago }) {
   return Object.keys(novos).length ? { ...resto, pagamentos: novos } : resto;
 }
 
-// A marca de uma fatura de cartão (o botão "Pago" da tela Cartão). A conta ligada ao cartão de quem vê é a mesma fatura
-// (mesma marca); um cartão de outra pessoa entra como conta comum (a parte da casa).
+// A marca de uma fatura de cartão (o botão "Pago" da tela Cartão). A conta da casa ligada a um cartão é a mesma fatura:
+// tem a mesma marca para qualquer pessoa (marcou a dona, a outra pessoa também vê pago).
 export const marcaDoCartao = (cartaoId) => `cartao-${cartaoId}`;
-export function marcaDaConta(casa, contaId, pessoaId) {
-  const dele = (casa.cartoes ?? []).find((c) => c.contaId === contaId && c.donaId === pessoaId);
-  return dele ? marcaDoCartao(dele.id) : contaId;
+export function marcaDaConta(casa, contaId) {
+  const cartao = (casa.cartoes ?? []).find((c) => c.contaId === contaId);
+  return cartao ? marcaDoCartao(cartao.id) : contaId;
 }
 
 // As contas com valor no mês, como marcas (sem repetir).
-const marcasDasContas = (casa, mes, pessoaId) => [...new Set(resumoDoMes(casa, mes).contas.map((c) => marcaDaConta(casa, c.conta.id, pessoaId)))];
+const marcasDasContas = (casa, mes) => [...new Set(resumoDoMes(casa, mes).contas.map((c) => marcaDaConta(casa, c.conta.id)))];
 // A fatura de cada cartão da pessoa, se tiver compras no mês.
 const marcasDosCartoes = (casa, mes, pessoaId) => (casa.cartoes ?? [])
   .filter((c) => c.donaId === pessoaId && faturaDoCartao(casa, c.id, mes).total > 0).map((c) => marcaDoCartao(c.id));
 
 // Todas as contas do mês pagas (o selo "Pago" das contas da casa no Balanço). Sem contas: não.
 export function contasPagas(casa, mes, pessoaId) {
-  const marcas = marcasDasContas(casa, mes, pessoaId);
+  const marcas = marcasDasContas(casa, mes);
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
 // Tudo pago: contas e cartões da pessoa. Mês sem nada para pagar não conta como pago.
 export function tudoPago(casa, mes, pessoaId) {
-  const marcas = [...new Set([...marcasDasContas(casa, mes, pessoaId), ...marcasDosCartoes(casa, mes, pessoaId)])];
+  const marcas = [...new Set([...marcasDasContas(casa, mes), ...marcasDosCartoes(casa, mes, pessoaId)])];
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 

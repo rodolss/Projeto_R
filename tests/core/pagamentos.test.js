@@ -55,8 +55,11 @@ test('já paguei: com tudo pago a tela abre no mês seguinte (e segue enquanto e
 
 test('já paguei: a fatura do cartão de quem paga também precisa estar paga; a conta ligada a ele é a mesma marca', () => {
   let casa = casaBase(true);
-  assert.equal(marcaDaConta(casa, 'c3', 'p1'), 'cartao-k1');
-  assert.equal(marcaDaConta(casa, 'c3', 'p2'), 'c3'); // cartão de outra pessoa: conta comum
+  assert.equal(marcaDaConta(casa, 'c3'), 'cartao-k1'); // a conta da casa ligada ao cartão é a mesma fatura, para qualquer pessoa
+  assert.equal(marcaDaConta(casa, 'c1'), 'c1');
+  // A dona marca a fatura: a outra pessoa vê a conta do cartão paga (e o contrário).
+  const feita = marcar(casa, '2026-12', 'cartao-k1');
+  assert.equal(estaPago(feita, '2026-12', marcaDaConta(feita, 'c3')), true);
   casa = marcar(marcar(casa, '2026-12', 'c1'), '2026-12', 'c2');
   assert.equal(contasPagas(casa, '2026-12', 'p1'), true); // contas (sem o cartão) pagas
   assert.equal(tudoPago(casa, '2026-12', 'p1'), false); // falta a fatura do cartão
