@@ -11,7 +11,6 @@ import {
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
-import { configComSalario } from '../core/salario.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 export const nomeDoMes = (mes) => MESES[Number(mes.slice(5, 7)) - 1];
@@ -260,19 +259,17 @@ function desenharMes(container, ctx) {
   }
 
   // Salário digitado uma vez só (desenho 2026-11-21-salario-unico): na visão única, o salário de quem administra no
-  // mês atual vale também para o salário do plano (e o Dia de pagamento já abre com ele).
+  // mês atual já abre o Dia de pagamento preenchido (para conferir). O salário do plano não muda por aqui.
   function folhaSalario(pessoa, folha) {
     const s = salarioNoMes(casa, mes, pessoa.id);
-    const doPlano = ctx.unica && ctx.estado && pessoa.id === visto?.id && mes === mesAtual;
+    const abreODia = ctx.unica && ctx.estado && pessoa.id === visto?.id && mes === mesAtual
+      && !(ctx.estado.meses ?? []).some((m) => m.mes === mes);
     return folhaValor({
       folha, texto: `Salário de ${pessoa.nome} em ${nome}`, situacao: s.situacao, valorAtual: s.valor,
       anterior: salarioNoMes(casa, mesAnterior, pessoa.id), dica: 'O salário líquido que caiu na conta.',
       aoSalvar: (c, valor) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor }),
       aoTirar: (c) => salvarSalario(c, { mes, pessoaId: pessoa.id, valor: null }),
-      depois: doPlano ? async (valor) => {
-        if (valor !== ctx.estado.config.salario) await ctx.salvar((e) => ({ ...e, config: configComSalario(e.config, valor, mes) }));
-        return 'Salvo. Vale também para o plano e para o Dia de pagamento.';
-      } : null,
+      depois: abreODia ? async () => 'Salvo. O Dia de pagamento já abre com esse valor para você conferir.' : null,
     });
   }
 

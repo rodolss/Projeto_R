@@ -11,7 +11,7 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { gastouMaisQueOOrcamento, gastoMedioFechado, LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
-import { salarioRegular, preencherRecebido, configComSalario } from '../core/salario.js';
+import { salarioRegular, preencherRecebido, levarParaCasa } from '../core/salario.js';
 import { salarioNoMes, salvarSalario } from '../core/casa.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
@@ -134,18 +134,20 @@ function desenhar(container, ctx) {
     });
   }
 
-  // Salário digitado uma vez só: o salário de todo mês contido no que caiu vale também para o Mês da casa e para o
-  // salário do plano (com 13º, férias ou PLR, o do plano). Grava depois de fechar a folha, sem segurar a tela.
+  // Salário digitado uma vez só: o salário de todo mês contido no que caiu (o efetivo, com o adiantamento das férias
+  // guardado) vale também para o Mês da casa — só se lá ainda for previsão. O salário do plano não muda. Editar um mês
+  // já registrado não mexe na casa. Grava depois de fechar a folha, sem segurar a tela.
   async function levarSalario() {
-    if (!visto) return;
-    const regular = salarioRegular({ recebido: r.recebido, tipoExtra: r.tipoExtra, pareceExtra: resposta().perguntarExtra, salarioPlano: estado.config.salario });
-    if (regular == null) return;
-    const naCasa = salarioNoMes(ctx.casa, mes, visto.id);
-    if (!(naCasa.situacao === 'confirmado' && naCasa.valor === regular)) {
+    if (!visto || r.editando) return;
+    const rr = resposta();
+    const regular = salarioRegular({ recebidoEfetivo: rr.recebidoEfetivo, tipoExtra: r.tipoExtra, pareceExtra: rr.perguntarExtra, salarioPlano: estado.config.salario });
+    if (!levarParaCasa({ salarioCasa: salarioNoMes(ctx.casa, mes, visto.id), regular })) return;
+    try {
       await ctx.salvarCasa((c) => salvarSalario(c, { mes, pessoaId: visto.id, valor: regular }));
+      ctx.aviso('Salário salvo também nas contas da casa.', 'ok', 3000);
+    } catch (erro) {
+      console.warn('Não deu para levar o salário para as contas da casa', erro);
     }
-    if (regular !== estado.config.salario) await ctx.salvar((e) => ({ ...e, config: configComSalario(e.config, regular, mes) }));
-    ctx.aviso('Salário salvo também nas contas da casa e no plano.', 'ok', 3000);
   }
 
   // ---------- folhas ----------
@@ -385,7 +387,11 @@ function desenhar(container, ctx) {
   const proventos = registrado ? existente.proventos ?? 0 : r.proventos;
 
   const tarefas = [
-    { n: 1, chave: 'salario', titulo: 'Salário que caiu', detalhe: sit.feitas.salario ? formatarBRL(recebido) : 'Falta preencher' },
+    {
+      n: 1, chave: 'salario', titulo: 'Salário que caiu',
+      // Preenchido pelo Mês da casa e ainda não confirmado: um toque confere.
+      detalhe: sit.feitas.salario ? formatarBRL(recebido) : recebido != null ? `Confira: ${formatarBRL(recebido)}` : 'Falta preencher',
+    },
     {
       n: 2, chave: 'proventos', titulo: 'Proventos desde o último registro',
       detalhe: sit.feitas.proventos ? formatarBRL(proventos ?? 0) : ultimoRegistro ? `Desde ${dataCurta(ultimoRegistro)}` : 'Desde que você começou',
