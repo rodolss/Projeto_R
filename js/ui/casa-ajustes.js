@@ -174,58 +174,112 @@ function desenhar(container, ctx) {
     if (folha === 'nova-conta') return folhaDaConta(null, folha);
     if (folha?.startsWith('conta-')) { const conta = ativas.find((c) => c.id === folha.slice(6)); return conta && folhaDaConta(conta, folha); }
     if (folha?.startsWith('pessoa-')) { const p = casa.pessoas.find((x) => x.id === folha.slice(7)); return p && folhaDaPessoa(p, folha); }
+    if (folha?.startsWith('cartao-')) { const k = cartoes.find((x) => x.id === folha.slice(7)); return k && folhaDoCartao(k, folha); }
+    if (folha?.startsWith('outra-')) { const p = usadas.find((x) => x.id === folha.slice(6)); return p && folhaDaOutraPessoa(p, folha); }
+    if (folha === 'etiquetas') return folhaDasEtiquetas();
     return null;
   }
 
-  // ---------- cartões (desenho 2026-11-19-cartao, vários cartões) ----------
+  // ---------- cartões e compras (desenho 2026-11-21-ajustes-casa-simples) ----------
+  // Como a Casa: cartões, pessoas e etiquetas em listas limpas; tocar abre uma folha simples.
   const cartoes = cartoesVisiveis(casa, visto); // cada um, os próprios
   const usado = (k) => k.fixas.length > 0 || casa.meses.some((m) => (m.compras ?? []).some((c) => c.contaId === k.contaId));
-  const blocoDoCartao = (k) => {
+  const tituloDoCartao = (k) => {
     const rotulo = rotuloDoCartao(casa, k);
-    const titulo = casa.pessoas.some((p) => p.nome === rotulo) ? `Cartão de ${rotulo}` : rotulo;
-    return cartao(
-      h('h2', {}, titulo),
-      // Com perfis, o cartão é de quem vê: sem "De quem é" (não dá para passar o cartão para outra pessoa).
-      formularioDoCartao(ctx, { cartaoId: k.id, donaFixa: Boolean(visto), aoSalvar: () => ctx.rerender() }),
-      !usado(k) && botaoDoisToques('Tirar este cartão', 'Toque de novo para tirar', () => salvar((c) => tirarCartao(c, k.id), 'Cartão tirado.')));
+    return casa.pessoas.some((p) => p.nome === rotulo) ? `Cartão de ${rotulo}` : rotulo;
   };
+  const diasDoCartao = (k) => (k.viraNoDia && k.venceNoDia ? `vira dia ${k.viraNoDia} · vence dia ${k.venceNoDia}` : 'falta escolher os dias');
+  const secaoCartoes = h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, cartoes.length > 1 ? 'Cartões' : 'Cartão'),
+    h('div', {},
+      ...cartoes.map((k) => linhaDaLista({
+        selo: iconeCategoria('cartao'), titulo: tituloDoCartao(k), detalhe: diasDoCartao(k), aoTocar: () => abrir(`cartao-${k.id}`),
+      })),
+      linhaDaLista({
+        selo: h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone('mais')), classe: 'linha-acao',
+        titulo: cartoes.length ? 'Adicionar outro cartão' : 'Configurar o cartão',
+        detalhe: !cartoes.length && 'Anote compra por compra: o que é da casa, de cada um e de outras pessoas',
+        aoTocar: () => ctx.navegar(cartoes.length ? '#/casa-cartao?novo=1' : '#/casa-cartao'),
+      })));
+
   const outrasPessoas = casa.outrasPessoas ?? [];
   const usadas = outrasPessoas.filter((p) => !p.arquivada);
   const paradas = outrasPessoas.filter((p) => p.arquivada);
-  const pessoasDosCartoes = cartoes.length > 0 && cartao(
-    h('h2', {}, 'Outras pessoas'),
-    h('p', { class: 'suave pequeno', style: 'margin:0' }, usadas.length
-      ? 'Para quem também se compra nos cartões. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'
-      : 'Ninguém ainda. Para acrescentar, use "+ Outra pessoa" ao anotar uma compra.'),
-    ...usadas.map((p) => h('div', { class: 'casa-ajuste-linha', style: 'margin-top:8px' },
-      h('input', {
-        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome de ${p.nome}`,
-        onchange: (e) => {
-          const nome = e.target.value.trim();
-          if (!nome) { e.target.value = p.nome; return; }
-          if (nome !== p.nome) salvar((c) => editarPessoaDoCartao(c, p.id, { nome }), 'Nome salvo.');
-        },
-      }),
-      h('button', {
-        type: 'button', class: 'botao-link', style: 'padding:6px 0',
-        onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: true }), `${p.nome} saiu da lista de "Para quem".`),
-      }, 'Não uso mais'))),
-    ...paradas.map((p) => h('div', { class: 'linha' },
-      h('div', { class: 'nome' }, h('span', {}, p.nome), h('small', {}, 'não aparece em "Para quem"')),
-      h('button', {
-        type: 'button', class: 'botao-link', style: 'padding:4px 0',
-        onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: false }), `${p.nome} voltou para a lista.`),
-      }, 'Voltar a usar'))));
-  const secaoCartoes = cartoes.length
-    ? [
-      ...cartoes.map(blocoDoCartao),
-      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao?novo=1' }, 'Adicionar outro cartão')),
-      pessoasDosCartoes,
-    ]
-    : [cartao(
-      h('h2', {}, 'Cartão'),
-      h('p', { class: 'suave' }, 'Anote compra por compra do cartão de cada um: o que é da casa, de cada um e de outras pessoas.'),
-      h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/casa-cartao' }, 'Configurar o cartão')))];
+  const secaoPessoas = cartoes.length > 0 && h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Para quem também compro'),
+    usadas.length > 0 && h('div', {}, ...usadas.map((p) => linhaDaLista({
+      selo: avatar(p), titulo: p.nome, detalhe: 'toque para mudar o nome', aoTocar: () => abrir(`outra-${p.id}`),
+    }))),
+    h('p', { class: 'nota nota-casa' }, usadas.length
+      ? 'Para acrescentar alguém, use "+ Outra pessoa" ao anotar uma compra.'
+      : 'Ninguém ainda. Para acrescentar alguém, use "+ Outra pessoa" ao anotar uma compra.'),
+    paradas.length > 0 && h('details', { class: 'casa-paradas' },
+      h('summary', {}, `Pessoas para quem não compra mais (${paradas.length})`),
+      ...paradas.map((p) => h('div', { class: 'linha' },
+        h('div', { class: 'nome' }, h('span', {}, p.nome)),
+        h('button', {
+          type: 'button', class: 'botao-link', style: 'padding:4px 0',
+          onclick: () => salvar((c) => editarPessoaDoCartao(c, p.id, { arquivada: false }), `${p.nome} voltou para a lista.`),
+        }, 'Voltar a usar')))));
+
+  const daCasa = Object.values(casa.etiquetasJuntas ?? {});
+  const secaoEtiquetas = h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Etiquetas'),
+    h('div', {}, linhaDaLista({
+      selo: h('span', { class: 'icone-cat cat-assinatura', 'aria-hidden': 'true' }, icone('etiqueta')), titulo: 'Palavras que andam juntas',
+      detalhe: daCasa.length ? `"Pão de Queijo" e mais ${daCasa.length} de vocês contam como uma etiqueta só` : '"Pão de Queijo" conta como uma etiqueta só',
+      aoTocar: () => abrir('etiquetas'),
+    })));
+
+  // ---------- folhas de cartões e compras ----------
+  const folhaDoCartao = (k, folha) => [
+    h('h2', {}, tituloDoCartao(k)),
+    // Com perfis, o cartão é de quem vê: sem "De quem é" (não dá para passar o cartão para outra pessoa).
+    formularioDoCartao(ctx, {
+      cartaoId: k.id, donaFixa: Boolean(visto), aoCancelar: fechar,
+      aoSalvar: () => { const acao = depoisDeSalvar(location.hash, folha, 'casa-ajustes'); if (acao === 'fechar') fechar(); else if (acao === 'redesenhar') ctx.rerender(); },
+    }),
+    usado(k)
+      ? h('p', { class: 'suave pequeno' }, 'Este cartão já tem compras anotadas: ele fica, para não perder o histórico.')
+      : botaoDoisToques('Tirar este cartão', 'Toque de novo para tirar', () => salvarNaFolha((c) => tirarCartao(c, k.id), 'Cartão tirado.', folha)),
+  ];
+
+  const folhaDaOutraPessoa = (pessoa, folha) => {
+    let nome = pessoa.nome;
+    return [
+      h('h2', {}, pessoa.nome),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', { class: 'entrada', type: 'text', value: pessoa.nome, autocomplete: 'off', oninput: (e) => { nome = e.target.value.trim(); } })),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Salvar', () => {
+        if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        if (nome === pessoa.nome) { fechar(); return; }
+        salvarNaFolha((c) => editarPessoaDoCartao(c, pessoa.id, { nome }), 'Nome salvo.', folha);
+      })),
+      botaoDoisToques(`Não compro mais para ${pessoa.nome}`, 'Toque de novo: sai da lista "Para quem"',
+        () => salvarNaFolha((c) => editarPessoaDoCartao(c, pessoa.id, { arquivada: true }), `${pessoa.nome} saiu da lista de "Para quem".`, folha)),
+    ];
+  };
+
+  // As expressões que valem uma etiqueta só (as do app vêm prontas; a casa acrescenta as suas em casa.etiquetasJuntas).
+  const folhaDasEtiquetas = () => {
+    const nova = { texto: '' };
+    return [
+      h('h2', {}, 'Palavras que andam juntas'),
+      h('p', { class: 'suave' }, 'Cada palavra de uma compra vira uma etiqueta: "Ração da Nami" tem duas, Ração e Nami. As expressões daqui contam como uma só.'),
+      daCasa.length > 0 && h('div', { class: 'cartao casa-compras' }, ...Object.entries(casa.etiquetasJuntas ?? {}).map(([chave, texto]) => h('div', { class: 'linha' },
+        h('div', { class: 'nome' }, h('span', {}, texto)),
+        botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => removerJunta(c, chave), 'Expressão tirada.'))))),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Acrescentar (duas palavras ou mais)'),
+        h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: Banho e Tosa', oninput: (e) => { nova.texto = e.target.value; } })),
+      h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), botao('Acrescentar', () => {
+        if (adicionarJunta(casa, nova.texto) === casa) { ctx.aviso('Escreva duas palavras ou mais que ainda não estejam na lista.', 'atencao', 3500); return; }
+        salvar((c) => adicionarJunta(c, nova.texto), 'Expressão acrescentada.');
+      })),
+      h('details', { class: 'casa-paradas' },
+        h('summary', {}, `Já vêm com o app (${JUNTAS_DO_APP.length})`),
+        h('div', { class: 'chips', style: 'margin-top:4px' }, ...JUNTAS_DO_APP.map((f) => h('span', { class: 'chip pequeno tag' }, f)))),
+    ];
+  };
 
   // ---------- sincronização ----------
   const outra = casa.pessoas[1]?.nome ?? 'a outra pessoa';
@@ -241,27 +295,6 @@ function desenhar(container, ctx) {
         cartaoConectar(ctx, { titulo: 'Chave nova', texto: 'Use quando o app avisar que a chave venceu ou ficou inválida.' })),
     ]
     : cartaoConectar(ctx, { titulo: 'Usar nos dois celulares', texto: 'Hoje as contas estão só neste aparelho. Conecte com uma chave do GitHub para ver as mesmas contas em outro celular.' });
-
-  // ---------- etiquetas compostas ----------
-  // Cada palavra de uma compra vira uma etiqueta ("Ração da Nami" → Ração e Nami). As expressões desta lista valem uma
-  // etiqueta só ("Pão de Queijo"): as do app vêm prontas; a casa acrescenta as suas (casa.etiquetasJuntas).
-  const novaJunta = { texto: '' };
-  const campoJunta = h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: Banho e Tosa', oninput: (e) => { novaJunta.texto = e.target.value; } });
-  const etiquetasCompostas = cartao(
-    h('h2', {}, 'Etiquetas compostas'),
-    h('p', { class: 'suave' }, 'Cada palavra de uma compra vira uma etiqueta: "Ração da Nami" tem duas, Ração e Nami. As expressões desta lista contam como uma etiqueta só, como "Pão de Queijo".'),
-    ...Object.entries(casa.etiquetasJuntas ?? {}).map(([chave, texto]) => h('div', { class: 'linha' },
-      h('div', { class: 'nome' }, h('span', {}, texto)),
-      botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => removerJunta(c, chave), 'Expressão tirada.')))),
-    h('div', { class: 'casa-ajuste' },
-      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nova expressão (duas palavras ou mais)'), campoJunta),
-      h('div', { class: 'botoes' }, botao('Adicionar', () => {
-        if (adicionarJunta(casa, novaJunta.texto) === casa) { ctx.aviso('Escreva duas palavras ou mais que ainda não estejam na lista.', 'atencao', 3500); return; }
-        salvar((c) => adicionarJunta(c, novaJunta.texto), 'Expressão adicionada.');
-      }, { secundario: true }))),
-    h('details', { class: 'casa-ajuste' },
-      h('summary', {}, `Já vêm com o app (${JUNTAS_DO_APP.length})`),
-      h('div', { class: 'chips', style: 'margin-top:8px' }, ...JUNTAS_DO_APP.map((f) => h('span', { class: 'chip pequeno tag' }, f)))));
 
   // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
   const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
@@ -322,8 +355,8 @@ function desenhar(container, ctx) {
     },
     {
       id: 'cartoes', icone: 'cartao', cat: 'cartao', titulo: 'Cartões e compras',
-      resumo: `${cartoes.length ? plural(cartoes.length, 'cartão', 'cartões') : 'Nenhum cartão'} · etiquetas`,
-      conteudo: [...secaoCartoes, etiquetasCompostas],
+      resumo: [cartoes.length ? plural(cartoes.length, 'cartão', 'cartões') : 'Nenhum cartão', usadas.length > 0 && plural(usadas.length, 'pessoa', 'pessoas'), 'etiquetas'].filter(Boolean).join(' · '),
+      conteudo: [secaoCartoes, secaoPessoas, secaoEtiquetas],
     },
     plano && {
       id: 'plano', icone: 'investir', cat: 'mercado', titulo: 'Plano de aposentadoria',
