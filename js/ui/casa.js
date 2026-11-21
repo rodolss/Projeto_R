@@ -10,8 +10,7 @@ import {
 } from '../core/casa.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
-import { mesEmFoco, marcaDaConta } from '../core/pagamentos.js';
-import { criarMarcador } from './pago.js';
+import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago } from '../core/pagamentos.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -194,12 +193,15 @@ function desenharMes(container, ctx) {
     if (aoTocarConta(casa, conta.id, visto) === 'parte') abrir(`parte-${conta.id}`);
     else abrir(`${conta.compraPorCompra ? 'cartao' : 'conta'}-${conta.id}`);
   };
-  // "Já paguei": o switch de cada conta (js/ui/pago.js). A conta ligada ao cartão de quem vê é a fatura inteira.
-  const marcador = criarMarcador({ ctx, casa, mes, visto, irPara });
-  const comPago = (conta, botaoLinha) => marcador(marcaDaConta(casa, conta.id, visto?.id), conta.nome, botaoLinha);
-  const linhasContas = r.contas.map((c) => comPago(c.conta, linha({
-    titulo: c.conta.nome, detalhe: detalheConta(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
-  })));
+  // "Já paguei" (desenho 2026-11-21-ja-paguei): o botão "Pago" fica no fim da folha de cada conta (como na tela Cartão) e
+  // a lista mostra o selo. A marca é da casa (vale para os dois); a conta ligada ao cartão de quem vê é a fatura inteira.
+  const marcaDe = (conta) => marcaDaConta(casa, conta.id, visto?.id);
+  const pagaConta = (conta) => estaPago(casa, mes, marcaDe(conta));
+  const linhasContas = r.contas.map((c) => linha({
+    titulo: c.conta.nome,
+    detalhe: pagaConta(c.conta) ? [h('span', { class: 'selo ok' }, 'Pago ✓'), ' ', ...[detalheConta(c)].flat()] : detalheConta(c),
+    valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar', aoTocar: tocarConta(c.conta),
+  }));
   const semValor = r.semValor.length
     ? (verSemValor
       ? r.semValor.map((conta) => linha({ titulo: conta.nome, detalhe: 'sem valor neste mês', valor: '—', vazio: true, aoTocar: tocarConta(conta) }))
@@ -210,7 +212,7 @@ function desenharMes(container, ctx) {
     : [];
   const listaContas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Contas'),
-    visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Ligue o switch das contas que você já pagou.'),
+    visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Abra a conta e toque em "Pago" depois de pagar.'),
     h('div', {}, ...linhasContas, ...semValor),
     !casa.contas.some((c) => !c.arquivada) && h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma conta cadastrada. Cadastre em Ajustes.'));
 
@@ -234,7 +236,28 @@ function desenharMes(container, ctx) {
   const dicaAnterior = (v) => v.situacao !== 'vazio' && h('p', { class: 'suave pequeno' }, `Em ${nomeDoMes(mesAnterior)}: ${formatarBRL(v.valor)}`);
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // valor digitado ainda não salvo: a atualização automática espera
 
-  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha }) {
+  // O botão "Pago" (ou "desfazer") do fim da folha de uma conta. Com tudo do mês pago, abre o mês seguinte.
+  function botaoPago(conta, folha) {
+    const pago = pagaConta(conta);
+    return h('div', { class: 'cartao-conferir' },
+      h('div', { class: 'botoes' }, botao(pago ? 'Conta paga ✓ (desfazer)' : 'Pago', async (e) => {
+        e.currentTarget.disabled = true;
+        const grava = (c) => marcarPago(c, { mes, marca: marcaDe(conta), pago: !pago });
+        const nova = grava(casa);
+        await ctx.salvarCasa(grava);
+        if (!pago && visto && tudoPago(nova, mes, visto.id)) {
+          ctx.aviso(`Tudo pago em ${nome}! Mostrando ${nomeDoMes(somarMeses(mes, 1))}.`, 'ok', 3500);
+          abertaAqui = false;
+          irPara(somarMeses(mes, 1));
+          return;
+        }
+        ctx.aviso(pago ? 'Marca de pago tirada.' : 'Conta marcada como paga.', 'ok', 2500);
+        terminar(folha);
+      }, { secundario: pago })),
+      !pago && h('p', { class: 'nota' }, 'Use depois de pagar: a lista e o Balanço mostram como paga.'));
+  }
+
+  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha, pagoDe = null }) {
     let valor = situacao === 'vazio' ? null : valorAtual;
     const salvar = botao('Salvar', async () => {
       if (valor == null) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
@@ -253,13 +276,14 @@ function desenharMes(container, ctx) {
         type: 'button', class: 'botao-link',
         onclick: async () => { await ctx.salvarCasa(aoTirar); ctx.aviso('Valor tirado. O app volta a prever.', 'ok', 3000); terminar(folha); },
       }, 'Tirar o valor deste mês'),
+      pagoDe && botaoPago(pagoDe, folha),
     ];
   }
 
   function folhaConta(conta, folha) {
     const v = valorDaConta(casa, mes, conta.id);
     return folhaValor({
-      folha, texto: `${conta.nome} de ${nome}`, situacao: v.situacao, valorAtual: v.valor,
+      folha, pagoDe: conta, texto: `${conta.nome} de ${nome}`, situacao: v.situacao, valorAtual: v.valor,
       anterior: valorDaConta(casa, mesAnterior, conta.id),
       aoSalvar: (c, valor) => salvarValor(c, { mes, contaId: conta.id, valor }),
       aoTirar: (c) => salvarValor(c, { mes, contaId: conta.id, valor: null }),
@@ -380,6 +404,7 @@ function desenharMes(container, ctx) {
         botao('Fechar', fechar, { secundario: true })),
       !v.compras.length && h('button', { type: 'button', class: 'botao-link', onclick: abrirSoTotal }, 'Digitar só o total da fatura'),
       soTotal,
+      botaoPago(conta, folha),
     ];
   }
 
@@ -416,6 +441,7 @@ function desenharMes(container, ctx) {
       h('div', { class: 'botoes' },
         d.podeAbrirCartao && botao('Abrir no Cartão', abrirCartao),
         botao('Fechar', fechar, { secundario: true })),
+      botaoPago(conta, `parte-${conta.id}`),
     ];
   }
 
