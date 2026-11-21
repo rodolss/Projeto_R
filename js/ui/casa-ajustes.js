@@ -1,7 +1,7 @@
 // Contas da casa · Ajustes (desenho de 2026-11-19): nomes, contas, cartão, sincronização e a volta para a aposentadoria,
 // em gavetas por grupo (desenho 2026-11-21-ajustes-em-gavetas).
 // Cada mudança salva na hora (nome ao sair do campo; o resto ao tocar), sem botão "Salvar" para esquecer.
-import { h, cartao, botao } from './dom.js';
+import { h, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core/casa.js';
 import { cartaoConectar } from './conectar.js';
 import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao } from '../core/cartao.js';
@@ -14,7 +14,8 @@ import { avatar } from './topo.js';
 import { adicionarJunta, removerJunta, JUNTAS_DO_APP } from '../core/tags.js';
 import { icone, iconeCategoria } from './icones.js';
 import { reduzMovimento } from './movimento.js';
-import { parametroDoHash } from './rotas.js';
+import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
+import { categoriaDaConta } from '../core/categorias.js';
 
 export function render(container, ctx) {
   desenhar(container, ctx);
@@ -35,81 +36,146 @@ function desenhar(container, ctx) {
     if (texto) ctx.aviso(texto, 'ok', 2500);
     ctx.rerender();
   };
+  const abrir = (folha) => { abertaAqui = true; location.hash = `#/casa-ajustes?folha=${folha}`; };
+  const fechar = () => {
+    if (abertaAqui) { abertaAqui = false; history.back(); } else location.replace('#/casa-ajustes');
+  };
+  // Depois de salvar (pode demorar, no GitHub): fecha a folha se ela ainda está aberta; senão só redesenha.
+  const salvarNaFolha = async (mutacao, texto, folha) => {
+    await ctx.salvarCasa(mutacao);
+    if (texto) ctx.aviso(texto, 'ok', 2500);
+    const acao = depoisDeSalvar(location.hash, folha, 'casa-ajustes');
+    if (acao === 'fechar') fechar();
+    else if (acao === 'redesenhar') ctx.rerender();
+  };
 
-  // ---------- pessoas ----------
-  const pessoas = cartao(
-    h('h2', {}, 'Quem divide as contas'),
-    ...casa.pessoas.map((p, k) => h('label', { class: 'campo', style: k ? 'margin-top:10px' : '' },
-      h('span', { class: 'campo-rotulo' }, k === 0 ? 'Primeira pessoa' : 'Segunda pessoa'),
-      h('input', {
-        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off',
-        onchange: (e) => {
-          const nome = e.target.value.trim();
-          if (!nome) { e.target.value = p.nome; return; }
-          if (nome !== p.nome) salvar((c) => renomearPessoa(c, p.id, nome), 'Nome salvo.');
-        },
-      }))));
-
-  // ---------- contas ----------
+  // ---------- casa (desenho 2026-11-21-ajustes-casa-simples) ----------
+  // Pessoas e contas em listas limpas, como nas Contas: tocar abre uma folha simples (nome, como a conta se preenche,
+  // posição, parar de usar). Nada de campos, setas e caixas espalhados pela lista.
+  const visto = ctx.perfil?.visto ?? null;
   const ativas = casa.contas.filter((c) => !c.arquivada);
   const arquivadas = casa.contas.filter((c) => c.arquivada);
-  // Perfis: conta ligada ao cartão de outra pessoa não muda aqui (nome, compra por compra, não uso mais).
-  const visto = ctx.perfil?.visto ?? null;
+  // Perfis: conta ligada ao cartão de outra pessoa não muda aqui (só a posição).
   const donoDeOutro = (conta) => donoDeOutroCartao(casa, conta.id, visto);
-  const linhaConta = (conta, k) => (donoDeOutro(conta) ? linhaTravada(conta, k) : linhaLivre(conta, k));
-  const setas = (conta, k) => [
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Subir ${conta.nome}`, disabled: k === 0, onclick: () => salvar((c) => moverConta(c, conta.id, -1)) }, '↑'),
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Descer ${conta.nome}`, disabled: k === ativas.length - 1, onclick: () => salvar((c) => moverConta(c, conta.id, 1)) }, '↓'),
-  ];
-  const linhaTravada = (conta, k) => h('div', { class: 'casa-ajuste' },
-    h('div', { class: 'casa-ajuste-linha' },
-      h('input', { class: 'entrada', type: 'text', value: conta.nome, disabled: true, 'aria-label': `Nome da conta ${conta.nome}` }),
-      ...setas(conta, k)),
-    h('p', { class: 'suave pequeno', style: 'margin:0' }, `Do cartão de ${donoDeOutro(conta).nome}: só ${donoDeOutro(conta).nome} muda esta conta.`));
-  const linhaLivre = (conta, k) => h('div', { class: 'casa-ajuste' },
-    h('div', { class: 'casa-ajuste-linha' },
-      h('input', {
-        class: 'entrada', type: 'text', value: conta.nome, autocomplete: 'off', 'aria-label': `Nome da conta ${conta.nome}`,
-        onchange: (e) => {
-          const nome = e.target.value.trim();
-          if (!nome) { e.target.value = conta.nome; return; }
-          if (nome !== conta.nome) salvar((c) => editarConta(c, conta.id, { nome }), 'Nome salvo.');
-        },
-      }),
-      h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Subir ${conta.nome}`, disabled: k === 0, onclick: () => salvar((c) => moverConta(c, conta.id, -1)) }, '↑'),
-      h('button', { type: 'button', class: 'seta-mes', 'aria-label': `Descer ${conta.nome}`, disabled: k === ativas.length - 1, onclick: () => salvar((c) => moverConta(c, conta.id, 1)) }, '↓')),
-    h('div', { class: 'casa-ajuste-linha' },
-      h('label', { class: 'marcar' },
-        h('input', { type: 'checkbox', checked: conta.compraPorCompra, onchange: (e) => salvar((c) => editarConta(c, conta.id, { compraPorCompra: e.target.checked })) }),
-        'Compra por compra (cartão)'),
-      h('button', {
-        type: 'button', class: 'botao-link', style: 'padding:6px 0',
-        onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: true }), `${conta.nome} não aparece mais nos meses novos.`),
-      }, 'Não uso mais')));
+  const cartaoDaConta = (conta) => (casa.cartoes ?? []).find((k) => k.contaId === conta.id) ?? null;
+  const nomeDe = (id) => [...casa.pessoas, ...(casa.perfis ?? [])].find((p) => p.id === id)?.nome ?? null;
+  const comoSePreenche = (conta) => {
+    const k = cartaoDaConta(conta);
+    if (k) return nomeDe(k.donaId) ? `compras do cartão de ${nomeDe(k.donaId)}` : 'compras do cartão';
+    return conta.compraPorCompra ? 'compra por compra' : 'um valor por mês';
+  };
+  const linhaDaLista = ({ selo, titulo, detalhe, aoTocar, classe = '' }) => h('button', { type: 'button', class: `casa-linha ${classe}`, onclick: aoTocar },
+    selo,
+    h('span', { class: 'texto' }, h('b', {}, titulo), detalhe && h('small', {}, detalhe)),
+    h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
 
-  const nova = { nome: '', compraPorCompra: false };
-  const contas = cartao(
+  const pessoas = h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Quem divide as contas'),
+    h('div', {}, ...casa.pessoas.map((p) => linhaDaLista({
+      selo: avatar(p), titulo: p.nome, detalhe: 'toque para mudar o nome', aoTocar: () => abrir(`pessoa-${p.id}`),
+    }))));
+
+  const contas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Contas'),
-    h('p', { class: 'suave' }, 'As contas aparecem no mês nesta ordem.'),
-    ...ativas.map(linhaConta),
-    h('div', { class: 'casa-ajuste', 'data-sem-recarregar': '' },
-      h('h3', { style: 'margin:0' }, 'Adicionar conta'),
-      h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: faxina, plano de saúde', 'aria-label': 'Nome da nova conta', oninput: (e) => { nova.nome = e.target.value.trim(); } }),
-      h('label', { class: 'marcar' }, h('input', { type: 'checkbox', onchange: (e) => { nova.compraPorCompra = e.target.checked; } }), 'Compra por compra (cartão)'),
-      h('div', { class: 'botoes' }, botao('Adicionar conta', () => {
-        if (!nova.nome) { ctx.aviso('Escreva o nome da conta.', 'atencao', 3000); return; }
-        salvar((c) => adicionarConta(c, nova), 'Conta adicionada.');
-      }, { secundario: true }))),
-    arquivadas.length > 0 && h('div', { class: 'casa-ajuste' },
-      h('h3', { style: 'margin:0' }, 'Contas que não usa mais'),
-      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Continuam no histórico, mas não aparecem nos meses novos.'),
+    h('div', {},
+      ...ativas.map((conta) => linhaDaLista({
+        selo: iconeCategoria(categoriaDaConta(conta)), titulo: conta.nome, detalhe: comoSePreenche(conta), aoTocar: () => abrir(`conta-${conta.id}`),
+      })),
+      linhaDaLista({ selo: h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone('mais')), titulo: 'Adicionar conta', aoTocar: () => abrir('nova-conta'), classe: 'linha-acao' })),
+    arquivadas.length > 0 && h('details', { class: 'casa-paradas' },
+      h('summary', {}, `Contas que não usa mais (${arquivadas.length})`),
       ...arquivadas.map((conta) => h('div', { class: 'linha' },
-        h('div', { class: 'nome' }, h('span', {}, conta.nome)),
+        h('div', { class: 'nome' }, h('span', {}, conta.nome), h('small', {}, 'continua no histórico')),
         h('button', {
           type: 'button', class: 'botao-link', style: 'padding:4px 0',
           // A previsão volta só deste mês em diante: os meses em que a conta estava parada não ganham valor.
           onclick: () => salvar((c) => editarConta(c, conta.id, { arquivada: false, ativadaEm: ctx.hoje.slice(0, 7) }), `${conta.nome} voltou para a lista.`),
         }, 'Voltar a usar')))));
+  const notaDaDivisao = h('p', { class: 'nota nota-casa' },
+    'Quem ganha mais paga mais: cada um paga a mesma fatia do que ganha. Um valor "a confirmar" é uma previsão com o último valor conhecido.');
+
+  // ---------- folhas da casa ----------
+  const folhaDaPessoa = (pessoa, folha) => {
+    let nome = pessoa.nome;
+    return [
+      h('h2', {}, 'Nome'),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Como aparece no app'),
+        h('input', { class: 'entrada', type: 'text', value: pessoa.nome, autocomplete: 'off', oninput: (e) => { nome = e.target.value.trim(); } })),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Salvar', () => {
+        if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        if (nome === pessoa.nome) { fechar(); return; }
+        salvarNaFolha((c) => renomearPessoa(c, pessoa.id, nome), 'Nome salvo.', folha);
+      })),
+    ];
+  };
+
+  // As duas maneiras de preencher uma conta, em botões grandes com exemplo (no lugar da caixa "Compra por compra").
+  const escolhaDoJeito = (inicial, aoEscolher, travada) => {
+    const opcoes = [
+      { valor: false, icone: 'recibo', titulo: 'Um valor por mês', texto: 'Você digita quanto veio. Ex.: luz, água, condomínio.' },
+      { valor: true, icone: 'sacola', titulo: 'Compra por compra', texto: 'Você anota cada compra e o app soma. Ex.: cartão, mercado.' },
+    ];
+    const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': 'Como você preenche esta conta?' });
+    const desenharOpcoes = (atual) => caixa.replaceChildren(...opcoes.map((o) => h('button', {
+      type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(o.valor === atual), disabled: travada,
+      onclick: () => { desenharOpcoes(o.valor); aoEscolher(o.valor); },
+    },
+    h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone(o.icone)),
+    h('span', { class: 'texto' }, h('b', {}, o.titulo), h('small', {}, o.texto)),
+    h('span', { class: 'opcao-marca', 'aria-hidden': 'true' }))));
+    desenharOpcoes(inicial);
+    return caixa;
+  };
+
+  const folhaDaConta = (conta, folha) => {
+    const nova = !conta;
+    const travada = !nova && Boolean(donoDeOutro(conta));
+    const doCartao = !nova && cartaoDaConta(conta);
+    const k = nova ? -1 : ativas.findIndex((c) => c.id === conta.id);
+    const editado = { nome: conta?.nome ?? '', compraPorCompra: conta?.compraPorCompra ?? false };
+    const salvarConta = () => {
+      if (!editado.nome) { ctx.aviso('Escreva o nome da conta.', 'atencao', 3000); return; }
+      if (nova) { salvarNaFolha((c) => adicionarConta(c, editado), 'Conta adicionada.', folha); return; }
+      const mudanca = {};
+      if (editado.nome !== conta.nome) mudanca.nome = editado.nome;
+      if (!doCartao && editado.compraPorCompra !== conta.compraPorCompra) mudanca.compraPorCompra = editado.compraPorCompra;
+      if (!Object.keys(mudanca).length) { fechar(); return; }
+      salvarNaFolha((c) => editarConta(c, conta.id, mudanca), 'Conta salva.', folha);
+    };
+    return [
+      h('h2', {}, nova ? 'Nova conta' : conta.nome),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', {
+          class: 'entrada', type: 'text', value: editado.nome, autocomplete: 'off', disabled: travada, placeholder: 'Ex.: faxina, plano de saúde',
+          oninput: (e) => { editado.nome = e.target.value.trim(); },
+        })),
+      travada
+        ? h('p', { class: 'suave pequeno' }, `É a conta do cartão de ${donoDeOutro(conta).nome}: só ${donoDeOutro(conta).nome} muda o nome e as compras dela. Aqui dá para mudar só a posição na lista.`)
+        : h('div', { class: 'campo' },
+          h('span', { class: 'campo-rotulo' }, 'Como você preenche esta conta?'),
+          escolhaDoJeito(editado.compraPorCompra, (v) => { editado.compraPorCompra = v; }, Boolean(doCartao)),
+          doCartao && h('span', { class: 'campo-dica' }, `Ela é a conta do cartão${nomeDe(doCartao.donaId) ? ` de ${nomeDe(doCartao.donaId)}` : ''}: as compras vêm da aba Cartão, e só a parte da casa entra aqui.`)),
+      !nova && h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Posição na lista'),
+        h('div', { class: 'casa-passo' },
+          h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Subir na lista', disabled: k <= 0, onclick: () => salvar((c) => moverConta(c, conta.id, -1)) }, '↑'),
+          h('span', { class: 'casa-vezes' }, `${k + 1}ª de ${ativas.length}`),
+          h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Descer na lista', disabled: k >= ativas.length - 1, onclick: () => salvar((c) => moverConta(c, conta.id, 1)) }, '↓')),
+        h('span', { class: 'campo-dica' }, 'As contas aparecem no mês nesta ordem.')),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), !travada && botao(nova ? 'Adicionar' : 'Salvar', salvarConta)),
+      // A conta de um cartão sai com o cartão ("Tirar este cartão", em Cartões e compras), não sozinha.
+      !nova && !travada && !doCartao && botaoDoisToques('Parar de usar esta conta', 'Toque de novo: ela sai dos meses novos',
+        () => salvarNaFolha((c) => editarConta(c, conta.id, { arquivada: true }), `${conta.nome} não aparece mais nos meses novos.`, folha)),
+    ];
+  };
+
+  // A folha aberta vem do endereço (#/casa-ajustes?folha=conta-x): o botão voltar do celular a fecha.
+  function conteudoDaFolha(folha) {
+    if (folha === 'nova-conta') return folhaDaConta(null, folha);
+    if (folha?.startsWith('conta-')) { const conta = ativas.find((c) => c.id === folha.slice(6)); return conta && folhaDaConta(conta, folha); }
+    if (folha?.startsWith('pessoa-')) { const p = casa.pessoas.find((x) => x.id === folha.slice(7)); return p && folhaDaPessoa(p, folha); }
+    return null;
+  }
 
   // ---------- cartões (desenho 2026-11-19-cartao, vários cartões) ----------
   const cartoes = cartoesVisiveis(casa, visto); // cada um, os próprios
@@ -197,11 +263,6 @@ function desenhar(container, ctx) {
       h('summary', {}, `Já vêm com o app (${JUNTAS_DO_APP.length})`),
       h('div', { class: 'chips', style: 'margin-top:8px' }, ...JUNTAS_DO_APP.map((f) => h('span', { class: 'chip pequeno tag' }, f)))));
 
-  const comoFunciona = cartao(
-    h('h2', {}, 'Como a divisão funciona'),
-    h('p', {}, 'Todo mês o app soma as contas da casa e divide pela renda: quem ganha mais paga mais, e cada um paga a mesma fatia do que ganha.'),
-    h('p', { class: 'suave' }, 'Um valor "a confirmar" é uma previsão feita com o último valor conhecido. Ele vira valor certo quando alguém salva.'));
-
   // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
   const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
   const novoPerfil = { nome: '' };
@@ -257,7 +318,7 @@ function desenhar(container, ctx) {
     {
       id: 'casa', icone: 'casa', cat: 'casa', titulo: 'Casa',
       resumo: `${casa.pessoas.map((p) => p.nome).join(' e ')} · ${plural(ativas.length, 'conta', 'contas')}`,
-      conteudo: [pessoas, contas, comoFunciona],
+      conteudo: [pessoas, contas, notaDaDivisao],
     },
     {
       id: 'cartoes', icone: 'cartao', cat: 'cartao', titulo: 'Cartões e compras',
@@ -297,7 +358,20 @@ function desenhar(container, ctx) {
     veAposentadoria(visto) && !ctx.unica && h('button', { type: 'button', class: 'botao-link', onclick: () => ctx.navegar('#/inicio') }, 'Ir para o planejador de aposentadoria'),
   ].filter(Boolean));
   if (parametroDoHash(location.hash, 'secao') === 'perfis') document.getElementById('perfis')?.scrollIntoView({ block: 'start' });
+
+  const folha = folhaAberta(location.hash);
+  const conteudo = folha && conteudoDaFolha(folha);
+  if (!conteudo) {
+    abertaAqui = false;
+    esconderFolha();
+    return;
+  }
+  const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: 'Ajustes da casa' });
+  painel.setAttribute('data-sem-recarregar', ''); // o que foi digitado fica só na memória até "Salvar"
+  setTimeout(() => painel.querySelector('input:not([disabled])')?.focus({ preventScroll: true }), 60);
 }
+
+let abertaAqui = false; // a folha foi aberta por um toque nesta sessão: fechar = voltar no histórico
 
 // O selo do grupo: a cor da categoria com o ícone próprio do grupo.
 function seloDoGrupo(g) {
