@@ -396,13 +396,21 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const compras = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, f.compras.length ? `Compras (${f.compras.length})` : 'Compras'),
     f.compras.length
-      ? h('div', {}, ...f.compras.map((c) => linhaItem({
-        titulo: c.nome,
-        detalhe: [c.data && dataCurta(c.data), nomeDoPara(casa, c.para), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
-        valor: c.valor,
-        jaTenho: c.jaTenho,
-        aoTocar: () => abrir(`compra-${c.id}`),
-      })))
+      // Agrupadas por "De quem é", na mesma ordem dessa lista, cada grupo com o subtotal.
+      ? h('div', {}, ...f.porPessoa.flatMap((p) => {
+        const deles = f.compras.filter((c) => c.para === p.para);
+        if (!deles.length) return [];
+        return [
+          h('div', { class: 'grupo-titulo' }, h('span', {}, p.nome), h('span', {}, formatarBRL(deles.reduce((s, c) => s + c.valor, 0)))),
+          ...deles.map((c) => linhaItem({
+            titulo: c.nome,
+            detalhe: [c.data && dataCurta(c.data), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
+            valor: c.valor,
+            jaTenho: c.jaTenho,
+            aoTocar: () => abrir(`compra-${c.id}`),
+          })),
+        ];
+      }))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
     // A soma das assinaturas e contas fixas desta fatura, ao lado do título: quanto vai todo mês de cara.
