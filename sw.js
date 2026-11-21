@@ -1,7 +1,7 @@
 // Service worker: o app abre na hora e sem internet. Estratégia cache-first por versão: cada versão do site tem o
 // seu cache, baixado inteiro na instalação; a página abre dele e a versão nova chega com o próximo service worker.
 // APIs externas (GitHub, IPCA) nunca passam pelo cache.
-const VERSAO = 'projeto-r-v74'; // igual a js/versao.js (um teste confere)
+const VERSAO = 'projeto-r-v75'; // igual a js/versao.js (um teste confere)
 const CASCA = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png',

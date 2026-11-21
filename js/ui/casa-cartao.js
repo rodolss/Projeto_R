@@ -681,9 +681,10 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       botaoOrdem.replaceChildren(icone(ordemMaisNovas ? 'maisNovas' : 'maisAntigas'));
       botaoOrdem.setAttribute('aria-label', texto);
       botaoOrdem.title = texto;
-      lista.replaceChildren(
-        ...[...compras].sort(compararPorData(ordemMaisNovas)).map((c) => linha(c, detalheDaCompra(c), `compra-${c.id}`)),
-        ...fixas.map((x) => linha(x, 'todo mês', `fixa-${x.id}`)));
+      // As de todo mês são as mais antigas (começam antes): na ordem crescente vêm primeiro; na decrescente, por último.
+      const dasCompras = [...compras].sort(compararPorData(ordemMaisNovas)).map((c) => linha(c, detalheDaCompra(c), `compra-${c.id}`));
+      const dasFixas = fixas.map((x) => linha(x, 'todo mês', `fixa-${x.id}`));
+      lista.replaceChildren(...(ordemMaisNovas ? [...dasCompras, ...dasFixas] : [...dasFixas, ...dasCompras]));
     };
     desenharLista();
     const resumo = para === 'casa'
