@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, acharCartao, adicionarCartao, configurarCartao, tirarCartao,
   adicionarPessoaDoCartao, editarPessoaDoCartao, opcoesPara, nomeDoPara, rotuloDoCartao, anotarCompra, faturaDoCartao,
-  editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
+  editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, nomesUsados, primeiraFatura, marcarJaTenho, podeTerJaTenho, JA_TENHO_DESDE, cofrinhoDoCartao,
 } from '../../js/core/cartao.js';
 import { valorDaConta, apagarCompra, conferirFatura, salvarValor } from '../../js/core/casa.js';
 import { somarMeses } from '../../js/core/meses.js';
@@ -460,4 +460,30 @@ test('cofrinho: cartão sem os dias ou que não existe devolve null; sem nada, v
   assert.equal(cofrinhoDoCartao(semDias, K, '2026-12-20'), null);
   assert.equal(cofrinhoDoCartao(casaBase(), 'sumiu', '2026-12-20'), null);
   assert.deepEqual(cofrinhoDoCartao(casaBase(), K, '2026-12-20'), { total: 0, faturas: [], devem: [] });
+});
+
+test('editar compra: só vai para a mesma fatura ou as seguintes, nunca para uma anterior', () => {
+  let casa = casaBase();
+  casa = anotarCompra(casa, { cartaoId: K, data: '2026-12-05', nome: 'Mercado', valor: 50, para: 'casa', novoId: () => 'm1' });
+  const fat = faturaDaCompra('2026-12-05', casa.cartoes[0]);
+  const noMes = (c, m) => c.meses.find((r) => r.mes === m)?.compras?.map((x) => x.id) ?? [];
+  const antes = editarCompraDoCartao(casa, { fatura: fat, compraId: 'm1', valor: 60, novaFatura: somarMeses(fat, -1) });
+  assert.deepEqual(noMes(antes, somarMeses(fat, -1)), []); // não foi para a anterior
+  assert.deepEqual(noMes(antes, fat), ['m1']); // ficou onde estava, com a outra mudança aplicada
+  const depois = editarCompraDoCartao(casa, { fatura: fat, compraId: 'm1', novaFatura: somarMeses(fat, 1) });
+  assert.deepEqual(noMes(depois, somarMeses(fat, 1)), ['m1']); // a seguinte vale
+  assert.deepEqual(noMes(depois, fat), []);
+});
+
+test('apagar de todo mês: some a série inteira; inicioDaFixa diz onde ela começou', () => {
+  let casa = casaBase();
+  casa = anotarCompra(casa, { cartaoId: K, data: '2026-10-05', nome: 'Netflix', valor: 40, para: 'casa', todoMes: true, novoId: () => 'f1' });
+  casa = anotarCompra(casa, { cartaoId: K, data: '2026-10-05', nome: 'Spotify', valor: 20, para: 'casa', todoMes: true, novoId: () => 'f9' });
+  casa = editarFixa(casa, { cartaoId: K, fixaId: 'f1', fatura: '2027-03', valor: 45, novoId: () => 'f2' }); // série com dois trechos
+  assert.equal(casa.cartoes[0].fixas.length, 3);
+  const inicio = inicioDaFixa(casa, { cartaoId: K, fixaId: 'f2' });
+  assert.equal(inicio, casa.cartoes[0].fixas.find((f) => f.id === 'f1').desde);
+  const sem = apagarFixa(casa, { cartaoId: K, fixaId: 'f2' }); // pelo trecho novo: apaga os dois
+  assert.deepEqual(sem.cartoes[0].fixas.map((f) => f.id), ['f9']); // a outra fixa fica
+  assert.equal(apagarFixa(casa, { cartaoId: K, fixaId: 'nao' }), casa);
 });

@@ -11,7 +11,7 @@ import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js
 import { estaPago, marcarPago, marcaDoCartao, tudoPago, estadoDoMes } from '../core/pagamentos.js';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
-  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
+  anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, apagarFixa, inicioDaFixa, nomesUsados, primeiraFatura,
   acharCartao, adicionarCartao, rotuloDoCartao, marcarJaTenho, podeTerJaTenho, cofrinhoDoCartao,
 } from '../core/cartao.js';
 import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
@@ -617,9 +617,23 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     const ehParcela = ehParcelada(compra);
     const parcela = compra.parcela ?? null;
     const faturaNome = h('output', { class: 'casa-vezes cartao-fatura-nome' });
-    const mostrarFatura = () => { faturaNome.textContent = nomeDaFatura(editado.fatura, hoje); };
+    const botaoAnterior = h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura anterior', onclick: () => trocarFatura(-1) }, '‹');
+    const mostrarFatura = () => { faturaNome.textContent = nomeDaFatura(editado.fatura, hoje); botaoAnterior.disabled = editado.fatura <= fatura; };
     mostrarFatura();
-    const trocarFatura = (d) => { editado.fatura = somarMeses(editado.fatura, d); mostrarFatura(); };
+    // Só para a mesma fatura ou as seguintes (nunca para uma anterior), e não para uma fatura travada.
+    const quemVe = ctx.perfil?.visto?.id ?? null;
+    const motivoDeNao = (m) => {
+      if (m < fatura) return 'Só dá para mandar a compra para a mesma fatura ou para as seguintes.';
+      if (m > fatura && estadoDoMes(casa, m, quemVe, hoje) !== 'livre') return `A fatura de ${nomeDaFatura(m, hoje)} está travada.`;
+      return null;
+    };
+    const trocarFatura = (d) => {
+      const m = somarMeses(editado.fatura, d);
+      const motivo = motivoDeNao(m);
+      if (motivo) { ctx.aviso(motivo, 'atencao', 3000); return; }
+      editado.fatura = m;
+      mostrarFatura();
+    };
 
     const salvar = botao('Salvar', async () => {
       if (!editado.nome.trim()) { ctx.aviso('Escreva o que foi comprado.', 'atencao', 3000); return; }
@@ -652,6 +666,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
           class: 'entrada', type: 'date', value: compra.data ?? '',
           onchange: (e) => {
             if (!e.target.value) return;
+            const motivo = motivoDeNao(faturaDaCompra(e.target.value, cfg));
+            if (motivo) { ctx.aviso(motivo, 'atencao', 3500); e.target.value = editado.data ?? ''; return; } // volta para a data de antes
             editado.data = e.target.value;
             editado.fatura = faturaDaCompra(editado.data, cfg);
             mostrarFatura();
@@ -659,7 +675,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         })),
       !ehParcela && h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Fatura'),
         h('div', { class: 'casa-passo' },
-          h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura anterior', onclick: () => trocarFatura(-1) }, '‹'),
+          botaoAnterior,
           faturaNome,
           h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura seguinte', onclick: () => trocarFatura(1) }, '›')),
         h('span', { class: 'campo-dica' }, 'O app calcula pela data. Mude só se o banco colocou a compra em outra fatura.')),
@@ -686,6 +702,15 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       ctx.aviso(`${fixa.nome} não aparece mais a partir da fatura de ${nomeDaFatura(fatura, hoje)}.`, 'ok', 3500);
       terminar(folha);
     });
+    // Lançou errado: apagar tira a de todo mês de todas as faturas. Só se ela começou numa fatura que ainda não está
+    // travada (senão mexeria no passado travado): aí fica só o "Parar de repetir".
+    const inicio = inicioDaFixa(casa, { cartaoId: cfg.id, fixaId: fixa.id });
+    const podeApagar = inicio != null && estadoDoMes(casa, inicio, ctx.perfil?.visto?.id ?? null, hoje) === 'livre';
+    const apagar = podeApagar && botaoDoisToques('Apagar (lancei errado)', 'Toque de novo para apagar de todas as faturas', async () => {
+      await ctx.salvarCasa((c) => apagarFixa(c, { cartaoId: cfg.id, fixaId: fixa.id }));
+      ctx.aviso(`${fixa.nome} foi apagada.`, 'ok', 3000);
+      terminar(folha);
+    });
     const jaTenho = jaTenhoDaFolha(fixa, dicaDoJaTenho({ forma: 'fixa', nomeDaFatura: nomeDaFatura(fatura, hoje) }), { fixaId: fixa.id });
     return [
       titulo(fixa.nome),
@@ -696,6 +721,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       jaTenho,
       h('div', { class: 'botoes' }, salvar, botao('Fechar', fechar, { secundario: true })),
       parar,
+      apagar,
+      !podeApagar && h('p', { class: 'suave pequeno' }, 'Ela começou numa fatura travada: só dá para parar de repetir.'),
     ];
   }
 
