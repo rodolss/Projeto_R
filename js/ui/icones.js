@@ -64,5 +64,3 @@ export function icone(nome) {
 // O selo colorido no começo de uma linha. `padrao` é o ícone de "outro" (recibo para conta, sacola para compra).
 export const iconeCategoria = (cat, padrao = 'recibo') => h('span', { class: `icone-cat cat-${cat}`, 'aria-hidden': 'true' },
   icone(cat === 'outro' ? padrao : (DA_CATEGORIA[cat] ?? padrao)));
-
-export const temIcone = (nome) => Object.prototype.hasOwnProperty.call(DESENHOS, nome);

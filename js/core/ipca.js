@@ -27,10 +27,6 @@ export function fatorInflacao(serie, de, ate) {
   return mesesEntre(de, ate).reduce((f, m) => f * (1 + (serie[m] ?? 0)), 1);
 }
 
-export function mesesFaltando(serie, de, ate) {
-  return mesesEntre(de, ate).filter((m) => !(m in serie));
-}
-
 export function paraReaisDeHoje(valor, mesDoValor, serie) {
   const ultimo = ultimoMes(serie);
   if (!ultimo) return valor;

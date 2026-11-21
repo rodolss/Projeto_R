@@ -40,10 +40,6 @@ export function provisaoMensal({ anual, salario, recebe13, recebeFerias }) {
   return Math.max(0, (anual - extrasEsperados) / 12);
 }
 
-export function rendaDoPatrimonio(patrimonio, swr) {
-  return patrimonio * swr / 12;
-}
-
 export function precisaRevisarOrcamento(ultimaRevisao, mesAtual) {
   if (!ultimaRevisao) return false;
   return diffMeses(ultimaRevisao, mesAtual) >= 6;

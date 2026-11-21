@@ -1,22 +1,12 @@
-// Mês fechado (desenho 2026-11-21-mes-fechado): com tudo pago, o mês não se edita até reabrir. O aviso fica no topo das
-// telas (Contas, Balanço, Cartão) com o botão "Reabrir mês".
-import { h, aviso, botao } from './dom.js';
+// Mês fechado e meses travados (desenhos 2026-11-21-mes-fechado e -meses-travados): o mês não se edita até reabrir. A
+// trava e o cadeado são os mesmos nas telas da casa (Contas, Balanço, Cartão).
+import { h } from './dom.js';
 import { reabrirMes, fecharMes, estadoDoMes, tudoPago, contasPagas } from '../core/pagamentos.js';
 import { somarMeses } from '../core/meses.js';
 
 export const AVISO_FECHADO = 'Mês fechado. Reabra o mês para editar.';
 
 export const AVISO_ANTIGO = 'Mês antigo: travado, não pode mais ser editado.';
-
-export function avisoMesFechado({ ctx, mes }) {
-  return aviso('info', '🔒 Mês fechado: tudo pago. Para editar, reabra o mês. ',
-    botao('Reabrir mês', async (e) => {
-      e.currentTarget.disabled = true;
-      await ctx.salvarCasa((c) => reabrirMes(c, mes));
-      ctx.aviso('Mês reaberto.', 'ok', 2500);
-      ctx.rerender();
-    }, { secundario: true }));
-}
 
 // O cadeado do card das Contas (SVG com as cores do app: verde = fechado/tudo pago, azul = aberto). A haste sobe e
 // vira ao abrir e desce ao fechar (transições no css/app.css, `.cadeado-svg`); o corpo dá um pulinho ao fechar.

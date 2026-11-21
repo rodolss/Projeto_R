@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { perto } from '../ajuda.js';
 import {
-  custoDeVida, calcularMetas, provisaoMensal, rendaDoPatrimonio, CATEGORIAS_SUGERIDAS, precisaRevisarOrcamento,
+  custoDeVida, calcularMetas, provisaoMensal, CATEGORIAS_SUGERIDAS, precisaRevisarOrcamento,
 } from '../../js/core/metas.js';
 
 test('custoDeVida inclui anuais/12', () => {
@@ -19,7 +19,6 @@ test('provisão', () => {
   perto(provisaoMensal({ anual: 12000, salario: 3000, recebe13: true, recebeFerias: true }), 666.67);
   assert.equal(provisaoMensal({ anual: 12000, salario: 3000, recebe13: false, recebeFerias: false }), 1000);
 });
-test('renda do patrimônio', () => perto(rendaDoPatrimonio(1504879.41, 0.04), 5016.26));
 test('revisão a cada 6 meses', () => {
   assert.equal(precisaRevisarOrcamento('2026-11', '2027-05'), true);
   assert.equal(precisaRevisarOrcamento('2026-11', '2027-04'), false);
