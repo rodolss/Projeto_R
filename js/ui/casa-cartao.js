@@ -305,6 +305,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const periodo = periodoDaFatura(fatura, cfg);
   const dona = quemE(casa, cfg.donaId);
   const nome = nomeDaFatura(fatura, hoje);
+  // Mês travado (meses passados; do atual em diante, com tudo pago): a fatura só se lê (desenho 2026-11-21-meses-travados).
+  const { travado, cadeado, avisarTravado } = travaDoMes({ ctx, mes: fatura });
 
   // Na tela do Cofrinho, o endereço leva `&tela=cofrinho` (abrir e fechar uma folha não sai dela).
   const naTela = telaDoCartao(location.hash);

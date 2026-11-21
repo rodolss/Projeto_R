@@ -121,7 +121,10 @@ function desenhar(container, ctx) {
     }, p.nome)));
 
   // ---------- a sobra ----------
+  // A trava do mês (meses passados; do atual em diante, com tudo pago): o cadeado no card e o salário só para ler.
+  const trava = travaDoMes({ ctx, mes });
   const sobra = cartao(
+    trava.cadeado,
     h('div', { class: 'rotulo' }, `Sobra de ${quem?.nome ?? '—'}`),
     h('div', { class: `valor-grande ${b.sobra < 0 ? 'balanco-negativo' : 'balanco-positivo'}` }, formatarBRL(b.sobra)),
     h('div', { class: 'suave' }, `Entrou ${formatarBRL(b.entrou)} · saiu ${formatarBRL(b.saiu)}`),
