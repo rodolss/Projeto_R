@@ -182,6 +182,7 @@ function desenhar(container, ctx) {
       // A fatura que fecha no mês; o vencimento diz qual é (com vencimento no dia 1, a do mês seguinte).
       detalhe: [k.aberta && selo('fatura aberta'), k.aberta && ' ',
         k.vence ? `seu cartão: o que é seu na fatura que vence em ${dataCurta(k.vence)}` : `seu cartão: o que é seu na fatura de ${nomeDoMes(k.fatura)}`,
+        k.seuJaTenho > 0 && ` (já tenho ${formatarBRL(k.seuJaTenho)} guardados: só o que falta entra)`,
         k.adiantado > 0 && ` + ${formatarBRL(k.adiantado)} que ainda faltam te devolverem`],
       valor: formatarBRL(k.seu + k.adiantado),
       aoTocar: irAoCartao(k),
