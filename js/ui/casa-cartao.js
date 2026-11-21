@@ -8,7 +8,7 @@ import { h, campoMoeda, cartao, botao, mostrarFolha, esconderFolha } from './dom
 import { formatarBRL } from '../core/formato.js';
 import { somarMeses } from '../core/meses.js';
 import { apagarCompra, parcelasSeguintes, conferirFatura } from '../core/casa.js';
-import { estaPago, marcarPago, marcaDoCartao, tudoPago } from '../core/pagamentos.js';
+import { estaPago, marcarPago, marcaDoCartao, tudoPago, estadoDoMes } from '../core/pagamentos.js';
 import {
   faturaDaCompra, periodoDaFatura, cartaoPronto, configurarCartao, adicionarPessoaDoCartao, opcoesPara, nomeDoPara,
   anotarCompra, faturaDoCartao, editarCompraDoCartao, editarFixa, pararFixa, nomesUsados, primeiraFatura,
@@ -17,6 +17,7 @@ import {
 import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './rotas.js';
 import { nomeDoMes } from './casa.js';
+import { travaDoMes } from './fechado.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 
 const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -340,7 +341,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const voltar = fatura !== aberta
     && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(aberta) }, 'Voltar para a fatura aberta');
 
-  const anotar = h('div', { class: 'botoes' }, botao('+ Anotar compra', () => abrir('anotar')));
+  const anotar = !travado && h('div', { class: 'botoes' }, botao('+ Anotar compra', () => abrir('anotar')));
 
   // ---------- total ----------
   const temItens = f.compras.length + f.fixas.length > 0;
@@ -353,6 +354,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   }[situacao];
   const pago = estaPago(casa, fatura, marcaDoCartao(cfg.id));
   const total = cartao(
+    cadeado,
     h('div', { class: 'rotulo' }, `Cartão de ${dona?.nome ?? '—'}`),
     h('div', { class: 'valor-grande' }, formatarBRL(f.total)),
     h('div', { style: 'margin-top:4px' }, selo, pago && ' ', pago && h('span', { class: 'selo ok' }, 'Paga ✓')));
@@ -391,16 +393,16 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         detalhe: [c.data && dataCurta(c.data), nomeDoPara(casa, c.para), c.parcela && `${c.parcela.n} de ${c.parcela.de}`].filter(Boolean).join(' · '),
         valor: c.valor,
         jaTenho: c.jaTenho,
-        aoTocar: () => abrir(`compra-${c.id}`),
+        aoTocar: () => (travado ? avisarTravado() : abrir(`compra-${c.id}`)),
       })))
       : h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma compra anotada nesta fatura.'));
   const fixas = f.fixas.length > 0 && h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Todo mês'),
     h('div', {}, ...f.fixas.map((x) => linhaItem({
-      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, aoTocar: () => abrir(`fixa-${x.id}`),
+      titulo: x.nome, detalhe: nomeDoPara(casa, x.para), valor: x.valor, jaTenho: x.jaTenho, aoTocar: () => (travado ? avisarTravado() : abrir(`fixa-${x.id}`)),
     }))));
 
-  const conferir = temItens && !f.conferida && h('div', { class: 'cartao-conferir' },
+  const conferir = temItens && !f.conferida && !travado && h('div', { class: 'cartao-conferir' },
     h('div', { class: 'botoes' }, botao('Pronto, fatura conferida', async (e) => {
       e.currentTarget.disabled = true;
       await ctx.salvarCasa((c) => conferirFatura(c, { mes: fatura, contaId: cfg.contaId }));
@@ -411,7 +413,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
 
   // ---------- pago ----------
   // "Já paguei" (desenho 2026-11-21-ja-paguei): a marca é da casa (vale para os dois) e aparece como "Pago" no Balanço.
-  const botaoPago = temItens && h('div', { class: 'cartao-conferir' },
+  const botaoPago = temItens && !travado && h('div', { class: 'cartao-conferir' },
     h('div', { class: 'botoes' }, botao(pago ? 'Fatura paga ✓ (desfazer)' : 'Pago', async (e) => {
       e.currentTarget.disabled = true;
       const nova = marcarPago(casa, { mes: fatura, marca: marcaDoCartao(cfg.id), pago: !pago });
@@ -438,6 +440,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   };
   // A folha da compra abre por cima do Cofrinho, na fatura dela; fechar volta para o Cofrinho já atualizado.
   const abrirDoCofrinho = (item) => {
+    if (estadoDoMes(casa, item.fatura, ctx.perfil?.visto?.id ?? null, hoje) !== 'livre') { ctx.aviso('Fatura travada: só leitura. Reabra o mês na tela da fatura.', 'info', 3000); return; }
     abertaAqui = true;
     location.hash = `#/casa-cartao?cartao=${cfg.id}&fatura=${item.fatura}&tela=cofrinho&folha=${item.tipo === 'fixa' ? 'fixa' : 'compra'}-${item.id}`;
   };
@@ -567,6 +570,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       if (!nova.para) { ctx.aviso('Escolha para quem é a compra.', 'atencao', 3000); return; }
       anotarBotao.disabled = true;
       const fat = faturaDaCompra(nova.data, cfg);
+      if (estadoDoMes(casa, fat, ctx.perfil?.visto?.id ?? null, hoje) !== 'livre') { ctx.aviso(`A fatura de ${nomeDaFatura(fat, hoje)} está travada: escolha uma data de uma fatura aberta.`, 'atencao', 4000); anotarBotao.disabled = false; return; }
       await ctx.salvarCasa((c) => anotarCompra(c, {
         cartaoId: cfg.id,
         data: nova.data, nome: nova.nome, valor: nova.valor, para: nova.para,
@@ -692,7 +696,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
   const [tipo, id] = aberto ? [aberto.split('-')[0], aberto.slice(aberto.indexOf('-') + 1)] : [];
   const compra = tipo === 'compra' ? f.compras.find((c) => c.id === id) : null;
   const fixa = tipo === 'fixa' ? f.fixas.find((x) => x.id === id) : null;
-  const conteudo = tipo === 'anotar' ? folhaAnotar(aberto)
+  const conteudo = travado ? null : tipo === 'anotar' ? folhaAnotar(aberto)
     : compra ? folhaCompra(compra, aberto)
       : fixa ? folhaFixa(fixa, aberto) : null;
   if (!conteudo) {

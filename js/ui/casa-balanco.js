@@ -11,7 +11,8 @@ import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER }
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
-import { estaPago, marcaDoCartao, contasPagas, estadoDoMes } from '../core/pagamentos.js';
+import { estaPago, marcaDoCartao, contasPagas } from '../core/pagamentos.js';
+import { travaDoMes } from './fechado.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
@@ -142,7 +143,7 @@ function desenhar(container, ctx) {
 
   // Salário só no Balanço (desenho 2026-11-21-salario-no-balanco): na visão única, o salário de quem administra se
   // digita aqui (o único lugar); nos outros casos a linha leva ao Mês, como antes.
-  const editavel = Boolean(visto && pessoaId === visto.id) && estadoDoMes(casa, mes, pessoaId, hoje) === 'livre'; // mês travado: só leitura // todo perfil digita o próprio salário aqui
+  const editavel = Boolean(visto && pessoaId === visto.id); // todo perfil digita o próprio salário aqui; mês travado: só leitura
   const fechar = () => {
     if (abertaAqui) {
       abertaAqui = false;
@@ -160,12 +161,12 @@ function desenhar(container, ctx) {
         linha({
           titulo: 'Salário',
           detalhe: s.situacao === 'a-confirmar' ? [selo('a confirmar'), ` igual a ${quando(s.deOnde, mes)}`]
-            : s.situacao === 'vazio' ? (editavel ? 'Toque para digitar' : 'Falta preencher no Mês') : null,
+            : s.situacao === 'vazio' ? (editavel && !trava.travado ? 'Toque para digitar' : 'Falta preencher no Mês') : null,
           valor: s.situacao === 'vazio' ? '—' : formatarBRL(s.valor),
-          aoTocar: editavel ? abrirSalario : irAoMes,
+          aoTocar: editavel ? (trava.travado ? trava.avisarTravado : abrirSalario) : irAoMes,
         }),
         s.extra > 0 && linha({
-          titulo: 'A mais neste mês', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? abrirSalario : null,
+          titulo: 'A mais neste mês', detalhe: '13º, férias, PLR, bônus', valor: formatarBRL(s.extra), aoTocar: editavel ? (trava.travado ? trava.avisarTravado : abrirSalario) : null,
         }))
       : h('p', { class: 'suave balanco-nota' }, 'Fora da divisão das contas da casa: sem salário aqui.'),
     editavel && h('p', { class: 'suave pequeno balanco-nota balanco-rodape' }, ctx.unica ? 'Seu salário se digita só aqui: ele vale para as contas da casa, o Dia de pagamento e o plano.' : 'Seu salário se digita só aqui: ele vale para as contas da casa e para o seu balanço.'));
@@ -264,7 +265,7 @@ function desenhar(container, ctx) {
       tirar,
     ];
   }
-  if (folhaAberta(location.hash) === 'salario' && editavel) {
+  if (folhaAberta(location.hash) === 'salario' && editavel && !trava.travado) {
     const painel = mostrarFolha({ conteudo: folhaSalario().filter(Boolean), aoFechar: fechar, rotulo: 'Seu salário' });
     setTimeout(() => painel.querySelector('input')?.focus({ preventScroll: true }), 50);
   } else {
