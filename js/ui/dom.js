@@ -1,5 +1,6 @@
 // Utilitários de interface: criação de elementos, campos e textos comuns.
 import { formatarBRL, parseBRL, mascararReais, valorDosReais, REGEX_REAIS } from '../core/formato.js';
+import { opcoesDeTag, nomeDaEtiqueta } from '../core/tags.js';
 
 export function h(tag, atributos = {}, ...filhos) {
   const el = document.createElement(tag);
@@ -65,6 +66,37 @@ export function campoMoeda({ rotulo, valor = null, aoMudar, dica = null, grande 
     rotulo && h('span', { class: 'campo-rotulo' }, rotulo),
     h('span', { class: `campo-moeda${grande ? ' grande' : ''}` }, h('span', { class: 'prefixo' }, 'R$'), input),
     dica && h('span', { class: 'campo-dica' }, dica));
+  campo.input = input;
+  return campo;
+}
+
+// Campo de etiqueta (desenho 2026-11-21-tags): o "O que foi" de uma compra. Ao digitar, as etiquetas que já existem
+// aparecem como balões para escolher (a que é igual, marcada); se nenhuma é igual, aparece "+ Criar …" para criar
+// uma nova. `aoMudar(nome)` recebe o nome final (a grafia da etiqueta que já existe, ou o que foi digitado);
+// `aoEscolher(nome)` avisa que tocaram num balão (hora de ir ao próximo campo). `campo.input` é o campo de texto.
+export function campoTag({ rotulo, placeholder, valor = '', tags = [], aoMudar, aoEscolher = () => {} }) {
+  const input = h('input', { class: 'entrada cartao-nome', type: 'text', autocomplete: 'off', value: valor, placeholder });
+  const baloes = h('div', { class: 'cartao-sugestoes tag-baloes', role: 'group', 'aria-label': 'Etiquetas' });
+  let criada = false; // o balão "Criar …" foi tocado
+  const desenhar = () => {
+    const o = opcoesDeTag(tags, input.value);
+    const lista = o.achadas.map((nome) => h('button', {
+      type: 'button', class: `chip pequeno tag${nome === o.exata ? ' ativo' : ''}`, 'aria-pressed': String(nome === o.exata),
+      onclick: () => { input.value = nome; criada = false; desenhar(); aoMudar(nomeDaEtiqueta(tags, nome)); aoEscolher(nome); },
+    }, nome));
+    if (o.nova) {
+      lista.push(h('button', {
+        type: 'button', class: `chip pequeno tag nova${criada ? ' ativo' : ''}`, 'aria-pressed': String(criada),
+        onclick: () => { criada = true; desenhar(); aoEscolher(o.nova); },
+      }, criada ? `✓ ${o.nova} (nova)` : `+ Criar “${o.nova}”`));
+    }
+    baloes.replaceChildren(...lista);
+  };
+  input.addEventListener('input', () => { criada = false; desenhar(); aoMudar(nomeDaEtiqueta(tags, input.value)); });
+  desenhar();
+  const campo = h('div', { class: 'campo' },
+    h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, rotulo), input),
+    baloes); // os balões ficam fora do <label>: tocar neles não foca o campo de novo
   campo.input = input;
   return campo;
 }

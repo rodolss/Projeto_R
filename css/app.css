@@ -422,6 +422,11 @@ a.barra-item:active { background: var(--cartao-2); }
 .cartao-outro { align-self: center; padding: 8px 4px; }
 .cartao-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .cartao-sugestoes:empty { display: none; }
+.tag-baloes { margin-top: 8px; }
+.chip.tag { background: var(--destaque-suave); border-color: var(--destaque-suave); color: var(--destaque); font-weight: 600; }
+.chip.tag.ativo { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-texto); }
+.chip.tag.nova { background: transparent; border: 1px dashed var(--destaque); }
+.chip.tag.nova.ativo { border-style: solid; background: var(--ok-fundo); border-color: var(--ok); color: var(--ok); }
 .chip.pequeno { padding: 5px 12px; font-size: 14px; background: var(--cartao-2); border-color: var(--cartao-2); }
 
 /* ---------- "Já tenho" (desenho 2026-11-20-ja-tenho) ---------- */
