@@ -196,6 +196,7 @@ function desenharMes(container, ctx) {
       h('span', { class: 'copiar-icone', 'aria-hidden': 'true' }, icone('copiar')),
       h('div', { class: 'rotulo' }, `${p.pessoa.nome} paga`),
       h('div', { class: 'valor' }, formatarBRL(p.paga)),
+      r.total > 0 && h('div', { class: 'parte-das-contas' }, `${formatarPct(p.paga / r.total, 0)} das contas`),
       h('div', { class: 'suave pequeno' }, `sobra ${formatarBRL(p.sobra)}`),
       h('div', { class: 'suave pequeno dica-copiar' }, 'Toque para copiar')))),
       h('p', { class: 'nota' }, `Quem ganha mais paga mais: cada um paga ${formatarPct(r.fatiaDaRenda, 0)} do que ganha.`),

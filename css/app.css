@@ -475,6 +475,7 @@ details.detalhes[open] > summary::after { content: "−"; }
 .casa-pessoa.copiado { box-shadow: 0 0 0 2px var(--ok), var(--sombra); }
 .casa-pessoa.copiado .copiar-icone { color: var(--ok); opacity: 1; animation: menu-pop 380ms cubic-bezier(.2, 1.4, .4, 1) both; }
 .dica-copiar { margin-top: 4px; }
+.parte-das-contas { display: inline-block; margin: 2px 0 4px; padding: 1px 9px; border-radius: 99px; background: var(--destaque-suave); color: var(--destaque); font-size: 12.5px; font-weight: 700; }
 .casa-lista { padding: 0; overflow: hidden; }
 .casa-lista > h2 { padding: 16px 16px 8px; margin: 0; }
 .titulo-com-soma { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
