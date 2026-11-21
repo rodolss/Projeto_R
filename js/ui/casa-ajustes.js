@@ -4,7 +4,7 @@
 import { h, cartao, botao, mostrarFolha, esconderFolha } from './dom.js';
 import { adicionarConta, editarConta, moverConta, renomearPessoa } from '../core/casa.js';
 import { cartaoConectar } from './conectar.js';
-import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao } from '../core/cartao.js';
+import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao, pessoasDe, donaDaPessoa } from '../core/cartao.js';
 import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
 import {
   cartoesVisiveis, veAposentadoria, adicionarPerfil, renomearPerfil, vincularAparelho, desvincularAparelho, donoDeOutroCartao,
@@ -202,13 +202,15 @@ function desenhar(container, ctx) {
         aoTocar: () => ctx.navegar(cartoes.length ? '#/casa-cartao?novo=1' : '#/casa-cartao'),
       })));
 
-  const outrasPessoas = casa.outrasPessoas ?? [];
+  // Cada um vê as próprias (o "Pai" dela não é o dele); sem perfis, todas, com de quem é cada uma.
+  const outrasPessoas = visto ? pessoasDe(casa, visto.id) : (casa.outrasPessoas ?? []);
   const usadas = outrasPessoas.filter((p) => !p.arquivada);
   const paradas = outrasPessoas.filter((p) => p.arquivada);
+  const deQuemE = (p) => { const dona = !visto && donaDaPessoa(casa, p); return dona && nomeDe(dona) ? `para quem ${nomeDe(dona)} compra` : 'toque para mudar o nome'; };
   const secaoPessoas = cartoes.length > 0 && h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Para quem também compro'),
     usadas.length > 0 && h('div', {}, ...usadas.map((p) => linhaDaLista({
-      selo: avatar(p), titulo: p.nome, detalhe: 'toque para mudar o nome', aoTocar: () => abrir(`outra-${p.id}`),
+      selo: avatar(p), titulo: p.nome, detalhe: deQuemE(p), aoTocar: () => abrir(`outra-${p.id}`),
     }))),
     h('p', { class: 'nota nota-casa' }, usadas.length
       ? 'Para acrescentar alguém, use "+ Outra pessoa" ao anotar uma compra.'

@@ -485,13 +485,13 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
         if (!outra.nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
         adicionar.disabled = true;
         let novoId = null;
-        await ctx.salvarCasa((c) => { const r = adicionarPessoaDoCartao(c, { nome: outra.nome }); novoId = r.id; return r.casa; });
+        await ctx.salvarCasa((c) => { const r = adicionarPessoaDoCartao(c, { nome: outra.nome, donaId: cfg.donaId }); novoId = r.id; return r.casa; });
         if (!opcoes.some((o) => o.id === novoId)) opcoes = [...opcoes, { id: novoId, nome: outra.nome }];
         atual = novoId;
         aoEscolher(novoId);
         desenharChips();
       });
-      area.replaceChildren(h('div', { class: 'cartao-outra' }, campo, adicionar, botao('Cancelar', desenharChips, { secundario: true })));
+      area.replaceChildren(h('div', { class: 'cartao-outra' }, campo, botao('Cancelar', desenharChips, { secundario: true }), adicionar));
       setTimeout(() => campo.focus(), 30);
     };
     desenharChips();

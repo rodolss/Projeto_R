@@ -98,16 +98,38 @@ export function rotuloDoCartao(casa, cartao) {
   return dona && daMesma === 1 ? dona.nome : conta?.nome ?? 'Cartão';
 }
 
-// ---------- as outras pessoas (valem para todos os cartões) ----------
+// ---------- as outras pessoas: cada uma é de quem compra para ela (desenho 2026-11-21-para-quem-de-cada-um) ----------
+// O "Pai" dela não aparece no cartão dele. Quem foi criada antes disso (sem `donaId`) é de quem já comprou para ela
+// num cartão; se ninguém comprou ainda (ou os dois já compraram), continua valendo para todos.
 const comPessoas = (casa, mudar) => ({ ...casa, outrasPessoas: mudar(casa.outrasPessoas ?? []) });
 
-// Nome que já existe (mesmo sem acento ou com outra caixa) devolve a pessoa que existe, de volta à lista.
-export function adicionarPessoaDoCartao(casa, { nome, novoId = idPadrao }) {
+export function donaDaPessoa(casa, pessoa) {
+  if (pessoa.donaId) return pessoa.donaId;
+  const donas = new Set();
+  for (const cartao of casa.cartoes ?? []) {
+    if (!cartao.donaId) continue;
+    const comprou = (cartao.fixas ?? []).some((f) => f.para === pessoa.id)
+      || casa.meses.some((m) => (m.compras ?? []).some((c) => c.contaId === cartao.contaId && c.para === pessoa.id));
+    if (comprou) donas.add(cartao.donaId);
+  }
+  return donas.size === 1 ? [...donas][0] : null;
+}
+
+// As outras pessoas de quem tem o cartão `donaId` (as dela e as que valem para todos).
+export const pessoasDe = (casa, donaId) => (casa.outrasPessoas ?? []).filter((p) => {
+  const dona = donaDaPessoa(casa, p);
+  return dona === null || dona === donaId;
+});
+
+// Nome que já existe na lista de quem compra (mesmo sem acento ou com outra caixa) devolve a pessoa que existe, de
+// volta à lista. A pessoa nova é de quem tem o cartão (`donaId`): o "Pai" de cada um é outra pessoa.
+export function adicionarPessoaDoCartao(casa, { nome, donaId = null, novoId = idPadrao }) {
   const limpo = nome.trim();
-  const igual = (casa.outrasPessoas ?? []).find((p) => semAcento(p.nome) === semAcento(limpo));
+  const candidatas = donaId ? pessoasDe(casa, donaId) : (casa.outrasPessoas ?? []);
+  const igual = candidatas.find((p) => semAcento(p.nome) === semAcento(limpo));
   if (igual) return { casa: igual.arquivada ? editarPessoaDoCartao(casa, igual.id, { arquivada: false }) : casa, id: igual.id };
   const id = novoId();
-  return { casa: comPessoas(casa, (lista) => [...lista, { id, nome: limpo }]), id };
+  return { casa: comPessoas(casa, (lista) => [...lista, { id, nome: limpo, ...(donaId ? { donaId } : {}) }]), id };
 }
 
 export function editarPessoaDoCartao(casa, id, { nome, arquivada }) {
@@ -117,7 +139,8 @@ export function editarPessoaDoCartao(casa, id, { nome, arquivada }) {
 
 // Ordem das escolhas e das somas: Casa, a dona do cartão, as pessoas da casa, os outros perfis, as outras pessoas.
 function todasAsOpcoes(casa, cartaoId) {
-  const dona = quemE(casa, acharCartao(casa, cartaoId)?.donaId);
+  const cartao = acharCartao(casa, cartaoId);
+  const dona = quemE(casa, cartao?.donaId);
   const daCasa = casa.pessoas.filter((p) => p.id !== dona?.id);
   const perfis = (casa.perfis ?? []).filter((p) => p.id !== dona?.id && !casa.pessoas.some((x) => x.id === p.id));
   return [
@@ -125,7 +148,8 @@ function todasAsOpcoes(casa, cartaoId) {
     ...(dona ? [dona] : []),
     ...daCasa,
     ...perfis,
-    ...(casa.outrasPessoas ?? []),
+    // No cartão, só as outras pessoas de quem o tem; sem cartão (o nome de um "para quem" qualquer), todas.
+    ...(cartao?.donaId ? pessoasDe(casa, cartao.donaId) : (casa.outrasPessoas ?? [])),
   ];
 }
 
