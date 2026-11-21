@@ -37,7 +37,9 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
       nome: casa.contas.find((c) => c.id === cartao.contaId)?.nome ?? 'Cartão',
       fatura,
       vence: periodo?.vence ?? null,
-      seu: somar(de((p) => p.para === pessoaId).map((p) => p.valor)),
+      // O que é dela na fatura, já sem o que ela já tem guardado ("já tenho" também vale nas compras da dona do cartão).
+      seu: somar(de((p) => p.para === pessoaId).map((p) => p.falta ?? p.valor)),
+      seuJaTenho: somar(de((p) => p.para === pessoaId).map((p) => p.jaTenho)),
       daCasa: somar(de((p) => p.para === 'casa').map((p) => p.valor)),
       outras: { valor: somar(outras.map((p) => p.valor)), jaTenho: somar(outras.map((p) => p.jaTenho)), falta: somar(outras.map((p) => p.falta)) },
       adiantado: somar(outras.map((p) => p.falta)),

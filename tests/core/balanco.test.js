@@ -44,7 +44,7 @@ test('balanço: entrou o salário; saiu a parte das contas e o que é seu no car
   assert.deepEqual(leo.contas, { valor: 120, total: 300, fatia: 0.03, aConfirmar: false });
   // A parte da casa do cartão já está nas contas: no cartão entra só o que é dele (Blusa + Academia).
   assert.deepEqual(leo.cartoes, [{
-    cartaoId: 'c2', nome: 'Cartão Leo', fatura: '2026-12', vence: '2026-12-10', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, adiantado: 50, aberta: false, conferida: true,
+    cartaoId: 'c2', nome: 'Cartão Leo', fatura: '2026-12', vence: '2026-12-10', seu: 170, daCasa: 100, outras: { valor: 80, jaTenho: 30, falta: 50 }, adiantado: 50, seuJaTenho: 0, aberta: false, conferida: true,
   }]);
   assert.deepEqual([leo.entrou, leo.saiu, leo.sobra, leo.previsao], [4000, 340, 3660, false]);
   // O cartão do Leo é só dele: o presente para a Ana não aparece no balanço dela.
@@ -162,4 +162,13 @@ test('balanço: o "já tenho" não pesa no saiu; o que ainda falta receber conta
   const tudo = migrarCasa({ ...casa, meses: casa.meses.map((m) => ({ ...m, compras: (m.compras ?? []).map((c) => (c.para === 'q1' || c.para === 'p1' ? { ...c, jaTenho: true } : c)) })) });
   const b = balancoDoMes(tudo, '2026-12', 'p2', '2026-12-20');
   assert.deepEqual([b.cartoes[0].adiantado, b.saiu], [0, 290]);
+});
+
+test('balanço: o "já tenho" das compras da própria dona do cartão também sai do que é dela (só o que falta entra)', () => {
+  let casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
+  // A Blusa (80, de Leo no cartão dele) com "já tenho": entra só o que falta dela (90 da Academia).
+  const blusa = casa.meses.flatMap((m) => m.compras ?? []).find((c) => c.nome === 'Blusa');
+  casa = migrarCasa({ ...casa, meses: casa.meses.map((m) => ({ ...m, compras: (m.compras ?? []).map((c) => (c.id === blusa.id ? { ...c, jaTenho: true } : c)) })) });
+  const k = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20').cartoes[0];
+  assert.deepEqual([k.seu, k.seuJaTenho], [90, 80]);
 });
