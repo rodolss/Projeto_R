@@ -205,7 +205,7 @@ function desenhar(container, ctx) {
 
   // O plano só no mês atual, na visão única e no balanço de quem administra.
   const plano = ctx.unica && ctx.estado && mes === mesAtual && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
-  container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, plano, entrou, saiu, outras].filter(Boolean));
+  container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, entrou, saiu, outras, plano].filter(Boolean));
 
   // ---------- a folha do salário (o único lugar onde ele se digita) ----------
   const terminar = () => {
