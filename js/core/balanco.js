@@ -6,6 +6,7 @@
 import { centavos, resumoDoMes } from './casa.js';
 import { faturaDoCartao, periodoDaFatura, cartaoPronto } from './cartao.js';
 import { extraDoMes } from './salario.js';
+import { contasPessoaisDoMes } from './contas-pessoais.js';
 
 const somar = (lista) => centavos(lista.reduce((s, x) => s + (x ?? 0), 0));
 
@@ -46,12 +47,18 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
       conferida: f.conferida,
     };
   });
+  // As contas pessoais (desenho 2026-11-22-contas-pessoais): só de quem é o balanço, fora da divisão.
+  const doMes = contasPessoaisDoMes(casa, mes, pessoaId);
+  const pessoais = { valor: doMes.total, aConfirmar: doMes.aConfirmar > 0, contas: doMes.contas };
   const entrou = centavos((salario?.valor ?? 0) + (salario?.extra ?? 0));
   // Você paga a fatura inteira: o que já está no cofrinho ("já tenho") não pesa; o que ainda falta as pessoas devolverem
   // conta como saída até chegar (`adiantado`).
-  const saiu = somar([contas?.valor, ...cartoes.map((c) => c.seu + c.adiantado)]);
-  const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
-  return { mes, pessoaId, salario, contas, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
+  const saiu = somar([contas?.valor, pessoais.valor, ...cartoes.map((c) => c.seu + c.adiantado)]);
+  // `previsaoSemPessoais`: para o custo de vida, que nem conta as contas pessoais com fim (um empréstimo previsto não
+  // pode tirar o mês dele).
+  const previsaoSemPessoais = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
+  const previsao = previsaoSemPessoais || pessoais.aConfirmar;
+  return { mes, pessoaId, salario, contas, pessoais, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao, previsaoSemPessoais };
 }
 
 // ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
 import { definirSalario } from '../../js/core/salario.js';
 import { salvarValor, adicionarCompra, apagarCompra, editarConta, migrarCasa } from '../../js/core/casa.js';
+import { adicionarContaPessoal } from '../../js/core/contas-pessoais.js';
 import { anotarCompra, adicionarCartao, configurarCartao, adicionarPessoaDoCartao, editarFixa, editarCompraDoCartao, marcarJaTenho } from '../../js/core/cartao.js';
 
 function base() {
@@ -171,4 +172,13 @@ test('salário só no Balanço: cada aparelho guarda o a mais de um mês diferen
   const remoto = definirSalario(b, { mes: '2026-12', pessoaId: 'p1', salario: 5000, extra: 5000 });
   const r = mesclarCasa({ base: b, local, remoto });
   assert.deepEqual(r.extras, { '2026-11': { p1: 1000 }, '2026-12': { p1: 5000 } });
+});
+
+test('conta pessoal criada num aparelho e valor de conta da casa no outro: os dois ficam', () => {
+  const b = migrarCasa(base());
+  const local = adicionarContaPessoal(b, { nome: 'Empréstimo', donoId: 'p1', mes: '2026-11', valor: 300, novoId: () => 'e1' });
+  const remoto = salvarValor(b, { mes: '2026-11', contaId: 'c2', valor: 210 });
+  const r = mesclarCasa({ base: b, local, remoto });
+  assert.deepEqual(r.contasPessoais.map((c) => c.id), ['e1']);
+  assert.deepEqual(mes(r, '2026-11').valores, { c1: 40, c2: 210, e1: 300 });
 });

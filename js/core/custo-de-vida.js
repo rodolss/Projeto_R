@@ -11,6 +11,12 @@ export const MESES_DO_CUSTO = 6;
 // O que é seu no cartão num mês: inclusive o que já tinha guardado ("já tenho"). O que outras pessoas ainda vão
 // devolver não é custo seu (no Balanço ele conta como saída até voltar).
 const seuNoCartao = (b) => centavos(b.cartoes.reduce((s, k) => s + k.seu + k.seuJaTenho, 0));
+// As contas pessoais de todo mês (desenho 2026-11-22-contas-pessoais): a conta com fim (um empréstimo) acaba antes da
+// aposentadoria e não entra no custo de vida.
+const semFim = (b) => b.pessoais.contas.filter((c) => !c.conta.ultimoMes);
+const pessoaisSemFim = (b) => centavos(semFim(b).reduce((s, c) => s + c.valor, 0));
+// Mês ainda em previsão para o custo de vida: o que fica de fora dele (a conta com fim) não conta.
+const emPrevisao = (b) => b.previsaoSemPessoais || semFim(b).some((c) => c.situacao === 'a-confirmar');
 
 // A média dos últimos `n` meses fechados antes do mês de `hoje` (sem previsão e com os salários da divisão), e cada
 // mês, do mais antigo ao mais novo. Nenhum mês fechado: null.
@@ -21,14 +27,15 @@ export function custoDeVidaReal(casa, pessoaId, hoje, n = MESES_DO_CUSTO) {
   for (let k = n; k >= 1; k--) {
     const mes = somarMeses(mesAtual, -k);
     const b = balancoDoMes(casa, mes, pessoaId, hoje);
-    if (b.previsao || !dadosCompletos(b)) continue;
+    if (emPrevisao(b) || !dadosCompletos(b)) continue;
     const contas = centavos(b.contas.valor);
     const cartao = seuNoCartao(b);
-    meses.push({ mes, contas, cartao, valor: centavos(contas + cartao) });
+    const pessoais = pessoaisSemFim(b);
+    meses.push({ mes, contas, cartao, pessoais, valor: centavos(contas + cartao + pessoais) });
   }
   if (!meses.length) return null;
   const media = (campo) => centavos(meses.reduce((s, m) => s + m[campo], 0) / meses.length);
-  return { media: media('valor'), contas: media('contas'), cartao: media('cartao'), meses };
+  return { media: media('valor'), contas: media('contas'), cartao: media('cartao'), pessoais: media('pessoais'), meses };
 }
 
 // O orçamento do plano vira o gasto real (um item mensal, do mês de hoje) e a revisão fica em dia. As categorias

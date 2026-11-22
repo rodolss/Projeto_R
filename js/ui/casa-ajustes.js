@@ -19,6 +19,8 @@ import { icone, iconeCategoria } from './icones.js';
 import { reduzMovimento } from './movimento.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { categoriaDaConta } from '../core/categorias.js';
+import { contasPessoaisDe, adicionarContaPessoal, editarContaPessoal, moverContaPessoal, faltamParcelas, ultimoMesDasParcelas } from '../core/contas-pessoais.js';
+import { textoDoFim, campoDoFim } from './conta-pessoal.js';
 
 export function render(container, ctx) {
   desenhar(container, ctx);
@@ -134,6 +136,27 @@ function desenhar(container, ctx) {
   const notaDaDivisao = h('p', { class: 'nota nota-casa' },
     'Quem ganha mais paga mais: cada um paga a mesma fatia do que ganha. Um valor "a confirmar" é uma previsão com o último valor conhecido.');
 
+  // Contas pessoais (desenho 2026-11-22-contas-pessoais): as de quem vê, fora da divisão. Sem perfil, não há dono.
+  const pessoaisAtivas = visto ? contasPessoaisDe(casa, visto.id) : [];
+  const pessoaisParadas = visto ? contasPessoaisDe(casa, visto.id, { arquivadas: true }) : [];
+  const secaoPessoais = visto && h('section', { class: 'cartao casa-lista' },
+    h('h2', {}, 'Contas pessoais'),
+    h('div', {},
+      ...pessoaisAtivas.map((conta) => linhaDaLista({
+        selo: iconeCategoria(categoriaDaConta(conta)), titulo: conta.nome, detalhe: textoDoFim(conta, mesDoFoco), aoTocar: () => abrir(`pessoal-${conta.id}`),
+      })),
+      linhaDaLista({ selo: h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone('mais')), titulo: 'Adicionar conta pessoal', aoTocar: () => abrir('nova-pessoal'), classe: 'linha-acao' })),
+    pessoaisParadas.length > 0 && h('details', { class: 'casa-paradas' },
+      h('summary', {}, `Contas pessoais que não usa mais (${pessoaisParadas.length})`),
+      ...pessoaisParadas.map((conta) => h('div', { class: 'linha' },
+        h('div', { class: 'nome' }, h('span', {}, conta.nome), h('small', {}, 'continua no histórico')),
+        h('button', {
+          type: 'button', class: 'botao-link', style: 'padding:4px 0',
+          // Volta do mês em foco em diante (não do mês de hoje: um mês já todo pago não reabre por uma previsão nova).
+          onclick: () => salvar((c) => editarContaPessoal(c, conta.id, { arquivada: false, desde: mesDoFoco }), `${conta.nome} voltou para a lista.`),
+        }, 'Voltar a usar')))),
+    h('p', { class: 'nota nota-casa' }, 'Aparecem só no seu perfil. Não entram na divisão da casa: saem só do seu balanço.'));
+
   // ---------- folhas da casa ----------
   // As duas maneiras de preencher uma conta, em botões grandes com exemplo (no lugar da caixa "Compra por compra").
   const escolhaDoJeito = (inicial, aoEscolher, travada) => {
@@ -195,9 +218,50 @@ function desenhar(container, ctx) {
     ];
   };
 
+  // Conta pessoal: nome, se tem fim (as parcelas contam a partir do mês em foco) e a posição na lista.
+  const folhaDaContaPessoal = (conta, folha) => {
+    const nova = !conta;
+    const k = nova ? -1 : pessoaisAtivas.findIndex((c) => c.id === conta.id);
+    const faltam = conta?.ultimoMes ? Math.max(1, faltamParcelas(conta, mesDoFoco)) : null;
+    const editado = { nome: conta?.nome ?? '', parcelas: faltam, mudouFim: false };
+    const salvarPessoal = () => {
+      if (!editado.nome) { ctx.aviso('Escreva o nome da conta.', 'atencao', 3000); return; }
+      if (nova) {
+        salvarNaFolha((c) => adicionarContaPessoal(c, { nome: editado.nome, donoId: visto.id, mes: mesDoFoco, parcelas: editado.parcelas }), 'Conta pessoal adicionada.', folha);
+        return;
+      }
+      const mudanca = {};
+      if (editado.nome !== conta.nome) mudanca.nome = editado.nome;
+      if (editado.mudouFim) mudanca.ultimoMes = ultimoMesDasParcelas(mesDoFoco, editado.parcelas);
+      if (!Object.keys(mudanca).length) { fechar(); return; }
+      salvarNaFolha((c) => editarContaPessoal(c, conta.id, mudanca), 'Conta salva.', folha);
+    };
+    return [
+      h('h2', {}, nova ? 'Nova conta pessoal' : conta.nome),
+      nova && h('p', { class: 'suave pequeno' }, 'Uma conta só sua, que se repete todo mês e não é no cartão. Ela não entra na divisão da casa.'),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', {
+          class: 'entrada', type: 'text', value: editado.nome, autocomplete: 'off', placeholder: 'Ex.: empréstimo, academia',
+          oninput: (e) => { editado.nome = e.target.value.trim(); },
+        })),
+      campoDoFim({ parcelas: editado.parcelas, mes: mesDoFoco, aoMudar: (n) => { editado.parcelas = n; editado.mudouFim = true; } }),
+      !nova && h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Posição na lista'),
+        h('div', { class: 'casa-passo' },
+          h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Subir na lista', disabled: k <= 0, onclick: () => salvar((c) => moverContaPessoal(c, conta.id, -1)) }, '↑'),
+          h('span', { class: 'casa-vezes' }, `${k + 1}ª de ${pessoaisAtivas.length}`),
+          h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Descer na lista', disabled: k >= pessoaisAtivas.length - 1, onclick: () => salvar((c) => moverContaPessoal(c, conta.id, 1)) }, '↓'))),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao(nova ? 'Adicionar' : 'Salvar', salvarPessoal)),
+      !nova && botaoDoisToques('Parar de usar esta conta', 'Toque de novo: ela sai dos meses novos',
+        () => salvarNaFolha((c) => editarContaPessoal(c, conta.id, { arquivada: true }), `${conta.nome} não aparece mais nos meses novos.`, folha)),
+    ];
+  };
+
   // A folha aberta vem do endereço (#/casa-ajustes?folha=conta-x): o botão voltar do celular a fecha.
   function conteudoDaFolha(folha) {
     if (folha === 'nova-conta') return folhaDaConta(null, folha);
+    if (folha === 'nova-pessoal') return visto && folhaDaContaPessoal(null, folha);
+    if (folha?.startsWith('pessoal-')) { const conta = pessoaisAtivas.find((c) => c.id === folha.slice(8)); return conta && folhaDaContaPessoal(conta, folha); }
     if (folha?.startsWith('conta-')) { const conta = ativas.find((c) => c.id === folha.slice(6)); return conta && folhaDaConta(conta, folha); }
     if (folha?.startsWith('cartao-')) { const k = cartoes.find((x) => x.id === folha.slice(7)); return k && folhaDoCartao(k, folha); }
     if (folha?.startsWith('outra-')) { const p = usadas.find((x) => x.id === folha.slice(6)); return p && folhaDaOutraPessoa(p, folha); }
@@ -452,8 +516,9 @@ function desenhar(container, ctx) {
   const grupos = [
     {
       id: 'casa', icone: 'casa', cat: 'casa', titulo: 'Casa',
-      resumo: `${juntarNomes(pessoasNoMes(casa, mesDoFoco).map((p) => p.nome))} · ${plural(ativas.length, 'conta', 'contas')}`,
-      conteudo: [pessoas, contas, notaDaDivisao],
+      resumo: [juntarNomes(pessoasNoMes(casa, mesDoFoco).map((p) => p.nome)), plural(ativas.length, 'conta', 'contas'),
+        pessoaisAtivas.length > 0 && plural(pessoaisAtivas.length, 'pessoal', 'pessoais')].filter(Boolean).join(' · '),
+      conteudo: [pessoas, contas, notaDaDivisao, secaoPessoais],
     },
     {
       id: 'cartoes', icone: 'cartao', cat: 'cartao', titulo: 'Cartões e compras',

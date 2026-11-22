@@ -180,6 +180,14 @@ function desenhar(container, ctx) {
       valor: c.valor == null ? '—' : formatarBRL(c.valor),
       aoTocar: irAoMes,
     }),
+    // Contas pessoais (desenho 2026-11-22-contas-pessoais): só de quem é o balanço, fora da divisão.
+    b.pessoais.contas.length > 0 && linha({
+      titulo: 'Contas pessoais', cat: 'outro',
+      detalhe: [b.pessoais.contas.every((x) => estaPago(casa, mes, x.conta.id)) && seloPago(), ' ', b.pessoais.aConfirmar && selo('a confirmar'), b.pessoais.aConfirmar && ' ',
+        b.pessoais.contas.map((x) => x.conta.nome).join(', ')],
+      valor: formatarBRL(b.pessoais.valor),
+      aoTocar: irAoMes,
+    }),
     ...b.cartoes.map((k) => linha({
       titulo: k.nome, cat: 'cartao',
       // A fatura do mês (a mesma do Cartão); o vencimento diz o dia.

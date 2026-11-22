@@ -38,20 +38,21 @@ function telaDoCustoReal(real, ctx) {
     h('h2', {}, 'De onde vem'),
     h('div', {},
       linhaParte('casa', 'Contas da casa', 'a sua parte, por mês', real.contas, '#/casa'),
-      linhaParte('cartao', 'Cartão', 'o que é seu, por mês', real.cartao, '#/casa-cartao')));
+      linhaParte('cartao', 'Cartão', 'o que é seu, por mês', real.cartao, '#/casa-cartao'),
+      real.pessoais > 0 && linhaParte('outro', 'Contas pessoais', 'as de todo mês, por mês', real.pessoais, '#/casa')));
   const maior = Math.max(...real.meses.map((m) => m.valor), 1);
   const porMes = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Mês a mês'),
     h('div', {}, ...[...real.meses].reverse().map((m) => h('a', { class: 'barra-item', href: `#/casa-balanco?mes=${m.mes}` },
       h('div', { class: 'barra-topo' }, h('b', {}, formatarMes(m.mes)), h('span', { class: 'quanto' }, formatarBRL(m.valor))),
-      h('small', {}, `contas ${formatarBRL(m.contas)} · cartão ${formatarBRL(m.cartao)}`),
+      h('small', {}, `contas ${formatarBRL(m.contas)} · cartão ${formatarBRL(m.cartao)}${m.pessoais > 0 ? ` · pessoais ${formatarBRL(m.pessoais)}` : ''}`),
       h('div', { class: 'barra-trilho', 'aria-hidden': 'true' }, h('i', { style: `width:${((m.valor / maior) * 100).toFixed(1)}%` }))))));
   return [
     h('h1', {}, 'Custo de vida'),
     heroi,
     partes,
     porMes,
-    h('p', { class: 'nota' }, 'É ele que define a meta de independência e a reserva de emergência do plano. Gastos que não passam pelas contas da casa nem pelo cartão não entram.'),
+    h('p', { class: 'nota' }, 'É ele que define a meta de independência e a reserva de emergência do plano. Gastos que não passam pelas contas da casa, pelas contas pessoais nem pelo cartão não entram. Uma conta pessoal com fim (um empréstimo) também não: ela acaba antes da aposentadoria.'),
   ];
 }
 

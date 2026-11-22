@@ -53,6 +53,7 @@ export function podeApagarPerfil(casa, id) {
     && !(casa.cartoes ?? []).some((c) => c.donaId === id || (c.fixas ?? []).some((f) => f.para === id))
     && !casa.meses.some((m) => (m.compras ?? []).some((c) => c.para === id))
     && !(casa.aparelhos ?? []).some((a) => a.perfilId === id)
+    && !(casa.contasPessoais ?? []).some((c) => c.donoId === id)
     && !casa.pessoas.some((p) => p.id === id);
 }
 

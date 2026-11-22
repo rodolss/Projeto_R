@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { criarCasa } from '../../js/core/casa.js';
 import { adicionarPerfil, vincularAparelho, entrarNaDivisao, sairDaDivisao, detalheDoPerfil, podeApagarPerfil, apagarPerfil } from '../../js/core/perfis.js';
 import { adicionarCartao, anotarCompra } from '../../js/core/cartao.js';
+import { adicionarContaPessoal } from '../../js/core/contas-pessoais.js';
 
 const ids = () => { let n = 0; return () => `id${++n}`; };
 
@@ -55,4 +56,9 @@ test('apagarPerfil tira só o perfil que pode sair; os outros pedidos não mudam
   const casa = casaBase();
   assert.deepEqual(apagarPerfil(casa, 'p3').perfis.map((p) => p.id), ['p1', 'p2']);
   assert.equal(apagarPerfil(casa, 'p2'), casa);
+});
+
+test('podeApagarPerfil: perfil com conta pessoal fica (a conta é dele)', () => {
+  const casa = adicionarContaPessoal(casaBase(), { nome: 'Academia', donoId: 'p3', mes: '2026-12', novoId: () => 'a1' });
+  assert.equal(podeApagarPerfil(casa, 'p3'), false);
 });

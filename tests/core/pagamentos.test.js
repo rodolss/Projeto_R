@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { marcarPago, estaPago, tudoPago, contasPagas, mesEmFoco, marcaDaConta, marcaDoCartao, mesFechado, reabrirMes, estadoDoMes, fecharMes } from '../../js/core/pagamentos.js';
 import { migrarCasa, salvarValor } from '../../js/core/casa.js';
 import { anotarCompra } from '../../js/core/cartao.js';
+import { adicionarContaPessoal } from '../../js/core/contas-pessoais.js';
 import { mesclarCasa } from '../../js/dados/mesclar-casa.js';
 
 // Casa inventada: Ana e Leo; Luz e Água com valor em dez e jan. `comCartao`: o cartão da Ana, com uma compra em dez.
@@ -102,4 +103,16 @@ test('meses travados: o mês-1 destrava; do mês-2 para trás é definitivo; do 
   assert.equal(estadoDoMes(casa, '2026-09', 'p1', hoje), 'definitivo');
   assert.equal(estadoDoMes(casaBase(), '2026-11', 'p1', hoje), 'livre'); // atual: só fecha com tudo pago
   assert.equal(estadoDoMes(casaBase(), '2027-01', 'p1', hoje), 'livre');
+});
+
+// Contas pessoais (desenho 2026-11-22-contas-pessoais): contam para o "Tudo pago" do dono; o selo das contas da casa não muda.
+test('tudo pago: as contas pessoais do dono precisam estar pagas; as dos outros e o selo da casa, não', () => {
+  let casa = marcar(marcar(casaBase(), '2026-12', 'c1'), '2026-12', 'c2');
+  assert.equal(tudoPago(casa, '2026-12', 'p1'), true);
+  casa = adicionarContaPessoal(casa, { nome: 'Empréstimo', donoId: 'p1', mes: '2026-12', valor: 300, novoId: () => 'e1' });
+  assert.equal(tudoPago(casa, '2026-12', 'p1'), false);
+  assert.equal(tudoPago(casa, '2026-12', 'p2'), true, 'a conta pessoal da Ana não pesa no Leo');
+  assert.equal(contasPagas(casa, '2026-12'), true, 'o selo das contas da casa continua só da casa');
+  assert.equal(tudoPago(marcar(casa, '2026-12', 'e1'), '2026-12', 'p1'), true);
+  assert.equal(mesEmFoco(casa, '2026-12-05', 'p1'), '2026-12');
 });

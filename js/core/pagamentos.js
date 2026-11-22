@@ -3,6 +3,7 @@
 // fora de `meses` (um app antigo que regrava o mês não o apaga). Quando tudo do mês está pago, a tela abre no seguinte.
 import { resumoDoMes } from './casa.js';
 import { faturaDoCartao } from './cartao.js';
+import { contasPessoaisDoMes } from './contas-pessoais.js';
 import { somarMeses } from './meses.js';
 
 export const estaPago = (casa, mes, marca) => Boolean(casa?.pagamentos?.[mes]?.[marca]);
@@ -48,9 +49,12 @@ export function contasPagas(casa, mes, pessoaId) {
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
-// Tudo pago: contas e cartões da pessoa. Mês sem nada para pagar não conta como pago.
+// As contas pessoais da pessoa com valor no mês (a marca é o id da conta).
+const marcasDasPessoais = (casa, mes, pessoaId) => contasPessoaisDoMes(casa, mes, pessoaId).contas.map((c) => c.conta.id);
+
+// Tudo pago: contas da casa, cartões e contas pessoais da pessoa. Mês sem nada para pagar não conta como pago.
 export function tudoPago(casa, mes, pessoaId) {
-  const marcas = [...new Set([...marcasDasContas(casa, mes), ...marcasDosCartoes(casa, mes, pessoaId)])];
+  const marcas = [...new Set([...marcasDasContas(casa, mes), ...marcasDosCartoes(casa, mes, pessoaId), ...marcasDasPessoais(casa, mes, pessoaId)])];
   return marcas.length > 0 && marcas.every((m) => estaPago(casa, mes, m));
 }
 
