@@ -14,6 +14,29 @@ const MES = /^\d{4}-\d{2}$/;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const igualCodigo = (a, b) => String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 
+// Só entra na lista o que ele consegue comprar (desenho 2026-11-22-onde-investir-agendado): aberto a qualquer
+// investidor e bem negociado na bolsa (média por dia, em reais), conferido na análise há no máximo 120 dias.
+export const LIQUIDEZ_MINIMA = { fiis: 1_000_000, acoes: 5_000_000 };
+const VALIDADE_DA_CONFERENCIA = 120;
+const diasEntre = (de, ate) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
+
+function errosDaConferencia(a, geradaEm) {
+  const c = a.conferido;
+  if (!c || typeof c !== 'object' || !DATA.test(c.em ?? '')) return [`${a.ticker}: falta a conferência (conferido: publicoGeral, liquidezDiaria, em)`];
+  const erros = [];
+  if (c.publicoGeral !== true) erros.push(`${a.ticker}: não está aberto a qualquer investidor (público geral)`);
+  const minimo = LIQUIDEZ_MINIMA[a.classe];
+  if (minimo != null && !(Number.isFinite(c.liquidezDiaria) && c.liquidezDiaria >= minimo)) {
+    erros.push(`${a.ticker}: pouco negociado (precisa de R$ ${minimo.toLocaleString('pt-BR')} por dia)`);
+  }
+  if (DATA.test(geradaEm ?? '')) {
+    const dias = diasEntre(c.em, geradaEm);
+    if (dias < 0) erros.push(`${a.ticker}: a conferência (${c.em}) é depois da análise (${geradaEm})`);
+    else if (dias > VALIDADE_DA_CONFERENCIA) erros.push(`${a.ticker}: a conferência tem mais de ${VALIDADE_DA_CONFERENCIA} dias; confira de novo`);
+  }
+  return erros;
+}
+
 export function validarRecomendacao(r) {
   const erros = [];
   if (!r || typeof r !== 'object') return { ok: false, erros: ['a recomendação não é um objeto'] };
@@ -26,7 +49,9 @@ export function validarRecomendacao(r) {
   for (const a of lista) {
     if (!a.ticker || !a.nome || !a.motivo) erros.push(`${a.ticker ?? '?'}: a lista precisa de ticker, nome e motivo`);
     if (!CLASSES_ISENTAS.includes(a.classe)) erros.push(`${a.ticker}: classe "${a.classe}" não é de renda isenta (fiis ou acoes)`);
+    erros.push(...errosDaConferencia(a, r.geradaEm));
   }
+  if (r.semOrdens !== undefined && !(typeof r.semOrdens === 'string' && r.semOrdens.trim())) erros.push('semOrdens, quando vem, precisa ser um texto');
   for (const o of ordens) {
     const naLista = lista.find((a) => igualCodigo(a.ticker, o.ticker));
     if (!naLista) erros.push(`${o.ticker}: a ordem está fora da lista da carteira`);
@@ -63,6 +88,17 @@ export function mesDoProximoPagamento(estado, hoje) {
   const mes = hoje.slice(0, 7);
   return (estado?.meses ?? []).some((m) => m.mes === mes) ? somarMeses(mes, 1) : mes;
 }
+
+// O mês das ordens da análise (a do dia 26 roda sozinha): o do próximo Dia de pagamento, mas nunca antes do mês da
+// última análise — uma recomendação de um mês à frente (feita à mão) é atualizada, não trocada por um mês anterior.
+export function mesDasOrdens(estado, hoje) {
+  const proximo = mesDoProximoPagamento(estado, hoje);
+  const ultima = estado?.recomendacao?.mes;
+  return MES.test(ultima ?? '') && ultima > proximo ? ultima : proximo;
+}
+
+// O que o cartão diz quando o mês não tem ordens: o motivo que a análise gravou, ou o caso comum (tudo para a reserva).
+export const motivoSemOrdens = (r) => r?.semOrdens || 'Este mês o dinheiro vai para a reserva de emergência.';
 
 // O que as cotas inteiras não cobriram do valor da carteira: vai para a caixa de oportunidade (fica investido e conta
 // para a meta), em vez de ficar parado na conta.
