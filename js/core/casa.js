@@ -138,15 +138,16 @@ export function resumoDoMes(casa, mes) {
   const salarios = pessoasNoMes(casa, mes).map((pessoa) => ({ pessoa, ...salarioNoMes(casa, mes, pessoa.id) }));
   const renda = centavos(salarios.reduce((s, x) => s + x.valor, 0));
   const divide = renda > 0;
-  let acumulado = 0;
+  // A última pessoa com salário paga o resto: as partes somam o total exato em centavos, e quem ainda não tem salário
+  // (alguém que acabou de entrar na divisão) paga zero, nunca −R$ 0,01.
+  const parte = (s) => centavos(total * (s.valor / renda));
+  const quemFecha = salarios.findLastIndex((s) => s.valor > 0);
+  const dosOutros = salarios.reduce((soma, s, k) => (k === quemFecha ? soma : soma + parte(s)), 0);
   const pessoas = salarios.map((s, k) => {
     const base = { pessoa: s.pessoa, salario: s.valor, situacaoSalario: s.situacao, deOnde: s.deOnde };
     if (!divide) return { ...base, fatia: null, paga: null, sobra: null };
-    const fatia = s.valor / renda;
-    // A última pessoa paga o resto: as partes somam o total exato em centavos.
-    const paga = k < salarios.length - 1 ? centavos(total * fatia) : centavos(total - acumulado);
-    acumulado += paga;
-    return { ...base, fatia, paga, sobra: centavos(s.valor - paga) };
+    const paga = k === quemFecha ? centavos(total - dosOutros) : parte(s);
+    return { ...base, fatia: s.valor / renda, paga, sobra: centavos(s.valor - paga) };
   });
   const aConfirmar = contas.filter((c) => c.situacao === 'a-confirmar').length
     + pessoas.filter((p) => p.situacaoSalario === 'a-confirmar').length;

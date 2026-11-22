@@ -3,7 +3,7 @@
 // de perfil (só neste aparelho) e vê a tela exatamente como a outra pessoa vê. É seguro sem PIN porque só quem
 // administra cria chaves. Separação só no app: os dados continuam no mesmo arquivo.
 import { faturaDoCartao, periodoDaFatura, cartaoPronto, primeiraFatura } from './cartao.js';
-import { valorDaConta, pessoasNoMes } from './casa.js';
+import { valorDaConta, pessoasNoMes, divideNoMes } from './casa.js';
 
 const idPadrao = () => globalThis.crypto.randomUUID();
 
@@ -81,12 +81,22 @@ export function podeSairDaDivisao(casa, id, mes) {
 
 export const sairDaDivisao = (casa, id, mes) => (podeSairDaDivisao(casa, id, mes) ? semAPessoa(casa, id, mes) : casa);
 
+// O mês, depois de `mes`, em que a pessoa já está marcada para entrar ou sair (o mês em foco pode voltar um mês,
+// quando um mês pago é reaberto, e a mudança marcada antes fica para depois dele).
+function proximaMudanca(casa, id, mes) {
+  const pessoa = casa.pessoas.find((p) => p.id === id);
+  if (!pessoa?.dentro) return null;
+  const viradas = pessoa.dentro.flatMap((d) => [d.de, d.ate]).filter((m) => m && m > mes).sort();
+  return viradas.find((m) => divideNoMes(pessoa, m) !== divideNoMes(pessoa, mes)) ?? null;
+}
+
 // A lista "Quem divide as contas" dos Ajustes: quem divide no mês (com o perfil, que tem a foto); quem administra
-// vê também os outros perfis, depois, para marcar.
+// vê também os outros perfis, depois, para marcar. `muda`: o mês de uma entrada ou saída já marcada para depois.
 export function quemDivideNosAjustes(casa, mes, { administra }) {
-  const dividem = pessoasNoMes(casa, mes).map((p) => ({ pessoa: acharPerfil(casa, p.id) ?? p, divide: true }));
+  const item = (pessoa, divide) => ({ pessoa, divide, muda: proximaMudanca(casa, pessoa.id, mes) });
+  const dividem = pessoasNoMes(casa, mes).map((p) => item(acharPerfil(casa, p.id) ?? p, true));
   if (!administra) return dividem;
-  const fora = (casa.perfis ?? []).filter((p) => !dividem.some((x) => x.pessoa.id === p.id)).map((p) => ({ pessoa: p, divide: false }));
+  const fora = (casa.perfis ?? []).filter((p) => !dividem.some((x) => x.pessoa.id === p.id)).map((p) => item(p, false));
   return [...dividem, ...fora];
 }
 

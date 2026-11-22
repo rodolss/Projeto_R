@@ -78,9 +78,11 @@ function desenhar(container, ctx) {
   const quemDivide = quemDivideNosAjustes(casa, mesDoFoco, { administra });
   const pessoas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Quem divide as contas'),
-    h('div', {}, ...quemDivide.map(({ pessoa: p, divide }) => linhaDaLista({
+    h('div', {}, ...quemDivide.map(({ pessoa: p, divide, muda }) => linhaDaLista({
       selo: avatar(p), titulo: p.nome, classe: divide ? '' : 'fora-da-divisao', aoTocar: () => abrir(`pessoa-${p.id}`),
-      detalhe: !administra ? 'toque para mudar o nome' : divide ? 'divide as contas' : 'não divide as contas',
+      detalhe: !administra ? 'toque para mudar o nome'
+        : muda ? (divide ? `sai da divisão em ${nomeDoMes(muda)}` : `divide a partir de ${nomeDoMes(muda)}`)
+          : divide ? 'divide as contas' : 'não divide as contas',
     }))),
     administra && h('p', { class: 'nota nota-casa' }, 'Os perfis vêm de Aparelhos e perfis. Toque em alguém para dizer se divide as contas.'));
 
@@ -106,9 +108,10 @@ function desenhar(container, ctx) {
   // ---------- folhas da casa ----------
   const folhaDaPessoa = (pessoa, folha) => {
     let nome = pessoa.nome;
-    const divideAgora = quemDivide.some((x) => x.pessoa.id === pessoa.id && x.divide);
+    const { divide: divideAgora, muda } = quemDivide.find((x) => x.pessoa.id === pessoa.id);
     let divide = divideAgora;
-    const podeSair = !divideAgora || podeSairDaDivisao(casa, pessoa.id, mesDoFoco);
+    let escolheu = false; // com uma mudança já marcada para depois, tocar numa opção (mesmo a marcada) vale do mês em foco
+    const podeSair = !(divideAgora || muda) || podeSairDaDivisao(casa, pessoa.id, mesDoFoco);
     const desde = nomeDoMes(mesDoFoco);
     return [
       h('h2', {}, administra ? pessoa.nome : 'Nome'),
@@ -117,19 +120,19 @@ function desenhar(container, ctx) {
       administra && h('div', { class: 'campo' },
         h('span', { class: 'campo-rotulo' }, 'Divide as contas da casa?'),
         escolhaEntre({
-          rotulo: 'Divide as contas da casa?', inicial: divide, aoEscolher: (v) => { divide = v; },
+          rotulo: 'Divide as contas da casa?', inicial: divide, aoEscolher: (v) => { divide = v; escolheu = true; },
           opcoes: [
             { valor: true, icone: 'casa', titulo: 'Divide as contas', texto: 'Paga uma parte do tamanho do que ganha. Ex.: quem mora junto e ajuda nas contas.' },
             { valor: false, icone: 'cartao', titulo: 'Não divide', texto: 'Usa só os próprios cartões no app. Ex.: um filho que tem cartão.', travada: !podeSair },
           ],
         }),
-        h('span', { class: 'campo-dica' }, podeSair
-          ? `Vale de ${desde} em diante. Os meses antes continuam como estão.`
-          : 'Precisam ficar pelo menos duas pessoas dividindo as contas.')),
+        h('span', { class: 'campo-dica' }, !podeSair ? 'Precisam ficar pelo menos duas pessoas dividindo as contas.'
+          : muda ? `Já está marcado para ${divideAgora ? 'sair' : 'entrar'} em ${nomeDoMes(muda)}. O que você escolher aqui vale de ${desde} em diante.`
+            : `Vale de ${desde} em diante. Os meses antes continuam como estão.`)),
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Salvar', () => {
         if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
         const mudouNome = nome !== pessoa.nome;
-        const mudouDivisao = divide !== divideAgora;
+        const mudouDivisao = divide !== divideAgora || (Boolean(muda) && escolheu);
         if (!mudouNome && !mudouDivisao) { fechar(); return; }
         const texto = !mudouDivisao ? 'Nome salvo.'
           : divide ? `${nome} divide as contas de ${desde} em diante.` : `${nome} não divide mais as contas de ${desde} em diante.`;

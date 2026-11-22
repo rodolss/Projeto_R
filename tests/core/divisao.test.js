@@ -105,6 +105,26 @@ test('resumoDoAno junta cada pessoa pelo id: a Cris, que entrou em março, soma 
   assert.deepEqual(antes.pessoas.map((p) => p.pessoa.id), ['p1', 'p2'], 'quem só entra no ano seguinte fica fora');
 });
 
+test('resumoDoMes: quem entrou e ainda não tem salário paga zero, nunca −R$ 0,01 (o arredondamento fica com quem ganha)', () => {
+  let casa = entrarNaDivisao(casaComCris(), 'p3', '2026-12');
+  casa = salvarValor(casa, { mes: '2026-12', contaId: 'id1', valor: 100.01 });
+  casa = salvarSalario(casa, { mes: '2026-12', pessoaId: 'p1', valor: 3000 });
+  casa = salvarSalario(casa, { mes: '2026-12', pessoaId: 'p2', valor: 3000 });
+  const r = resumoDoMes(casa, '2026-12');
+  assert.equal(r.pessoas.find((p) => p.pessoa.id === 'p3').paga, 0);
+  assert.ok(r.pessoas.every((p) => p.paga >= 0));
+  assert.equal(Math.round(r.pessoas.reduce((s, p) => s + p.paga, 0) * 100), 10001, 'as partes somam o total');
+});
+
+test('quemDivideNosAjustes: uma mudança já marcada para depois do mês em foco vem em `muda` (o foco pode voltar um mês)', () => {
+  const casa = sairDaDivisao(entrarNaDivisao(casaComCris(), 'p3', '2026-12'), 'p2', '2027-01');
+  const lista = quemDivideNosAjustes(casa, '2026-11', { administra: true });
+  const de = (id) => lista.find((x) => x.pessoa.id === id);
+  assert.deepEqual([de('p3').divide, de('p3').muda], [false, '2026-12'], 'a Cris entra em dezembro');
+  assert.deepEqual([de('p2').divide, de('p2').muda], [true, '2027-01'], 'o Leo sai em janeiro');
+  assert.equal(de('p1').muda, null);
+});
+
 test('balancoDoMes: o perfil que entrou na divisão ganha salário e a parte dele nas contas', () => {
   let casa = entrarNaDivisao(casaComCris(), 'p3', '2026-12');
   casa = salvarValor(casa, { mes: '2026-12', contaId: 'id1', valor: 600 });
