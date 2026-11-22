@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { regraDaSobra } from '../../js/core/investir-sobra.js';
+import { regraDaSobra, potencialDeInvestimento } from '../../js/core/investir-sobra.js';
 import { definirSalario } from '../../js/core/salario.js';
 import { migrarCasa, salvarValor, salvarSalario } from '../../js/core/casa.js';
 
@@ -21,6 +21,16 @@ function casaBase(luz = {}) {
   return casa;
 }
 const regra = (casa, estado, mes) => regraDaSobra({ casa, estado, pessoaId: 'p1', mes, hoje: `${mes}-07` });
+
+test('potencial de investimento: o deste mês (pela sobra do anterior) e a média dos últimos 3 meses com dados', () => {
+  // Novembro com a luz em 2000: a Ana paga 1200 e sobram 4800 (4320 para investir); os outros meses, 4860.
+  const casa = casaBase({ '2026-11': 2000 });
+  const p = potencialDeInvestimento({ casa, estado: { meses: [] }, pessoaId: 'p1', mes: '2027-01', hoje: '2027-01-07' });
+  assert.deepEqual([p.atual.mes, p.atual.investir, p.media, p.quantos], ['2026-12', 4860, 4680, 3]);
+  // No começo, só os meses com salários e contas entram na média.
+  const comeco = potencialDeInvestimento({ casa, estado: { meses: [] }, pessoaId: 'p1', mes: '2026-11', hoje: '2026-11-07' });
+  assert.deepEqual([comeco.atual.investir, comeco.media, comeco.quantos], [4860, 4860, 1]);
+});
 
 test('investir a sobra: a sobra do mês anterior, 10% para lazer, o resto para investir', () => {
   const r = regra(casaBase(), { meses: [] }, '2026-12');
