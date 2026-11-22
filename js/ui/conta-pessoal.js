@@ -15,7 +15,8 @@ export function textoDoFim(conta, mes) {
   return conta.ultimoMes < mes ? `terminou em ${mesPorExtenso(conta.ultimoMes)}` : `até ${mesPorExtenso(conta.ultimoMes)}`;
 }
 
-export const textoDasParcelas = (n) => (n == null ? null : n === 1 ? 'última parcela' : `faltam ${n} parcelas`);
+// Sem fim, ou um valor depois da última parcela (adiantado antes de encurtar o fim): sem texto.
+export const textoDasParcelas = (n) => (n == null || n < 1 ? null : n === 1 ? 'última parcela' : `faltam ${n} parcelas`);
 
 const MAXIMO = 600; // 50 anos: cabe um financiamento
 

@@ -70,3 +70,13 @@ test('custo de vida real: conta pessoal sem fim entra; com fim (empréstimo), n�
   assert.equal(r.pessoais, 33.33);
   assert.equal(custoDeVidaReal(casa, 'p2', HOJE).pessoais, 0, 'as da Ana não entram no do Leo');
 });
+
+test('revisão: empréstimo ainda "a confirmar" não tira o mês do custo de vida (ele nem entra no custo)', () => {
+  let casa = adicionarContaPessoal(casaBase(), { nome: 'Empréstimo', donoId: 'p1', mes: '2026-08', valor: 300, parcelas: 24, novoId: () => 'e1' });
+  const r = custoDeVidaReal(casa, 'p1', HOJE);
+  assert.deepEqual(r.meses.map((m) => m.mes), ['2026-08', '2026-09', '2026-10']);
+  assert.equal(r.pessoais, 0);
+  // Uma conta de todo mês ainda prevista continua deixando o mês de fora (como as contas da casa).
+  casa = adicionarContaPessoal(casa, { nome: 'Academia', donoId: 'p1', mes: '2026-09', valor: 100, novoId: () => 'a1' });
+  assert.deepEqual(custoDeVidaReal(casa, 'p1', HOJE).meses.map((m) => m.mes), ['2026-08', '2026-09']);
+});

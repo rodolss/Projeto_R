@@ -54,8 +54,11 @@ export function balancoDoMes(casa, mes, pessoaId, hoje) {
   // Você paga a fatura inteira: o que já está no cofrinho ("já tenho") não pesa; o que ainda falta as pessoas devolverem
   // conta como saída até chegar (`adiantado`).
   const saiu = somar([contas?.valor, pessoais.valor, ...cartoes.map((c) => c.seu + c.adiantado)]);
-  const previsao = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || pessoais.aConfirmar || cartoes.some((c) => c.aberta));
-  return { mes, pessoaId, salario, contas, pessoais, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao };
+  // `previsaoSemPessoais`: para o custo de vida, que nem conta as contas pessoais com fim (um empréstimo previsto não
+  // pode tirar o mês dele).
+  const previsaoSemPessoais = Boolean((salario && salario.situacao !== 'confirmado') || contas?.aConfirmar || cartoes.some((c) => c.aberta));
+  const previsao = previsaoSemPessoais || pessoais.aConfirmar;
+  return { mes, pessoaId, salario, contas, pessoais, cartoes, entrou, saiu, sobra: centavos(entrou - saiu), previsao, previsaoSemPessoais };
 }
 
 // ---------- balanço e plano (desenho 2026-11-20-balanco-e-plano) ----------

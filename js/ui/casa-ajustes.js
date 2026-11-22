@@ -152,10 +152,10 @@ function desenhar(container, ctx) {
         h('div', { class: 'nome' }, h('span', {}, conta.nome), h('small', {}, 'continua no histórico')),
         h('button', {
           type: 'button', class: 'botao-link', style: 'padding:4px 0',
-          // Volta só deste mês em diante: os meses em que estava parada não ganham previsão.
-          onclick: () => salvar((c) => editarContaPessoal(c, conta.id, { arquivada: false, desde: ctx.hoje.slice(0, 7) }), `${conta.nome} voltou para a lista.`),
+          // Volta do mês em foco em diante (não do mês de hoje: um mês já todo pago não reabre por uma previsão nova).
+          onclick: () => salvar((c) => editarContaPessoal(c, conta.id, { arquivada: false, desde: mesDoFoco }), `${conta.nome} voltou para a lista.`),
         }, 'Voltar a usar')))),
-    h('p', { class: 'nota nota-casa' }, 'Só você vê. Não entram na divisão da casa: saem só do seu balanço.'));
+    h('p', { class: 'nota nota-casa' }, 'Aparecem só no seu perfil. Não entram na divisão da casa: saem só do seu balanço.'));
 
   // ---------- folhas da casa ----------
   // As duas maneiras de preencher uma conta, em botões grandes com exemplo (no lugar da caixa "Compra por compra").

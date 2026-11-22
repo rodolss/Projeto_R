@@ -15,3 +15,8 @@ test('as parcelas que faltam: a última, ou quantas', () => {
   assert.equal(textoDasParcelas(18), 'faltam 18 parcelas');
   assert.equal(textoDasParcelas(null), null);
 });
+
+test('revisão: depois da última parcela (valor adiantado, fim encurtado) não aparece "faltam -1"', () => {
+  assert.equal(textoDasParcelas(0), null);
+  assert.equal(textoDasParcelas(-1), null);
+});
