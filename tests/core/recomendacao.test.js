@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarRecomendacao, aplicarRecomendacao, recomendacaoDoMes, aplicadoDasOrdens, mesDoProximoPagamento, restoDasOrdens,
+  LIQUIDEZ_MINIMA, mesDasOrdens, motivoSemOrdens, precisaRevisarLista,
 } from '../../js/core/recomendacao.js';
 import { arredondarDistribuicao } from '../../js/core/alocacao.js';
 
@@ -21,8 +22,10 @@ function recomendacao() {
     mes: '2026-12', geradaEm: '2026-11-26', valor: 1000,
     estrategia: { fiis: 0.5, acoes: 0.5 },
     lista: [
-      { ticker: 'AAAA11', nome: 'Fundo de galpões', classe: 'fiis', fatia: 0.5, motivo: 'Aluguéis de galpões logísticos' },
-      { ticker: 'BBBB3', nome: 'Empresa de energia', classe: 'acoes', fatia: 0.5, motivo: 'Transmissão de energia, contratos longos' },
+      { ticker: 'AAAA11', nome: 'Fundo de galpões', classe: 'fiis', fatia: 0.5, motivo: 'Aluguéis de galpões logísticos',
+        conferido: { publicoGeral: true, liquidezDiaria: 8_000_000, em: '2026-11-26' } },
+      { ticker: 'BBBB3', nome: 'Empresa de energia', classe: 'acoes', fatia: 0.5, motivo: 'Transmissão de energia, contratos longos',
+        conferido: { publicoGeral: true, liquidezDiaria: 60_000_000, em: '2026-09-01' } },
     ],
     ordens: [
       { ticker: 'AAAA11', nome: 'Fundo de galpões', classe: 'fiis', cotas: 4, preco: 100, valor: 400, motivo: 'Abaixo da fatia' },
@@ -91,6 +94,77 @@ test('restoDasOrdens: o que as cotas inteiras não cobriram (vai para a caixa de
   assert.equal(restoDasOrdens(recomendacao(), 1000), 67.5);
   assert.equal(restoDasOrdens(recomendacao(), 932.9), 0.4);
   assert.equal(restoDasOrdens(recomendacao(), 900), 0, 'nunca negativo');
+});
+
+// Onde investir agendado (desenho 2026-11-22-onde-investir-agendado): só entra na lista o que ele consegue comprar.
+test('validarRecomendacao: ativo da lista sem a conferência (aberto a qualquer investidor, bem negociado) é recusado', () => {
+  const r = recomendacao();
+  delete r.lista[0].conferido;
+  r.lista[1].conferido.publicoGeral = false;
+  const { erros } = validarRecomendacao(r);
+  assert.ok(erros.some((e) => /AAAA11/.test(e) && /confer/.test(e)));
+  assert.ok(erros.some((e) => /BBBB3/.test(e) && /qualquer investidor/.test(e)));
+});
+
+test('validarRecomendacao: liquidez mínima por classe (igual ao mínimo passa)', () => {
+  const r = recomendacao();
+  r.lista[0].conferido.liquidezDiaria = LIQUIDEZ_MINIMA.fiis - 1;
+  r.lista[1].conferido.liquidezDiaria = LIQUIDEZ_MINIMA.acoes;
+  const { erros } = validarRecomendacao(r);
+  assert.deepEqual(LIQUIDEZ_MINIMA, { fiis: 1_000_000, acoes: 5_000_000 });
+  assert.ok(erros.some((e) => /AAAA11/.test(e) && /negociad/.test(e)));
+  assert.ok(!erros.some((e) => /BBBB3/.test(e)));
+});
+
+test('validarRecomendacao: a conferência vale 120 dias e não pode ser depois da análise', () => {
+  const velha = recomendacao();
+  velha.lista[1].conferido.em = '2026-07-28'; // 121 dias antes de 2026-11-26
+  assert.ok(validarRecomendacao(velha).erros.some((e) => /BBBB3/.test(e) && /120 dias/.test(e)));
+  const limite = recomendacao();
+  limite.lista[1].conferido.em = '2026-07-29'; // 120 dias
+  assert.equal(validarRecomendacao(limite).ok, true);
+  const futura = recomendacao();
+  futura.lista[0].conferido.em = '2026-11-27';
+  assert.ok(validarRecomendacao(futura).erros.some((e) => /AAAA11/.test(e) && /confer/.test(e)));
+});
+
+test('validarRecomendacao: semOrdens, quando vem, é um texto', () => {
+  assert.equal(validarRecomendacao({ ...recomendacao(), ordens: [], semOrdens: 'Faltam os salários de dezembro no Balanço.' }).ok, true);
+  assert.ok(validarRecomendacao({ ...recomendacao(), semOrdens: '' }).erros.some((e) => /semOrdens/.test(e)));
+});
+
+test('validarRecomendacao: lista e ordens precisam ser listas (sem ordens é [], não ausente)', () => {
+  const semOrdens = recomendacao();
+  delete semOrdens.ordens;
+  assert.ok(validarRecomendacao(semOrdens).erros.some((e) => /ordens/.test(e)));
+  assert.ok(validarRecomendacao({ ...recomendacao(), lista: 'x' }).erros.some((e) => /lista/.test(e)));
+});
+
+test('precisaRevisarLista: sem lista, ativo sem conferência válida ou conferência com mais de 90 dias', () => {
+  const lista = recomendacao().lista; // conferidos em 2026-11-26 e 2026-09-01
+  assert.equal(precisaRevisarLista(lista, '2026-11-26'), false);
+  assert.equal(precisaRevisarLista(lista, '2026-11-30'), false, '90 dias da mais antiga');
+  assert.equal(precisaRevisarLista(lista, '2026-12-01'), true, '91 dias');
+  assert.equal(precisaRevisarLista(null, '2026-11-26'), true);
+  assert.equal(precisaRevisarLista([], '2026-11-26'), true);
+  const semConferir = structuredClone(lista);
+  delete semConferir[1].conferido; // a lista feita à mão em 22/11 não tem conferência
+  assert.equal(precisaRevisarLista(semConferir, '2026-11-26'), true);
+  const poucoNegociado = structuredClone(lista);
+  poucoNegociado[0].conferido.liquidezDiaria = 10;
+  assert.equal(precisaRevisarLista(poucoNegociado, '2026-11-26'), true);
+});
+
+test('motivoSemOrdens: o que a análise disse, ou a reserva de emergência', () => {
+  assert.equal(motivoSemOrdens({}), 'Este mês o dinheiro vai para a reserva de emergência.');
+  assert.equal(motivoSemOrdens({ semOrdens: 'Faltam os salários de dezembro no Balanço.' }), 'Faltam os salários de dezembro no Balanço.');
+});
+
+test('mesDasOrdens: o do próximo Dia de pagamento, mas nunca antes da última análise', () => {
+  assert.equal(mesDasOrdens({ meses: [], recomendacao: { mes: '2026-12' } }, '2026-11-26'), '2026-12', 'novembro desconsiderado: atualiza a de dezembro');
+  assert.equal(mesDasOrdens({ meses: [] }, '2026-11-26'), '2026-11');
+  assert.equal(mesDasOrdens({ meses: [], recomendacao: { mes: '2026-12' } }, '2026-12-26'), '2026-12');
+  assert.equal(mesDasOrdens({ meses: [{ mes: '2026-12' }], recomendacao: { mes: '2026-12' } }, '2027-01-26'), '2027-01');
 });
 
 test('recomendacaoDoMes: só a do mês pedido', () => {

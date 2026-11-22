@@ -18,7 +18,7 @@ import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { resumoDaCarteira, evolucao, proventosDaCarteira } from '../core/carteira.js';
 import { potencialDeInvestimento } from '../core/investir-sobra.js';
 import { mesPadraoDaCasa } from './casa.js';
-import { recomendacaoDoMes } from '../core/recomendacao.js';
+import { recomendacaoDoMes, motivoSemOrdens } from '../core/recomendacao.js';
 import { graficoEvolucao, colunasProventos, barraDivisao } from './carteira-graficos.js';
 import { abaAtivos, folhaDeAtivos, NOMES_GRUPO, seloDoAtivo } from './carteira-ativos.js';
 
@@ -92,16 +92,14 @@ function cartaoOndeInvestir(estado, mes, abrir, mesCalendario) {
   if (rec && estado.meses.some((m) => m.mes === rec.mes)) {
     return h('section', { class: 'cartao onde-investir' },
       h('h2', {}, `Investido em ${nome} ✓`),
-      h('p', { class: 'suave' }, `As compras de ${nome} já foram registradas no Dia de pagamento. Para o próximo mês, peça `, h('b', {}, '/onde-investir'), ' no Claude Code perto do dia do salário.'),
+      h('p', { class: 'suave' }, `As compras de ${nome} já foram registradas no Dia de pagamento. As do próximo mês aparecem aqui sozinhas no dia 26, à noite.`),
       h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
   }
   if (!rec) {
     return h('section', { class: 'cartao onde-investir' },
       h('h2', {}, `Onde investir em ${nome}`),
-      h('p', { class: 'suave' }, estado.recomendacao
-        ? `A última análise foi para ${nomeDoMes(estado.recomendacao.mes)}. Para as ordens de ${nome}, peça no Claude Code: `
-        : 'Peça no Claude Code: ', h('b', {}, '/onde-investir'),
-      '. Ele busca os preços do dia e diz o que comprar: fundos imobiliários e ações que pagam renda isenta.'),
+      h('p', { class: 'suave' }, 'A análise roda sozinha todo dia 26, à noite, com os preços do dia, e diz o que comprar: fundos imobiliários e ações que pagam renda isenta. ',
+        estado.recomendacao ? `A última foi para ${nomeDoMes(estado.recomendacao.mes)}. ` : '', 'Para antes, peça ', h('b', {}, '/onde-investir'), ' no Claude Code.'),
       estado.recomendacao && h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
   }
   const total = rec.ordens.reduce((s, o) => s + o.valor, 0);
@@ -113,7 +111,7 @@ function cartaoOndeInvestir(estado, mes, abrir, mesCalendario) {
         seloDoAtivo(o.ticker, o.classe),
         h('span', { class: 'texto' }, h('b', {}, `Compre ${o.cotas} ${o.cotas === 1 ? 'cota' : 'cotas'} de ${o.ticker}`), h('small', {}, `${o.nome} · ${o.motivo}`)),
         h('span', { class: 'quanto' }, `≈ ${formatarBRL(o.valor)}`))))
-      : h('p', {}, h('b', {}, 'Este mês o dinheiro vai para a reserva de emergência.')),
+      : h('p', {}, h('b', {}, motivoSemOrdens(rec))),
     rec.ordens.length > 0 && h('p', { class: 'ordens-total' }, 'Total: ', h('b', {}, formatarBRL(total)), ` de ${formatarBRL(rec.valor)} para a carteira`),
     rec.resumo && h('p', { class: 'suave' }, rec.resumo),
     h('details', { class: 'avisos-recomendacao' }, h('summary', {}, 'Avisos'),

@@ -11,7 +11,7 @@
 // de novo, grave de novo e envie (nada se perde).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrar } from '../js/core/esquema.js';
 import { migrarCasa } from '../js/core/casa.js';
@@ -20,8 +20,10 @@ import { regraDaSobra } from '../js/core/investir-sobra.js';
 import { calcularMes } from '../js/core/motor.js';
 import { LAZER } from '../js/core/balanco.js';
 import { resumoDaCarteira } from '../js/core/carteira.js';
-import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesDoProximoPagamento } from '../js/core/recomendacao.js';
+import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesDasOrdens, LIQUIDEZ_MINIMA, precisaRevisarLista } from '../js/core/recomendacao.js';
 import { somarMeses } from '../js/core/meses.js';
+import { donoDaUrl } from './github-dono.mjs';
+import { dentroDe } from './caminhos.mjs';
 
 const REPO = 'Projeto_R-dados';
 const args = process.argv.slice(2);
@@ -29,7 +31,9 @@ const comando = args[0];
 const opcao = (nome) => { const k = args.indexOf(`--${nome}`); return k >= 0 ? args[k + 1] : null; };
 const pasta = opcao('pasta');
 const gh = (...a) => execFileSync('gh', a, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-const dono = () => opcao('dono') ?? gh('api', 'user', '--jq', '.login').trim();
+// O dono: --dono, ou o do remoto do git deste repositório (na nuvem, `gh api user` não passa pelo proxy), ou o do gh.
+const remoto = () => { try { return execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: raiz, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } };
+const dono = () => opcao('dono') ?? donoDaUrl(remoto()) ?? gh('api', 'user', '--jq', '.login').trim();
 const lerJson = (arquivo) => JSON.parse(readFileSync(join(pasta, arquivo), 'utf8'));
 const hojeLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
@@ -41,8 +45,8 @@ function falhar(texto) {
 if (!pasta) falhar('Falta --pasta <dir> (use a pasta de rascunho da sessão).');
 // Os dados são pessoais: nunca dentro do repositório público (que não os ignora).
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dentro = relative(raiz, resolve(pasta));
-if (!dentro.startsWith('..') && !isAbsolute(dentro)) falhar(`--pasta está dentro do repositório público (${raiz}): use a pasta de rascunho da sessão.`);
+if (dentroDe(raiz, pasta)) falhar(`--pasta está dentro do repositório público (${raiz}): use a pasta de rascunho da sessão.`);
+if (opcao('recomendacao') && dentroDe(raiz, opcao('recomendacao'))) falhar(`--recomendacao está dentro do repositório público (${raiz}): escreva-a na pasta de rascunho.`);
 
 if (comando === 'baixar') {
   mkdirSync(pasta, { recursive: true });
@@ -60,10 +64,10 @@ if (comando === 'baixar') {
   const estado = migrar(lerJson('dados.json'));
   const casa = migrarCasa(lerJson('casa.json'));
   const admin = (casa.perfis ?? []).find((p) => p.admin) ?? null;
-  // O mês das ordens é o do próximo Dia de pagamento (ele registra o mês do calendário); --mes escolhe outro (ex.: o mês
-  // do calendário já fechou e o usuário não vai registrar o Dia de pagamento dele).
+  // O mês das ordens é o do próximo Dia de pagamento (ele registra o mês do calendário), nunca antes do da última
+  // análise (desenho 2026-11-22-onde-investir-agendado); --mes escolhe outro.
   const mesFoco = mesEmFoco(casa, hoje, admin?.id ?? null);
-  const mes = opcao('mes') ?? mesDoProximoPagamento(estado, hoje);
+  const mes = opcao('mes') ?? mesDasOrdens(estado, hoje);
   const regra = regraDaSobra({ casa, estado, pessoaId: admin?.id, mes, hoje });
   // O motor divide o valor: reserva de emergência primeiro, caixa de oportunidade na queda, o resto para a carteira. A
   // data vai dentro do mês das ordens (o motor deixa de fora o registro desse mês, e conta os de antes).
@@ -85,7 +89,9 @@ if (comando === 'baixar') {
     totalNaCarteira: carteira.carteira,
     divisaoAtual: carteira.alocacao.filter((a) => a.valor > 0 || ESTRATEGIA_RENDA_ISENTA[a.classe]).map((a) => ({ classe: a.classe, valor: a.valor, pct: Math.round(a.pct * 1000) / 10 })),
     listaAtual: estado.recomendacao?.lista ?? null,
+    revisarLista: precisaRevisarLista(estado.recomendacao?.lista, hoje),
     ultimaAnalise: estado.recomendacao ? { mes: estado.recomendacao.mes, geradaEm: estado.recomendacao.geradaEm } : null,
+    liquidezMinima: LIQUIDEZ_MINIMA,
   }, null, 2));
 } else if (comando === 'gravar') {
   const arquivo = opcao('recomendacao');
