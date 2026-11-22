@@ -6,6 +6,7 @@ import { formatarBRL, formatarPct } from '../core/formato.js';
 import { resumoDoAno, anosDisponiveis } from '../core/casa-ano.js';
 import { parametroDoHash } from './rotas.js';
 import { nomeDoMes } from './casa.js';
+import { seletorDePeriodo, gradeDeAnos } from './seletor-periodo.js';
 
 const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
 
@@ -38,10 +39,13 @@ function desenhar(container, ctx) {
   const r = resumoDoAno(casa, ano, mesAtual);
   const irPara = (a) => location.replace(`#/casa-ano?ano=${a}`);
 
-  const cabecalho = h('div', { class: 'casa-mes' },
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Ano anterior', disabled: ano <= anos[0], onclick: () => irPara(ano - 1) }, '‹'),
-    h('h1', {}, String(ano)),
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próximo ano', disabled: ano >= anos.at(-1), onclick: () => irPara(ano + 1) }, '›'));
+  // Seletor de ano (desenho 2026-11-22-seletor-de-mes): pílula no centro; tocar no ano abre a lista dos anos.
+  const cabecalho = seletorDePeriodo({
+    rotulo: String(ano),
+    anterior: { aria: 'Ano anterior', desligado: ano <= anos[0], ir: () => irPara(ano - 1) },
+    proximo: { aria: 'Próximo ano', desligado: ano >= anos.at(-1), ir: () => irPara(ano + 1) },
+    grade: anos.length > 1 && (() => gradeDeAnos({ atual: ano, anos, irPara })),
+  });
   const ate = r.ate && Number(mesAtual.slice(0, 4)) === ano && r.ate.slice(5) !== '12'
     && h('p', { class: 'nota', style: 'margin-top:-6px' }, `Até ${nomeDoMes(r.ate)}.`);
 
