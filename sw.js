@@ -11,7 +11,7 @@ const CASCA = [
   './js/core/esquema.js', './js/core/financas.js', './js/core/formato.js', './js/core/investir-sobra.js', './js/core/ipca.js',
   './js/core/lembretes.js', './js/core/lista-mes.js', './js/core/marcos.js', './js/core/meses.js', './js/core/perfis.js', './js/core/metas.js', './js/core/motor.js', './js/core/projecao.js',
   './js/core/pagamentos.js', './js/core/media-contas.js', './js/core/protecao.js', './js/core/salario.js', './js/core/simulador.js', './js/core/tags.js', './js/core/ortografia.js', './js/core/gastos-por-etiqueta.js', './js/core/categorias.js', './js/core/custo-de-vida.js', './js/core/contas-pessoais.js', './js/core/cotacoes.js', './js/core/renda-fixa.js',
-  './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/cotacoes-remoto.js', './js/dados/mesclar.js', './js/dados/mesclar-casa.js',
+  './js/dados/armazem.js', './js/dados/github.js', './js/dados/ipca-remoto.js', './js/dados/cotacoes-remoto.js', './js/dados/renda-fixa-remoto.js', './js/dados/mesclar.js', './js/dados/mesclar-casa.js',
   './js/ui/atualizacao.js', './js/ui/boas-vindas.js', './js/ui/casa.js', './js/ui/casa-balanco.js', './js/ui/casa-cartao.js', './js/ui/casa-cofrinho.js', './js/ui/casa-etiquetas.js', './js/ui/icones.js', './js/ui/enfeite.js', './js/ui/casa-ajustes.js', './js/ui/casa-ano.js', './js/ui/conta-pessoal.js', './js/ui/cotacoes-aparelho.js', './js/ui/seletor-periodo.js', './js/ui/carteira-graficos.js', './js/ui/carteira-ativos.js', './js/ui/config.js', './js/ui/conectar.js', './js/ui/detalhes.js', './js/ui/dom.js', './js/ui/festa.js', './js/ui/grafico.js', './js/ui/historico.js',
   './js/ui/inicio.js', './js/ui/mais.js', './js/ui/mes.js', './js/ui/mes-rascunho.js', './js/ui/movimento.js', './js/ui/nativo.js', './js/ui/fechado.js', './js/ui/orcamento.js', './js/ui/rotas.js', './js/ui/simular.js', './js/ui/topo.js',
 ];
@@ -41,7 +41,8 @@ self.addEventListener('activate', (evento) => {
 // no cache vai à rede (confirmando com o servidor, sem a cópia de 10 minutos do aparelho) e fica guardado.
 self.addEventListener('fetch', (evento) => {
   const req = evento.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // dados-publicos/ (preços do Tesouro, que mudam todo dia útil) vai sempre à rede, sem ficar no cache da versão.
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin || new URL(req.url).pathname.includes('/dados-publicos/')) return;
   const navegacao = req.mode === 'navigate';
   evento.respondWith((async () => {
     const guardada = await caches.match(navegacao ? './index.html' : req, { ignoreSearch: true });

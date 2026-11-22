@@ -32,3 +32,8 @@ test('abre do cache da versão antes de ir à rede', () => {
   assert.ok(doFetch.includes('caches.match('), 'o fetch procura no cache');
   assert.ok(doFetch.indexOf('caches.match(') < doFetch.indexOf('await fetch('), 'procura no cache antes de buscar na rede');
 });
+// Os preços do Tesouro mudam todo dia útil: o arquivo público nunca fica preso no cache da versão.
+test('dados-publicos/ não passa pelo cache do service worker', () => {
+  const doFetch = texto.slice(texto.indexOf("addEventListener('fetch'"));
+  assert.match(doFetch.slice(0, doFetch.indexOf('respondWith')), /dados-publicos/);
+});
