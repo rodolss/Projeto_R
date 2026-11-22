@@ -1,0 +1,37 @@
+name: preços do Tesouro
+
+# Copia os preços do dia do Tesouro Direto (arquivo público do Tesouro Transparente) para dados-publicos/tesouro.json,
+# que o app lê do próprio site (desenho 2026-11-22-renda-fixa-automatica). Dados públicos: nada pessoal passa por aqui.
+on:
+  schedule:
+    - cron: '30 11 * * 1-5' # 8h30 em Brasília
+    - cron: '30 21 * * 1-5' # 18h30 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tesouro
+  cancel-in-progress: false
+
+jobs:
+  tesouro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: node scripts/tesouro.mjs dados-publicos/tesouro.json
+      - name: Gravar se mudou
+        run: |
+          if git diff --quiet -- dados-publicos/tesouro.json; then
+            echo "Sem mudança."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados-publicos/tesouro.json
+          git commit -m "dados: preços do Tesouro de $(node -p "require('./dados-publicos/tesouro.json').data")"
+          git push

@@ -6,6 +6,7 @@ import {
 } from '../../js/core/cotacoes.js';
 import { posicoes } from '../../js/core/carteira.js';
 import { CARTEIRA_PADRAO } from '../../js/core/alocacao.js';
+import { perto } from '../ajuda.js';
 
 const HOJE = '2026-12-10';
 const estadoVazio = () => ({ config: { mesInicio: '2026-12' }, carteiraAlvo: structuredClone(CARTEIRA_PADRAO), ativos: [], saldos: [], meses: [] });
@@ -97,4 +98,17 @@ test('posições: aplicado vem do custo e o ganho é o valor de hoje menos o cus
   const [q] = posicoes(semPreco, HOJE);
   assert.equal(q.ganho, null);
   assert.equal(q.aplicado, q.saldo);
+});
+
+test('revisão: aporte do Dia de pagamento sem cotas num Tesouro vira títulos pelo preço do dia (não some dinheiro)', () => {
+  const base = novoPapel(estadoVazio(), { ticker: 'Tesouro Selic 2029', nome: 'x', grupo: 'reserva', fonte: 'tesouro', cotas: 1, preco: 17000, cotacao: 17000, hoje: '2026-12-01', novoId: ((n) => () => `t${++n}`)(0) }).estado;
+  const comAporte = { ...base, meses: [{ mes: '2026-12', data: '2026-12-02', aplicado: [{ ativoId: 't1', valor: 1000 }] }] };
+  const a = comAporte.ativos[0];
+  perto(cotasDoPapel(comAporte, a), 1 + 1000 / 17000, 1e-6);
+  assert.equal(custoDoPapel(comAporte, a), 18000);
+  const dia3 = aplicarCotacoes(comAporte, { 'Tesouro Selic 2029': { preco: 17010, em: 'x' } }, '2026-12-03');
+  perto(dia3.saldos.at(-1).valor, (1 + 1000 / 17000) * 17010, 0.01);
+  // A transferência da caixa (valor negativo) tira títulos na mesma conta.
+  const transferencia = { ...base, meses: [{ mes: '2026-12', data: '2026-12-02', aplicado: [{ ativoId: 't1', valor: -1700 }] }] };
+  perto(cotasDoPapel(transferencia, transferencia.ativos[0]), 0.9, 1e-6);
 });

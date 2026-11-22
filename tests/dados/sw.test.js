@@ -9,7 +9,7 @@ const casca = [...texto.match(/const CASCA = \[([\s\S]*?)\];/)[1].matchAll(/'\.\
 const modulos = (dir) => readdirSync(dir, { withFileTypes: true })
   .flatMap((d) => (d.isDirectory() ? modulos(join(dir, d.name)) : d.name.endsWith('.js') ? [join(dir, d.name).replaceAll('\\', '/')] : []));
 
-test('service worker na versão 96', () => assert.match(texto, /const VERSAO = 'projeto-r-v96'/));
+test('service worker na versão 97', () => assert.match(texto, /const VERSAO = 'projeto-r-v97'/));
 // A página compara a própria versão com a do service worker novo: só recarrega se forem diferentes.
 test('página e service worker na mesma versão, e o service worker responde a versão', () => {
   const daPagina = readFileSync('js/versao.js', 'utf8').match(/VERSAO = '([^']+)'/)?.[1];
@@ -31,4 +31,9 @@ test('abre do cache da versão antes de ir à rede', () => {
   const doFetch = texto.slice(texto.indexOf("addEventListener('fetch'"));
   assert.ok(doFetch.includes('caches.match('), 'o fetch procura no cache');
   assert.ok(doFetch.indexOf('caches.match(') < doFetch.indexOf('await fetch('), 'procura no cache antes de buscar na rede');
+});
+// Os preços do Tesouro mudam todo dia útil: o arquivo público nunca fica preso no cache da versão.
+test('dados-publicos/ não passa pelo cache do service worker', () => {
+  const doFetch = texto.slice(texto.indexOf("addEventListener('fetch'"));
+  assert.match(doFetch.slice(0, doFetch.indexOf('respondWith')), /dados-publicos/);
 });

@@ -19,7 +19,7 @@ import {
 } from '../core/lista-mes.js';
 import { lerRascunho, salvarRascunho, apagarRascunho } from './mes-rascunho.js';
 import { folhaAberta, depoisDeSalvar } from './rotas.js';
-import { papelAutomatico } from '../core/cotacoes.js';
+import { atualizaSozinho } from '../core/renda-fixa.js';
 
 const ROTULOS_EXTRA = { 'decimo-terceiro': '13º', ferias: 'Férias', plr: 'PLR/bônus', outro: 'Outro' };
 const TITULOS_FOLHA = {
@@ -83,7 +83,7 @@ function desenhar(container, ctx) {
   const nome = nomeDoMes(mes);
   const Nome = nome[0].toUpperCase() + nome.slice(1);
   const estimados = saldosAtuais(estado, hoje);
-  const listaSaldos = estado.ativos.filter((a) => a.papel !== 'fgts' && !papelAutomatico(a)); // o papel com cotação automática se atualiza sozinho
+  const listaSaldos = estado.ativos.filter((a) => a.papel !== 'fgts' && !atualizaSozinho(a)); // papel da bolsa, Tesouro e CDB se atualizam sozinhos
 
   // ---------- contas ----------
   const saldosDoRascunho = () => {
