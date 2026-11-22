@@ -8,7 +8,8 @@ import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao, pessoasDe, donaDaPes
 import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
 import {
   cartoesVisiveis, veAposentadoria, adicionarPerfil, renomearPerfil, vincularAparelho, desvincularAparelho, donoDeOutroCartao,
-  codigoDoAparelho, quemDivideNosAjustes, entrarNaDivisao, sairDaDivisao, podeSairDaDivisao,
+  codigoDoAparelho, quemDivideNosAjustes, entrarNaDivisao, sairDaDivisao, podeSairDaDivisao, detalheDoPerfil, podeApagarPerfil,
+  apagarPerfil, perfisEscondidos,
 } from '../core/perfis.js';
 import { pessoasNoMes } from '../core/casa.js';
 import { mesPadraoDaCasa, nomeDoMes } from './casa.js';
@@ -199,6 +200,10 @@ function desenhar(container, ctx) {
     if (folha?.startsWith('cartao-')) { const k = cartoes.find((x) => x.id === folha.slice(7)); return k && folhaDoCartao(k, folha); }
     if (folha?.startsWith('outra-')) { const p = usadas.find((x) => x.id === folha.slice(6)); return p && folhaDaOutraPessoa(p, folha); }
     if (folha === 'etiquetas') return folhaDasEtiquetas();
+    if (!administra) return null; // perfis e aparelhos: só quem administra
+    if (folha === 'novo-perfil') return folhaDoNovoPerfil(folha);
+    if (folha?.startsWith('perfil-')) { const p = perfis.find((x) => x.id === folha.slice(7)); return p && folhaDoPerfil(p, folha); }
+    if (folha?.startsWith('aparelho-')) { const a = aparelhos.find((x) => x.id === folha.slice(9)); return a && folhaDoAparelho(a, folha); }
     return null;
   }
 
@@ -321,41 +326,102 @@ function desenhar(container, ctx) {
     : cartaoConectar(ctx, { titulo: 'Usar nos dois celulares', texto: 'Hoje as contas estão só neste aparelho. Conecte com uma chave do GitHub para ver as mesmas contas em outro celular.' });
 
   // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
-  const novoPerfil = { nome: '' };
-  const perfisEAparelhos = administra && h('section', { class: 'cartao', id: 'perfis' },
-    h('h2', {}, 'Perfis e aparelhos'),
-    h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Cada um vê só os próprios cartões. O perfil de cada celular vem da chave do GitHub dele: uma chave nova pergunta "Quem usa este celular?".'),
-    ...(casa.perfis ?? []).map((p) => h('div', { class: 'casa-ajuste-linha', style: 'margin-top:10px' },
-      avatar(p),
-      h('input', {
-        class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', 'aria-label': `Nome do perfil ${p.nome}`,
-        onchange: (e) => {
-          const nome = e.target.value.trim();
-          if (!nome) { e.target.value = p.nome; return; }
-          if (nome !== p.nome) salvar((c) => renomearPerfil(c, p.id, nome), 'Nome salvo.');
-        },
-      }),
-      p.admin && h('span', { class: 'selo ok' }, 'administra'))),
-    h('div', { class: 'casa-ajuste', 'data-sem-recarregar': '' },
-      h('h3', { style: 'margin:0' }, 'Novo perfil'),
-      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Tem cartões próprios. Para dividir as contas da casa, toque nele em Casa › Quem divide as contas.'),
-      h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Nome', 'aria-label': 'Nome do novo perfil', oninput: (e) => { novoPerfil.nome = e.target.value.trim(); } }),
-      h('div', { class: 'botoes' }, botao('Criar perfil', () => {
-        if (!novoPerfil.nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
-        salvar((c) => adicionarPerfil(c, { nome: novoPerfil.nome }).casa, 'Perfil criado.');
-      }, { secundario: true }))),
-    h('div', { class: 'casa-ajuste' },
-      h('h3', { style: 'margin:0' }, 'Aparelhos'),
-      ...(casa.aparelhos ?? []).map((a) => h('div', { class: 'casa-ajuste-linha' },
-        h('span', { class: 'marcar' }, a.id === ctx.perfil.impressao ? 'Este aparelho'
-          : !a.perfilId ? `Pedido de aparelho novo · código ${codigoDoAparelho(a.id)}` : `Aparelho desde ${a.desde.split('-').reverse().join('/')}`),
-        h('select', {
-          class: 'entrada', 'aria-label': 'Perfil do aparelho', style: 'flex:0 1 150px',
-          disabled: a.id === ctx.perfil.impressao, // este aparelho não sai do próprio perfil por engano
-          onchange: (e) => { if (e.target.value) salvar((c) => vincularAparelho(c, { impressao: a.id, perfilId: e.target.value, hoje: a.desde }), 'Aparelho atualizado.'); },
-        }, !a.perfilId && h('option', { value: '', selected: true }, 'Escolha o perfil'),
-        ...(casa.perfis ?? []).map((p) => h('option', { value: p.id, selected: p.id === a.perfilId }, p.nome))),
-        a.id !== ctx.perfil.impressao && botaoDoisToques('Tirar', 'Tirar?', () => salvar((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.'))))));
+  // Desenho 2026-11-21-perfis-e-aparelhos-simples: como Casa e Cartões, listas limpas; tocar abre uma folha simples.
+  // Um pedido de aparelho novo fica em destaque no topo.
+  const perfis = casa.perfis ?? [];
+  const aparelhos = casa.aparelhos ?? [];
+  const pedidos = aparelhos.filter((a) => !a.perfilId);
+  const impressao = ctx.perfil?.impressao ?? null;
+  const nomeDoPerfil = (id) => perfis.find((p) => p.id === id)?.nome ?? null;
+  const seloCelular = () => seloDoGrupo({ cat: 'conexao', icone: 'celular' });
+  const dataBR = (iso) => iso.split('-').reverse().join('/');
+  const tituloDoAparelho = (a) => (a.id === impressao ? 'Este aparelho' : !a.perfilId ? 'Aparelho novo' : `Aparelho de ${nomeDoPerfil(a.perfilId) ?? 'outra pessoa'}`);
+  const detalheDoAparelho = (a) => [
+    a.id === impressao && nomeDoPerfil(a.perfilId), !a.perfilId ? 'pedindo para entrar' : `desde ${dataBR(a.desde)}`, `código ${codigoDoAparelho(a.id)}`,
+  ].filter(Boolean).join(' · ');
+  const perfisEAparelhos = administra && [
+    ...pedidos.map((a) => h('section', { class: 'cartao casa-pedido', role: 'status' },
+      seloCelular(),
+      h('span', { class: 'texto' }, h('b', {}, 'Um aparelho novo quer entrar'), h('small', {}, `Código ${codigoDoAparelho(a.id)}: confira se é o mesmo que aparece nele.`)),
+      botao('Ver', () => abrir(`aparelho-${a.id}`)))),
+    h('section', { class: 'cartao casa-lista', id: 'perfis' },
+      h('h2', {}, 'Perfis'),
+      h('div', {},
+        ...perfis.map((p) => linhaDaLista({ selo: avatar(p), titulo: p.nome, detalhe: detalheDoPerfil(casa, p, impressao), aoTocar: () => abrir(`perfil-${p.id}`) })),
+        linhaDaLista({ selo: h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone('mais')), titulo: 'Adicionar perfil', aoTocar: () => abrir('novo-perfil'), classe: 'linha-acao' })),
+      h('p', { class: 'nota nota-casa' }, 'Cada um vê só os próprios cartões. O perfil de cada celular vem da chave do GitHub dele.')),
+    // Os pedidos ficam só no destaque de cima; aqui, os aparelhos já liberados.
+    aparelhos.some((a) => a.perfilId) && h('section', { class: 'cartao casa-lista' },
+      h('h2', {}, 'Aparelhos'),
+      h('div', {}, ...aparelhos.filter((a) => a.perfilId).map((a) => linhaDaLista({
+        selo: seloCelular(), titulo: tituloDoAparelho(a), detalhe: detalheDoAparelho(a), aoTocar: () => abrir(`aparelho-${a.id}`),
+      })))),
+  ];
+
+  // ---------- folhas de perfis e aparelhos ----------
+  const folhaDoPerfil = (p, folha) => {
+    let nome = p.nome;
+    const divide = pessoasNoMes(casa, mesDoFoco).some((x) => x.id === p.id);
+    return [
+      h('div', { class: 'folha-perfil-topo' }, avatar(p), h('div', {}, h('h2', {}, p.nome), h('small', { class: 'suave' }, detalheDoPerfil(casa, p, impressao)))),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', { class: 'entrada', type: 'text', value: p.nome, autocomplete: 'off', oninput: (e) => { nome = e.target.value.trim(); } })),
+      h('p', { class: 'suave pequeno' }, `${divide ? 'Divide' : 'Não divide'} as contas da casa. Para mudar, marque em Casa › Quem divide as contas.`),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Salvar', () => {
+        if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        if (nome === p.nome) { fechar(); return; }
+        salvarNaFolha((c) => renomearPerfil(c, p.id, nome), 'Nome salvo.', folha);
+      })),
+      podeApagarPerfil(casa, p.id) && botaoDoisToques('Apagar perfil', 'Toque de novo para apagar', () => salvarNaFolha((c) => apagarPerfil(c, p.id), `${p.nome} foi apagado.`, folha)),
+    ];
+  };
+
+  const folhaDoNovoPerfil = (folha) => {
+    let nome = '';
+    return [
+      h('h2', {}, 'Novo perfil'),
+      h('p', { class: 'suave' }, 'Cada perfil vê só os próprios cartões e entra no app pelo celular dele. Ex.: um filho que tem cartão.'),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: Cris', oninput: (e) => { nome = e.target.value.trim(); } })),
+      h('p', { class: 'suave pequeno' }, 'Para usar no celular da pessoa: instale o app lá e conecte com uma chave do GitHub só para aquele celular. Ele vai perguntar "Quem usa este celular?".'),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Criar perfil', () => {
+        if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
+        const igual = (x) => x.toLocaleLowerCase('pt-BR');
+        if (perfis.some((p) => igual(p.nome) === igual(nome))) { ctx.aviso('Já existe um perfil com esse nome.', 'atencao', 3000); return; }
+        salvarNaFolha((c) => adicionarPerfil(c, { nome }).casa, `Perfil criado. Para ${nome} dividir as contas, marque em Casa › Quem divide as contas.`, folha);
+      })),
+    ];
+  };
+
+  const folhaDoAparelho = (a, folha) => {
+    const este = a.id === impressao; // este aparelho não sai do próprio perfil por engano
+    const escondidos = perfisEscondidos(casa);
+    // Pedido de um aparelho novo de quem administra: já vem marcado o perfil que a escolha no aparelho não oferece.
+    let escolhido = a.perfilId ?? (escondidos.length === 1 ? escondidos[0].id : null);
+    const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': 'De quem é este aparelho?' });
+    const desenhar = () => caixa.replaceChildren(...perfis.map((p) => h('button', {
+      type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(p.id === escolhido), disabled: este,
+      onclick: () => { escolhido = p.id; desenhar(); },
+    },
+    avatar(p),
+    h('span', { class: 'texto' }, h('b', {}, p.nome), h('small', {}, detalheDoPerfil(casa, p, impressao))),
+    h('span', { class: 'opcao-marca', 'aria-hidden': 'true' }))));
+    desenhar();
+    return [
+      h('h2', {}, tituloDoAparelho(a)),
+      h('p', { class: 'suave' }, detalheDoAparelho(a)),
+      h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'De quem é este aparelho?'), caixa,
+        este && h('span', { class: 'campo-dica' }, 'Este aparelho fica sempre no seu perfil. Para mudar, use outro aparelho seu.')),
+      h('div', { class: 'botoes' }, botao(este ? 'Fechar' : 'Cancelar', fechar, { secundario: true }), !este && botao(a.perfilId ? 'Salvar' : 'Liberar', () => {
+        if (!escolhido) { ctx.aviso('Escolha de quem é este aparelho.', 'atencao', 3000); return; }
+        if (escolhido === a.perfilId) { fechar(); return; }
+        salvarNaFolha((c) => vincularAparelho(c, { impressao: a.id, perfilId: escolhido, hoje: a.desde }),
+          a.perfilId ? 'Aparelho atualizado.' : `Aparelho liberado para ${nomeDoPerfil(escolhido)}.`, folha);
+      })),
+      !este && botaoDoisToques(a.perfilId ? 'Tirar este aparelho' : 'Recusar o pedido', 'Toque de novo: ele vai perguntar de novo quem usa',
+        () => salvarNaFolha((c) => desvincularAparelho(c, a.id), 'O aparelho vai perguntar de novo quem usa.', folha)),
+    ];
+  };
 
   // Visão única (desenho 2026-11-21-planejador-integrado): um "Ajustes" só; o plano de aposentadoria é uma seção daqui.
   const plano = ctx.unica && h('section', { class: 'cartao casa-lista' },
@@ -368,7 +434,6 @@ function desenhar(container, ctx) {
   // ---------- gavetas (desenho 2026-11-21-ajustes-em-gavetas) ----------
   // Os ajustes em grupos que abrem e fecham (um por vez). A gaveta aberta continua aberta depois de salvar (o desenho
   // refaz a tela) e ao voltar para cá na mesma sessão.
-  const perfis = casa.perfis ?? [];
   const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
   const grupos = [
     {
@@ -387,8 +452,11 @@ function desenhar(container, ctx) {
     },
     {
       id: 'aparelhos', icone: 'celular', cat: 'conexao', titulo: 'Aparelhos e perfis',
-      resumo: [ctx.conexao ? 'Sincronizado' : 'Só neste aparelho', administra && plural(perfis.length, 'perfil', 'perfis')].filter(Boolean).join(' · '),
-      conteudo: [...[sincronizacao].flat(), perfisEAparelhos],
+      resumo: [
+        administra && pedidos.length > 0 && plural(pedidos.length, 'pedido novo', 'pedidos novos'),
+        ctx.conexao ? 'Sincronizado' : 'Só neste aparelho', administra && plural(perfis.length, 'perfil', 'perfis'),
+      ].filter(Boolean).join(' · '),
+      conteudo: [...(perfisEAparelhos || []), ...[sincronizacao].flat()],
     },
   ].filter(Boolean);
   // Vindo de "Perfis e aparelhos" (o menu da foto): abre a gaveta deles.

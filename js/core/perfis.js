@@ -34,6 +34,29 @@ export function adicionarPerfil(casa, { nome, novoId = idPadrao }) {
   return { casa: { ...casa, perfis: [...(casa.perfis ?? []), { id, nome: nome.trim() }] }, id };
 }
 
+// ---------- perfis nos Ajustes (desenho 2026-11-21-perfis-e-aparelhos-simples) ----------
+// A linha de explicação de cada perfil na lista: "administra · este aparelho e mais 1", "1 aparelho"...
+export function detalheDoPerfil(casa, perfil, impressao) {
+  const deles = (casa.aparelhos ?? []).filter((a) => a.perfilId === perfil.id);
+  const comEste = deles.some((a) => a.id === impressao);
+  const plural = (n) => `${n} ${n === 1 ? 'aparelho' : 'aparelhos'}`;
+  const aparelhos = comEste ? `este aparelho${deles.length > 1 ? ` e mais ${deles.length - 1}` : ''}`
+    : deles.length ? plural(deles.length) : 'sem aparelho ainda';
+  return [perfil.admin && 'administra', aparelhos].filter(Boolean).join(' · ');
+}
+
+// Só sai o perfil criado por engano: sem cartão, sem aparelho, fora da divisão (nem com meses passados) e que não
+// administra. Assim nada some do histórico.
+export function podeApagarPerfil(casa, id) {
+  const perfil = acharPerfil(casa, id);
+  return Boolean(perfil) && !perfil.admin
+    && !(casa.cartoes ?? []).some((c) => c.donaId === id)
+    && !(casa.aparelhos ?? []).some((a) => a.perfilId === id)
+    && !casa.pessoas.some((p) => p.id === id);
+}
+
+export const apagarPerfil = (casa, id) => (podeApagarPerfil(casa, id) ? { ...casa, perfis: casa.perfis.filter((p) => p.id !== id) } : casa);
+
 // ---------- quem divide as contas (desenho 2026-11-21-divisao-pelos-perfis) ----------
 // Entrar ou sair vale do mês dado (o mês em foco) em diante, e os meses antes não mudam: entrar junta [mês, sempre)
 // aos períodos da pessoa (`dentro`, em casa.js); sair tira. Desfazer no mesmo mês volta ao que era. Sem períodos, a
