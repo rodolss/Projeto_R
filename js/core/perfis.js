@@ -3,7 +3,7 @@
 // de perfil (só neste aparelho) e vê a tela exatamente como a outra pessoa vê. É seguro sem PIN porque só quem
 // administra cria chaves. Separação só no app: os dados continuam no mesmo arquivo.
 import { faturaDoCartao, periodoDaFatura, cartaoPronto, primeiraFatura } from './cartao.js';
-import { valorDaConta } from './casa.js';
+import { valorDaConta, pessoasNoMes } from './casa.js';
 
 const idPadrao = () => globalThis.crypto.randomUUID();
 
@@ -28,10 +28,66 @@ export function vincularAparelho(casa, { impressao, perfilId, hoje }) {
 
 export const desvincularAparelho = (casa, impressao) => ({ ...casa, aparelhos: (casa.aparelhos ?? []).filter((a) => a.id !== impressao) });
 
-// Perfil novo: cartões próprios; não entra na divisão das contas (as pessoas da casa continuam duas).
+// Perfil novo: cartões próprios; só divide as contas quando quem administra marca (entrarNaDivisao).
 export function adicionarPerfil(casa, { nome, novoId = idPadrao }) {
   const id = novoId();
   return { casa: { ...casa, perfis: [...(casa.perfis ?? []), { id, nome: nome.trim() }] }, id };
+}
+
+// ---------- quem divide as contas (desenho 2026-11-21-divisao-pelos-perfis) ----------
+// Entrar ou sair vale do mês dado (o mês em foco) em diante, e os meses antes não mudam: entrar junta [mês, sempre)
+// aos períodos da pessoa (`dentro`, em casa.js); sair tira. Desfazer no mesmo mês volta ao que era. Sem períodos, a
+// pessoa deixa a lista de quem divide; com um período sem começo nem fim, divide sempre (sem `dentro`).
+function comPeriodos(casa, id, dentro) {
+  const pessoa = casa.pessoas.find((p) => p.id === id);
+  const { dentro: _antes, ...resto } = pessoa;
+  if (JSON.stringify(dentro) === JSON.stringify(pessoa.dentro ?? [{}])) return casa;
+  if (!dentro.length) return { ...casa, pessoas: casa.pessoas.filter((p) => p.id !== id) };
+  const sempre = dentro.length === 1 && !dentro[0].de && !dentro[0].ate;
+  return { ...casa, pessoas: casa.pessoas.map((p) => (p.id === id ? (sempre ? resto : { ...resto, dentro }) : p)) };
+}
+
+export function entrarNaDivisao(casa, id, mes) {
+  const pessoa = casa.pessoas.find((p) => p.id === id);
+  if (!pessoa) {
+    const perfil = acharPerfil(casa, id);
+    return perfil ? { ...casa, pessoas: [...casa.pessoas, { id, nome: perfil.nome, dentro: [{ de: mes }] }] } : casa;
+  }
+  let juntou = false;
+  const dentro = (pessoa.dentro ?? [{}]).filter((d) => !d.de || d.de < mes).map((d) => {
+    if (d.ate && d.ate < mes) return d;
+    juntou = true; // o período chega até o mês: segue aberto dali em diante
+    const { ate: _fim, ...aberto } = d;
+    return aberto;
+  });
+  return comPeriodos(casa, id, juntou ? dentro : [...dentro, { de: mes }]);
+}
+
+// Sem a trava das duas pessoas (podeSairDaDivisao a usa para simular).
+const semAPessoa = (casa, id, mes) => {
+  const pessoa = casa.pessoas.find((p) => p.id === id);
+  if (!pessoa) return casa;
+  const dentro = (pessoa.dentro ?? [{}]).filter((d) => !d.de || d.de < mes).map((d) => (!d.ate || d.ate > mes ? { ...d, ate: mes } : d));
+  return comPeriodos(casa, id, dentro);
+};
+
+// Ficam pelo menos duas dividindo em todo mês dali em diante (conferido em cada mês em que alguém entra ou sai).
+export function podeSairDaDivisao(casa, id, mes) {
+  const depois = semAPessoa(casa, id, mes);
+  if (depois === casa) return false;
+  const viradas = depois.pessoas.flatMap((p) => (p.dentro ?? []).flatMap((d) => [d.de, d.ate])).filter((m) => m && m > mes);
+  return [mes, ...viradas].every((m) => pessoasNoMes(depois, m).length >= 2);
+}
+
+export const sairDaDivisao = (casa, id, mes) => (podeSairDaDivisao(casa, id, mes) ? semAPessoa(casa, id, mes) : casa);
+
+// A lista "Quem divide as contas" dos Ajustes: quem divide no mês (com o perfil, que tem a foto); quem administra
+// vê também os outros perfis, depois, para marcar.
+export function quemDivideNosAjustes(casa, mes, { administra }) {
+  const dividem = pessoasNoMes(casa, mes).map((p) => ({ pessoa: acharPerfil(casa, p.id) ?? p, divide: true }));
+  if (!administra) return dividem;
+  const fora = (casa.perfis ?? []).filter((p) => !dividem.some((x) => x.pessoa.id === p.id)).map((p) => ({ pessoa: p, divide: false }));
+  return [...dividem, ...fora];
 }
 
 // O perfil de uma pessoa da casa muda o nome dela junto.

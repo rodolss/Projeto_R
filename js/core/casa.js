@@ -1,4 +1,5 @@
-// Contas da casa (desenho de 2026-11-19): as contas do mês divididas entre duas pessoas em proporção à renda.
+// Contas da casa (desenho de 2026-11-19): as contas do mês divididas entre as pessoas da casa (duas ou mais, desde
+// o desenho 2026-11-21-divisao-pelos-perfis) em proporção à renda.
 // O mês é o mês em que as contas são pagas. Valor digitado = confirmado; sem ele, o app prevê pelo último
 // valor conhecido ("a confirmar"). No cartão compra por compra, o valor é a soma das compras do mês.
 // Versão 2 (desenho 2026-11-19-cartao): o cartão de uma das pessoas guarda também compras dela e de outras
@@ -114,6 +115,12 @@ export function salarioNoMes(casa, mes, pessoaId) {
   return { valor: 0, situacao: 'vazio', deOnde: null };
 }
 
+// Quem divide (desenho 2026-11-21-divisao-pelos-perfis): `dentro` são os períodos em que a pessoa divide as contas
+// ({ de?, ate? } em 'AAAA-MM'; `ate` é o mês em que ela deixa de dividir). Sem `dentro`, divide sempre.
+export const divideNoMes = (pessoa, mes) => !pessoa.dentro
+  || pessoa.dentro.some((d) => (!d.de || d.de <= mes) && (!d.ate || mes < d.ate));
+export const pessoasNoMes = (casa, mes) => casa.pessoas.filter((p) => divideNoMes(p, mes));
+
 export function resumoDoMes(casa, mes) {
   const contas = [];
   const semValor = [];
@@ -128,7 +135,7 @@ export function resumoDoMes(casa, mes) {
     }
   }
   const total = centavos(contas.reduce((s, c) => s + c.valor, 0));
-  const salarios = casa.pessoas.map((pessoa) => ({ pessoa, ...salarioNoMes(casa, mes, pessoa.id) }));
+  const salarios = pessoasNoMes(casa, mes).map((pessoa) => ({ pessoa, ...salarioNoMes(casa, mes, pessoa.id) }));
   const renda = centavos(salarios.reduce((s, x) => s + x.valor, 0));
   const divide = renda > 0;
   let acumulado = 0;
