@@ -67,9 +67,12 @@ export function abaAtivos({ resumo, abrir }) {
 }
 
 // "Onde ele entra?": os grupos em botões grandes com exemplo.
-function escolhaDoGrupo(inicial, aoEscolher) {
+// Na aba "Renda fixa e outros" ficam só os grupos fora da bolsa: ações, FIIs e exterior se cadastram pela busca.
+export const GRUPOS_FORA_DA_BOLSA = GRUPOS.filter((g) => !COM_COTAS.has(g));
+
+function escolhaDoGrupo(inicial, aoEscolher, grupos = GRUPOS) {
   const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': 'Onde ele entra?' });
-  const desenhar = (atual) => caixa.replaceChildren(...GRUPOS.map((g) => h('button', {
+  const desenhar = (atual) => caixa.replaceChildren(...grupos.map((g) => h('button', {
     type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(g === atual), onclick: () => { desenhar(g); aoEscolher(g); },
   },
   h('span', { class: `chave-grupo grande cor-${g}`, 'aria-hidden': 'true' }),
@@ -108,7 +111,7 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
         h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: Tesouro IPCA+ 2035, CDB do banco', oninput: (e) => { novo.nome = e.target.value.trim(); } }),
         h('span', { class: 'campo-dica' }, 'Para ações e fundos que você compra pela corretora, é mais fácil procurar pelo código na busca.')),
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Onde ele entra?'),
-        escolhaDoGrupo(novo.grupo, (g) => { novo.grupo = g; cotas.hidden = !COM_COTAS.has(g); })),
+        escolhaDoGrupo(novo.grupo, (g) => { novo.grupo = g; cotas.hidden = !COM_COTAS.has(g); }, GRUPOS_FORA_DA_BOLSA)),
       campoMoeda({ rotulo: 'Saldo hoje (opcional)', dica: 'Copie da corretora. Sem ele, o saldo vem dos aportes.', aoMudar: (v) => { novo.saldo = v; } }),
       (() => { cotas.hidden = !COM_COTAS.has(novo.grupo); return cotas; })(),
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Adicionar', () => {
