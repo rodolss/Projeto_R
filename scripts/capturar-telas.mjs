@@ -17,7 +17,7 @@ const PORTA = 9333;
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2);
-const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera', '--estado', '--local'].includes(args[k - 1]));
+const saida = args.find((a, k) => !a.startsWith('--') && !['--rotas', '--espera', '--estado', '--local', '--depois'].includes(args[k - 1]));
 if (!saida) {
   console.error('Uso: node scripts/capturar-telas.mjs <pasta-saida> [--rotas inicio,mes] [--festa] [--sem-dados] [--reduzir]');
   process.exit(2);
@@ -25,6 +25,8 @@ if (!saida) {
 const opcao = (nome) => args.includes(`--${nome}`);
 const iRotas = args.indexOf('--rotas');
 const rotas = iRotas >= 0 ? args[iRotas + 1].split(',') : ['inicio', 'mes', 'simular', 'mais'];
+const iDepois = args.indexOf('--depois'); // arquivo .js executado na página depois de abrir cada rota (digitar, tocar), com 1,5 s de espera
+const depois = iDepois >= 0 ? readFileSync(args[iDepois + 1], 'utf8') : null;
 const iEspera = args.indexOf('--espera');
 const ESPERA_MS = iEspera >= 0 ? Number(args[iEspera + 1]) : 1500;
 const iEstado = args.indexOf('--estado');
@@ -141,6 +143,10 @@ try {
     for (const rota of rotas) {
       await cdp.enviar('Page.navigate', { url: `${APP}?c=${Date.now()}#/${rota}` });
       await pausa(ESPERA_MS);
+      if (depois) {
+        await cdp.enviar('Runtime.evaluate', { expression: depois, awaitPromise: true });
+        await pausa(1500);
+      }
       const { cssContentSize } = await cdp.enviar('Page.getLayoutMetrics');
       const altura = Math.max(915, Math.ceil(cssContentSize.height));
       // A janela cresce até a altura da página: assim o menu fixo aparece no rodapé da foto, não no meio.

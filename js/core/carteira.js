@@ -74,8 +74,10 @@ export function posicoes(estado, hoje) {
       cotasNoSaldo: p.ultimo?.cotas > 0 ? p.ultimo.cotas : null, // as do último saldo, quando os aportes depois vieram sem cotas
       valorCota: p.ultimo?.cotas > 0 ? centavos(p.ultimo.valor / p.ultimo.cotas) : null,
       // Do mais novo para o mais antigo; no mesmo dia, o aporte vem antes do saldo (conta depois dele).
+      // Papel automático: as compras e vendas (os saldos diários são só o valor do dia, não vão para o histórico).
       historico: [
-        ...saldos.map((s) => ({ tipo: 'saldo', data: s.data, valor: s.valor, cotas: s.cotas ?? null })),
+        ...(auto ? ativo.compras.map((c) => ({ tipo: c.cotas > 0 ? 'compra' : 'venda', data: c.data, valor: c.preco != null ? centavos(Math.abs(c.cotas) * c.preco) : null, cotas: c.cotas, preco: c.preco ?? null }))
+          : saldos.map((s) => ({ tipo: 'saldo', data: s.data, valor: s.valor, cotas: s.cotas ?? null }))),
         ...aportes.filter((a) => a.valor).map((a) => ({ tipo: a.valor > 0 ? 'aporte' : 'resgate', data: a.data, valor: a.valor, cotas: a.cotas })),
       ].sort((a, b) => (a.data !== b.data ? (a.data < b.data ? 1 : -1) : (a.tipo === 'saldo') - (b.tipo === 'saldo'))),
     };
