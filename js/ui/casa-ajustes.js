@@ -8,8 +8,10 @@ import { editarPessoaDoCartao, tirarCartao, rotuloDoCartao, pessoasDe, donaDaPes
 import { formularioDoCartao, botaoDoisToques } from './casa-cartao.js';
 import {
   cartoesVisiveis, veAposentadoria, adicionarPerfil, renomearPerfil, vincularAparelho, desvincularAparelho, donoDeOutroCartao,
-  codigoDoAparelho,
+  codigoDoAparelho, quemDivideNosAjustes, entrarNaDivisao, sairDaDivisao, podeSairDaDivisao,
 } from '../core/perfis.js';
+import { pessoasNoMes } from '../core/casa.js';
+import { mesPadraoDaCasa, nomeDoMes } from './casa.js';
 import { avatar } from './topo.js';
 import { adicionarJunta, removerJunta, JUNTAS_DO_APP } from '../core/tags.js';
 import { icone, iconeCategoria } from './icones.js';
@@ -69,11 +71,20 @@ function desenhar(container, ctx) {
     h('span', { class: 'texto' }, h('b', {}, titulo), detalhe && h('small', {}, detalhe)),
     h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'));
 
+  // Quem divide vem dos perfis (desenho 2026-11-21-divisao-pelos-perfis): quem administra vê todos e marca, na folha de
+  // cada um, quem divide; vale do mês em foco em diante. Os outros veem só quem divide, como antes.
+  const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
+  const mesDoFoco = mesPadraoDaCasa(ctx);
+  const quemDivide = quemDivideNosAjustes(casa, mesDoFoco, { administra });
   const pessoas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Quem divide as contas'),
-    h('div', {}, ...casa.pessoas.map((p) => linhaDaLista({
-      selo: avatar(p), titulo: p.nome, detalhe: 'toque para mudar o nome', aoTocar: () => abrir(`pessoa-${p.id}`),
-    }))));
+    h('div', {}, ...quemDivide.map(({ pessoa: p, divide, muda }) => linhaDaLista({
+      selo: avatar(p), titulo: p.nome, classe: divide ? '' : 'fora-da-divisao', aoTocar: () => abrir(`pessoa-${p.id}`),
+      detalhe: !administra ? 'toque para mudar o nome'
+        : muda ? (divide ? `sai da divisão em ${nomeDoMes(muda)}` : `divide a partir de ${nomeDoMes(muda)}`)
+          : divide ? 'divide as contas' : 'não divide as contas',
+    }))),
+    administra && h('p', { class: 'nota nota-casa' }, 'Os perfis vêm de Aparelhos e perfis. Toque em alguém para dizer se divide as contas.'));
 
   const contas = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Contas'),
@@ -97,27 +108,48 @@ function desenhar(container, ctx) {
   // ---------- folhas da casa ----------
   const folhaDaPessoa = (pessoa, folha) => {
     let nome = pessoa.nome;
+    const { divide: divideAgora, muda } = quemDivide.find((x) => x.pessoa.id === pessoa.id);
+    let divide = divideAgora;
+    let escolheu = false; // com uma mudança já marcada para depois, tocar numa opção (mesmo a marcada) vale do mês em foco
+    const podeSair = !(divideAgora || muda) || podeSairDaDivisao(casa, pessoa.id, mesDoFoco);
+    const desde = nomeDoMes(mesDoFoco);
     return [
-      h('h2', {}, 'Nome'),
+      h('h2', {}, administra ? pessoa.nome : 'Nome'),
       h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Como aparece no app'),
         h('input', { class: 'entrada', type: 'text', value: pessoa.nome, autocomplete: 'off', oninput: (e) => { nome = e.target.value.trim(); } })),
+      administra && h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Divide as contas da casa?'),
+        escolhaEntre({
+          rotulo: 'Divide as contas da casa?', inicial: divide, aoEscolher: (v) => { divide = v; escolheu = true; },
+          opcoes: [
+            { valor: true, icone: 'casa', titulo: 'Divide as contas', texto: 'Paga uma parte do tamanho do que ganha. Ex.: quem mora junto e ajuda nas contas.' },
+            { valor: false, icone: 'cartao', titulo: 'Não divide', texto: 'Usa só os próprios cartões no app. Ex.: um filho que tem cartão.', travada: !podeSair },
+          ],
+        }),
+        h('span', { class: 'campo-dica' }, !podeSair ? 'Precisam ficar pelo menos duas pessoas dividindo as contas.'
+          : muda ? `Já está marcado para ${divideAgora ? 'sair' : 'entrar'} em ${nomeDoMes(muda)}. O que você escolher aqui vale de ${desde} em diante.`
+            : `Vale de ${desde} em diante. Os meses antes continuam como estão.`)),
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Salvar', () => {
         if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
-        if (nome === pessoa.nome) { fechar(); return; }
-        salvarNaFolha((c) => renomearPessoa(c, pessoa.id, nome), 'Nome salvo.', folha);
+        const mudouNome = nome !== pessoa.nome;
+        const mudouDivisao = divide !== divideAgora || (Boolean(muda) && escolheu);
+        if (!mudouNome && !mudouDivisao) { fechar(); return; }
+        const texto = !mudouDivisao ? 'Nome salvo.'
+          : divide ? `${nome} divide as contas de ${desde} em diante.` : `${nome} não divide mais as contas de ${desde} em diante.`;
+        salvarNaFolha((c) => {
+          const renomeada = mudouNome ? renomearPessoa(c, pessoa.id, nome) : c;
+          if (!mudouDivisao) return renomeada;
+          return divide ? entrarNaDivisao(renomeada, pessoa.id, mesDoFoco) : sairDaDivisao(renomeada, pessoa.id, mesDoFoco);
+        }, texto, folha);
       })),
     ];
   };
 
-  // As duas maneiras de preencher uma conta, em botões grandes com exemplo (no lugar da caixa "Compra por compra").
-  const escolhaDoJeito = (inicial, aoEscolher, travada) => {
-    const opcoes = [
-      { valor: false, icone: 'recibo', titulo: 'Um valor por mês', texto: 'Você digita quanto veio. Ex.: luz, água, condomínio.' },
-      { valor: true, icone: 'sacola', titulo: 'Compra por compra', texto: 'Você anota cada compra e o app soma. Ex.: cartão, mercado.' },
-    ];
-    const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': 'Como você preenche esta conta?' });
+  // Escolhas em botões grandes com exemplo (no lugar de caixas de marcar). Cada opção pode vir travada.
+  const escolhaEntre = ({ rotulo, opcoes, inicial, aoEscolher, travada = false }) => {
+    const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': rotulo });
     const desenharOpcoes = (atual) => caixa.replaceChildren(...opcoes.map((o) => h('button', {
-      type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(o.valor === atual), disabled: travada,
+      type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(o.valor === atual), disabled: travada || Boolean(o.travada),
       onclick: () => { desenharOpcoes(o.valor); aoEscolher(o.valor); },
     },
     h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone(o.icone)),
@@ -126,6 +158,14 @@ function desenhar(container, ctx) {
     desenharOpcoes(inicial);
     return caixa;
   };
+  // As duas maneiras de preencher uma conta (no lugar da caixa "Compra por compra").
+  const escolhaDoJeito = (inicial, aoEscolher, travada) => escolhaEntre({
+    rotulo: 'Como você preenche esta conta?', inicial, aoEscolher, travada,
+    opcoes: [
+      { valor: false, icone: 'recibo', titulo: 'Um valor por mês', texto: 'Você digita quanto veio. Ex.: luz, água, condomínio.' },
+      { valor: true, icone: 'sacola', titulo: 'Compra por compra', texto: 'Você anota cada compra e o app soma. Ex.: cartão, mercado.' },
+    ],
+  });
 
   const folhaDaConta = (conta, folha) => {
     const nova = !conta;
@@ -173,7 +213,7 @@ function desenhar(container, ctx) {
   function conteudoDaFolha(folha) {
     if (folha === 'nova-conta') return folhaDaConta(null, folha);
     if (folha?.startsWith('conta-')) { const conta = ativas.find((c) => c.id === folha.slice(6)); return conta && folhaDaConta(conta, folha); }
-    if (folha?.startsWith('pessoa-')) { const p = casa.pessoas.find((x) => x.id === folha.slice(7)); return p && folhaDaPessoa(p, folha); }
+    if (folha?.startsWith('pessoa-')) { const x = quemDivide.find((q) => q.pessoa.id === folha.slice(7)); return x && folhaDaPessoa(x.pessoa, folha); }
     if (folha?.startsWith('cartao-')) { const k = cartoes.find((x) => x.id === folha.slice(7)); return k && folhaDoCartao(k, folha); }
     if (folha?.startsWith('outra-')) { const p = usadas.find((x) => x.id === folha.slice(6)); return p && folhaDaOutraPessoa(p, folha); }
     if (folha === 'etiquetas') return folhaDasEtiquetas();
@@ -299,7 +339,6 @@ function desenhar(container, ctx) {
     : cartaoConectar(ctx, { titulo: 'Usar nos dois celulares', texto: 'Hoje as contas estão só neste aparelho. Conecte com uma chave do GitHub para ver as mesmas contas em outro celular.' });
 
   // ---------- perfis e aparelhos (só quem administra, vendo o próprio perfil) ----------
-  const administra = Boolean(ctx.perfil?.admin && visto && ctx.perfil.vinculado?.id === visto.id);
   const novoPerfil = { nome: '' };
   const perfisEAparelhos = administra && h('section', { class: 'cartao', id: 'perfis' },
     h('h2', {}, 'Perfis e aparelhos'),
@@ -317,7 +356,7 @@ function desenhar(container, ctx) {
       p.admin && h('span', { class: 'selo ok' }, 'administra'))),
     h('div', { class: 'casa-ajuste', 'data-sem-recarregar': '' },
       h('h3', { style: 'margin:0' }, 'Novo perfil'),
-      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Tem cartões próprios e não entra na divisão das contas.'),
+      h('p', { class: 'suave pequeno', style: 'margin:0' }, 'Tem cartões próprios. Para dividir as contas da casa, toque nele em Casa › Quem divide as contas.'),
       h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Nome', 'aria-label': 'Nome do novo perfil', oninput: (e) => { novoPerfil.nome = e.target.value.trim(); } }),
       h('div', { class: 'botoes' }, botao('Criar perfil', () => {
         if (!novoPerfil.nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
@@ -352,7 +391,7 @@ function desenhar(container, ctx) {
   const grupos = [
     {
       id: 'casa', icone: 'casa', cat: 'casa', titulo: 'Casa',
-      resumo: `${casa.pessoas.map((p) => p.nome).join(' e ')} · ${plural(ativas.length, 'conta', 'contas')}`,
+      resumo: `${juntarNomes(pessoasNoMes(casa, mesDoFoco).map((p) => p.nome))} · ${plural(ativas.length, 'conta', 'contas')}`,
       conteudo: [pessoas, contas, notaDaDivisao],
     },
     {
@@ -407,6 +446,9 @@ function desenhar(container, ctx) {
 }
 
 let abertaAqui = false; // a folha foi aberta por um toque nesta sessão: fechar = voltar no histórico
+
+// "Ana e Leo"; "Ana, Leo e Cris".
+export const juntarNomes = (nomes) => (nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}` : nomes.join(''));
 
 // O selo do grupo: a cor da categoria com o ícone próprio do grupo.
 function seloDoGrupo(g) {

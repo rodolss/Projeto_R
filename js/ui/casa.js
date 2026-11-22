@@ -188,7 +188,7 @@ function desenharMes(container, ctx) {
     ? [
       // Tocar no quanto cada um paga copia o valor (só os números, como "1234,56") para colar no app do banco.
       h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p, k) => h('button', {
-        type: 'button', class: `cartao casa-pessoa copiavel cor-${k % 2}`, 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
+        type: 'button', class: `cartao casa-pessoa copiavel cor-${k % 3}`, 'aria-label': `Copiar ${formatarBRL(p.paga)}, quanto ${p.pessoa.nome} paga`,
         onclick: async (e) => {
           const cartaoPessoa = e.currentTarget;
           const ok = await copiarTexto(p.paga.toFixed(2).replace('.', ','));

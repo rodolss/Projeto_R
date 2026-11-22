@@ -475,6 +475,11 @@ details.detalhes[open] > summary::after { content: "−"; }
 /* Cards "X paga": avatar e nome, valor em destaque, fatia do total em barra e o que sobra. */
 .casa-pessoa { --cor: var(--destaque); }
 .casa-pessoa.cor-1 { --cor: var(--cat-conexao); }
+.casa-pessoa.cor-2 { --cor: var(--cat-transporte); }
+/* Três ou mais dividindo: com número ímpar de cards, o último ocupa a linha inteira. */
+.casa-pessoas > :last-child:nth-child(odd):not(:first-child) { grid-column: 1 / -1; }
+.casa-linha.fora-da-divisao .avatar { opacity: 0.55; }
+.casa-linha.fora-da-divisao .texto b { color: var(--suave); }
 .pessoa-topo { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .pessoa-topo .avatar { width: 26px; height: 26px; font-size: 12px; }
 .pessoa-nome { flex: 1; min-width: 0; font-size: 13.5px; color: var(--suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

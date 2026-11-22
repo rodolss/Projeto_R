@@ -54,7 +54,7 @@ function desenhar(container, ctx) {
     h('div', { class: 'rotulo' }, 'Contas no ano'),
     h('div', { class: 'valor-grande' }, formatarBRL(r.total)),
     h('div', { class: 'suave' }, `média de ${formatarBRL(r.mediaMensal)} por mês`),
-    r.fatiaDaRenda != null && h('p', { style: 'margin-top:8px' }, h('b', {}, formatarPct(r.fatiaDaRenda, 0)), ' da renda dos dois foi para as contas.'));
+    r.fatiaDaRenda != null && h('p', { style: 'margin-top:8px' }, h('b', {}, formatarPct(r.fatiaDaRenda, 0)), r.pessoas.length > 2 ? ' da renda de vocês foi para as contas.' : ' da renda dos dois foi para as contas.'));
 
   const pessoas = h('div', { class: 'casa-pessoas' }, ...r.pessoas.map((p) => h('section', { class: 'cartao casa-pessoa' },
     h('div', { class: 'rotulo' }, `${p.pessoa.nome} pagou`),

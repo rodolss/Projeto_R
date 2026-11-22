@@ -1,6 +1,6 @@
 // Resumo do ano das contas da casa (o quadro da direita da planilha, sem os defeitos dela): só meses até
 // o mês atual, médias por pessoa só nos meses que dividem e peso de cada conta sobre o total de todas.
-import { centavos, primeiroMes, resumoDoMes } from './casa.js';
+import { centavos, primeiroMes, resumoDoMes, divideNoMes } from './casa.js';
 import { somarMeses } from './meses.js';
 
 const media = (soma, n) => (n ? centavos(soma / n) : null);
@@ -23,8 +23,11 @@ export function resumoDoAno(casa, ano, mesAtual) {
   const totalQueDivide = dividem.reduce((s, r) => s + r.total, 0);
   const renda = centavos(dividem.reduce((s, r) => s + r.renda, 0));
 
-  const pessoas = casa.pessoas.map((pessoa, k) => {
-    const daPessoa = dividem.map((r) => r.pessoas[k]);
+  // Cada pessoa pelo id (quem entra ou sai da divisão muda as posições): só quem dividiu em algum mês do ano.
+  const noMes = (r, pessoa) => r.pessoas.find((x) => x.pessoa.id === pessoa.id);
+  const doAno = casa.pessoas.filter((p) => (resumos.length ? resumos.some((r) => noMes(r, p)) : divideNoMes(p, fim)));
+  const pessoas = doAno.map((pessoa) => {
+    const daPessoa = dividem.map((r) => noMes(r, pessoa)).filter(Boolean);
     const totalPago = centavos(daPessoa.reduce((s, p) => s + p.paga, 0));
     return {
       pessoa,

@@ -11,7 +11,7 @@ const somar = (lista) => centavos(lista.reduce((s, x) => s + (x ?? 0), 0));
 
 export function balancoDoMes(casa, mes, pessoaId, hoje) {
   const r = resumoDoMes(casa, mes);
-  // Quem não é pessoa da casa (um perfil novo) não divide as contas: sem salário nem parte das contas.
+  // Quem não divide as contas no mês (um perfil fora da divisão): sem salário nem parte das contas.
   const daCasa = r.pessoas.find((p) => p.pessoa.id === pessoaId) ?? null;
   // O a mais do mês (13º, férias, PLR: desenho 2026-11-21-salario-no-balanco) entra no que entrou, sem mudar a divisão.
   const salario = daCasa && { valor: daCasa.salario, situacao: daCasa.situacaoSalario, deOnde: daCasa.deOnde, extra: extraDoMes(casa, mes, pessoaId) };
