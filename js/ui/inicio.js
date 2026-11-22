@@ -46,8 +46,8 @@ function cartaoPagamento(estado, hoje, ctx, mes = hoje.slice(0, 7)) {
     h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar' : 'Abrir'));
 }
 
-// O quanto investir este mês (desenho 2026-11-22-para-investir): a sobra do Balanço do mês anterior menos o lazer — a
-// mesma conta do Dia de pagamento —, e o potencial (a média dos últimos meses). Substitui o "Dia de pagamento?"; com o
+// O quanto investir este mês (desenhos 2026-11-22-para-investir e -sobra-do-proprio-mes): a sobra (prevista, até fechar)
+// do Balanço do mês em foco menos o lazer — a mesma conta do Dia de pagamento —, e o potencial (a média dos últimos meses). Substitui o "Dia de pagamento?"; com o
 // mês já registrado (ou fora da visão única, sem o Balanço), fica o cartão do pagamento.
 // O mês é o mês em foco (como nas telas da casa): com o mês do calendário todo pago e fechado, já é o seguinte. O Dia de
 // pagamento registra o mês do calendário, então um mês em foco à frente mostra o valor, mas ainda sem "Investir agora".

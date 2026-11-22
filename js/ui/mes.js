@@ -5,7 +5,7 @@ import {
   h, campoMoeda, cartao, botao, aviso, linha, AVISO_EXEMPLOS, mostrarFolha, esconderFolha,
 } from './dom.js';
 import { formatarBRL, formatarDuracao } from '../core/formato.js';
-import { formatarMes } from '../core/meses.js';
+import { formatarMes, somarMeses } from '../core/meses.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
 import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
@@ -91,9 +91,10 @@ function desenhar(container, ctx) {
       .map(([ativoId, s]) => ({ ativoId, valor: s.valor, cotas: s.cotas ?? null }));
     return lista.length ? lista : null;
   };
-  // Investir a sobra (desenho 2026-11-20-investir-a-sobra): na visão única, o quanto investir no Dia de pagamento é a
-  // sobra do Balanço do mês anterior (o que já fechou), menos 10% para lazer — js/core/investir-sobra.js. Sem as
-  // contas da casa carregadas ou sem os dados do Balanço: pelo orçamento, com aviso.
+  // Investir a sobra (desenho 2026-11-22-sobra-do-proprio-mes): na visão única, o quanto investir no Dia de pagamento é
+  // a sobra do Balanço deste mês (no dia 27, quando o salário cai, as contas e as faturas dele já fecharam), menos 10%
+  // para lazer — js/core/investir-sobra.js. Sem as contas da casa carregadas ou sem os dados do Balanço: pelo
+  // orçamento, com aviso.
   const regra = (() => {
     if (!ctx.unica || !ctx.perfil?.visto) return null;
     if (!ctx.casa) return { semCasa: true };
@@ -145,14 +146,14 @@ function desenhar(container, ctx) {
           h('div', { class: 'rotulo' }, `Registrado em ${dataCurta(existente.data)}`),
           h('div', { class: 'valor-grande' }, formatarBRL(existente.recebido ?? 0)),
           noBalanco != null && noBalanco !== existente.recebido
-          && h('div', { class: 'suave' }, `No Balanço agora: ${formatarBRL(noBalanco)}. O registro guarda o valor do dia; a sobra de ${nome} (e o próximo Dia de pagamento) já usa o do Balanço.`))
+          && h('div', { class: 'suave' }, `No Balanço agora: ${formatarBRL(noBalanco)}. O registro guarda o valor do dia; a sobra de ${nome} já usa o do Balanço.`))
         : doBalanco.carregando
           ? aviso('info', 'As contas da casa ainda estão carregando. O salário aparece aqui sozinho.')
           : doBalanco.pronto
             ? cartao(
           h('div', { class: 'rotulo' }, `Do Balanço de ${nome}`),
           h('div', { class: 'valor-grande' }, formatarBRL(doBalanco.recebido)),
-          doBalanco.extra > 0 && h('div', { class: 'suave' }, `${formatarBRL(doBalanco.salario)} de salário + ${formatarBRL(doBalanco.extra)} a mais (vai pela sobra, no próximo Dia de pagamento).`))
+          doBalanco.extra > 0 && h('div', { class: 'suave' }, `${formatarBRL(doBalanco.salario)} de salário + ${formatarBRL(doBalanco.extra)} a mais (já entra na sobra de ${nome}).`))
         : aviso('info', `Digite seu salário de ${nome} no Balanço: é o único lugar, e ele vale para tudo.`),
       h('p', { class: 'suave pequeno' }, 'O salário se digita só no Balanço; aqui, nas contas da casa e nos Ajustes ele aparece sozinho.'),
       h('div', { class: 'botoes' },
@@ -258,14 +259,15 @@ function desenhar(container, ctx) {
   function conferenciaDoBalanco(rr) {
     if (!regra) return [];
     if (regra.semCasa) return [aviso('info', 'As contas da casa ainda não carregaram: por enquanto, o valor sai do orçamento.')];
-    const nomeAnterior = nomeDoMes(regra.mes);
+    const nomeAnterior = nomeDoMes(regra.mes); // o mês da sobra: o deste Dia de pagamento
+    const mesAntes = nomeDoMes(somarMeses(regra.mes, -1)); // o Dia de pagamento antes deste
     const pct = `${Math.round(LAZER * 100)}%`;
     const extra = rr.extra?.valor > 0 && rr.extra;
     const linha = regra.incompleto
       ? aviso('info', `Para investir pela sobra, faltam os salários de ${nomeAnterior} (o seu se digita no Balanço; o da outra pessoa, no Mês da casa). Por enquanto, o valor sai do orçamento.`)
       : h('p', { class: 'suave' },
         `Sobrou em ${nomeAnterior}: ${formatarBRL(regra.sobra)}${regra.previsao ? ' (com valores ainda a confirmar)' : ''}. `,
-        regra.jaInvestido > 0 && `Desse salário, ${formatarBRL(regra.jaInvestido)} já tinham sido investidos no Dia de pagamento de ${nomeAnterior}. `,
+        regra.jaInvestido > 0 && `Desse salário, ${formatarBRL(regra.jaInvestido)} já tinham sido investidos no Dia de pagamento de ${mesAntes}. `,
         regra.deficit > 0 && `Antes, ${formatarBRL(regra.deficit)} de meses no vermelho ainda precisavam ser cobertos. `,
         regra.base > 0 && `${pct} para lazer: ${formatarBRL(regra.lazer)}. `,
         regra.deficitAgora > 0 && `Ficam ${formatarBRL(regra.deficitAgora)} no vermelho para as próximas sobras cobrirem. `,

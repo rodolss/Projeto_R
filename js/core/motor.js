@@ -243,8 +243,8 @@ function excedenteDefinido({ recebidoEfetivo, salario, tipoExtra, investir, laze
   };
 }
 
-// `investirDefinido` (desenho 2026-11-20-investir-a-sobra): o quanto investir já decidido fora daqui (a sobra do
-// Balanço do mês anterior, menos o lazer — js/core/investir-sobra.js). Ele substitui o excedente do orçamento — sem
+// `investirDefinido` (desenhos 2026-11-20-investir-a-sobra e 2026-11-22-sobra-do-proprio-mes): o quanto investir já
+// decidido fora daqui (a sobra do Balanço do próprio mês, menos o lazer — js/core/investir-sobra.js). Ele substitui o excedente do orçamento — sem
 // provisão nem anuais, que o Balanço já conta quando acontecem; a divisão entre reserva, carteira e caixa continua a
 // mesma. A resposta diz de onde veio (`origem`), e o registro do mês guarda isso.
 export function calcularMes({

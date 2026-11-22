@@ -34,7 +34,7 @@ export function salarioDoPlanoPelaCasa(config, { casa, pessoaId, hoje }) {
 
 // O rascunho do Dia de pagamento com o salário do Balanço: na visão única a etapa do salário não aparece (sempre
 // feita). O que caiu é o salário + o a mais do Balanço; ainda não confirmado, a previsão; sem nada na casa, o salário
-// do plano. Pela sobra ele não muda o quanto investir (é a sobra do mês anterior); fica gravado no registro.
+// do plano. Pela sobra ele não muda o quanto investir (é a sobra do Balanço do mês); fica gravado no registro.
 export function rascunhoComBalanco(base, dia, salarioDoPlano = null) {
   return { ...base, recebido: dia.recebido ?? salarioDoPlano, tipoExtra: null, feito: { ...base.feito, salario: true } };
 }
