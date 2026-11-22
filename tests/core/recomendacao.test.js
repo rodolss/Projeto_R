@@ -155,6 +155,16 @@ test('precisaRevisarLista: sem lista, ativo sem conferência válida ou conferê
   assert.equal(precisaRevisarLista(poucoNegociado, '2026-11-26'), true);
 });
 
+test('validarRecomendacao: ativo dos excluídos não volta para a lista; cada excluído tem código, motivo e data', () => {
+  const excluidos = [{ ticker: 'cccc3', motivo: 'Lucro despencou e dividendos barrados', em: '2026-11-22' }];
+  assert.equal(validarRecomendacao({ ...recomendacao(), excluidos }).ok, true);
+  const r = recomendacao();
+  r.lista.push({ ticker: 'CCCC3', nome: 'Outra', classe: 'acoes', fatia: 0, motivo: 'x', conferido: { publicoGeral: true, liquidezDiaria: 9e6, em: '2026-11-26' } });
+  assert.ok(validarRecomendacao({ ...r, excluidos }).erros.some((e) => /CCCC3/.test(e) && /excluíd/.test(e)));
+  assert.ok(validarRecomendacao({ ...recomendacao(), excluidos: [{ ticker: 'DDDD3' }] }).erros.some((e) => /DDDD3/.test(e) && /motivo/.test(e)));
+  assert.ok(validarRecomendacao({ ...recomendacao(), excluidos: 'x' }).erros.some((e) => /excluidos/.test(e)));
+});
+
 test('motivoSemOrdens: o que a análise disse, ou a reserva de emergência', () => {
   assert.equal(motivoSemOrdens({}), 'Este mês o dinheiro vai para a reserva de emergência.');
   assert.equal(motivoSemOrdens({ semOrdens: 'Faltam os salários de dezembro no Balanço.' }), 'Faltam os salários de dezembro no Balanço.');
