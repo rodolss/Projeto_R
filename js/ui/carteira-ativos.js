@@ -90,7 +90,8 @@ export function folhaDeAtivos(folha, { ctx, resumo, fechar, salvarNaFolha }) {
     return [
       h('h2', {}, 'Novo investimento'),
       h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
-        h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: XFIX11, Tesouro IPCA+ 2035', oninput: (e) => { novo.nome = e.target.value.trim(); } })),
+        h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: XFIX11, Tesouro IPCA+ 2035', oninput: (e) => { novo.nome = e.target.value.trim(); } }),
+        h('span', { class: 'campo-dica' }, 'Use o mesmo nome da sua carteira-alvo (ex.: XFIX11): assim o Dia de pagamento aplica nele, sem criar outro.')),
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Onde ele entra?'),
         escolhaDoGrupo(novo.grupo, (g) => { novo.grupo = g; cotas.hidden = !COM_COTAS.has(g); })),
       campoMoeda({ rotulo: 'Saldo hoje (opcional)', dica: 'Copie da corretora. Sem ele, o saldo vem dos aportes.', aoMudar: (v) => { novo.saldo = v; } }),

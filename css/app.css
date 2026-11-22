@@ -848,11 +848,11 @@ a.barra-item:active { background: var(--cartao-2); }
 .heroi-ganho { margin: 6px 0 0; font-size: 14px; }
 .heroi-ganho b { color: #fff; font-variant-numeric: tabular-nums; }
 .heroi-rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-.botao-heroi { min-height: 40px; padding: 0 16px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.botao-heroi { min-height: 44px; padding: 0 16px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .botao-heroi:active { background: rgba(255, 255, 255, 0.24); }
 /* As três vistas: controle segmentado (como no iOS e no Material). */
 .segmentos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--cartao-2); }
-.segmentos button { min-height: 40px; border: 0; border-radius: 10px; background: none; color: var(--suave); font: inherit; font-weight: 600; cursor: pointer; }
+.segmentos button { min-height: 44px; border: 0; border-radius: 10px; background: none; color: var(--suave); font: inherit; font-weight: 600; cursor: pointer; }
 .segmentos button.ativo { background: var(--cartao); color: var(--texto); box-shadow: var(--sombra); }
 .inicio-topo .anel { width: min(220px, 62vw); }
 .inicio-topo .anel-grande { font-size: 36px; }

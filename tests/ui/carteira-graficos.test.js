@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { topoDaEscala, rotuloDoMes } from '../../js/ui/carteira-graficos.js';
+import { topoDaEscala, rotuloDoMes, rotuloDoEixo } from '../../js/ui/carteira-graficos.js';
+
+test('rotuloDoEixo: as marcas do eixo sem arredondar errado (2.500 é "2,5 mil", não "3 mil")', () => {
+  assert.equal(rotuloDoEixo(0), '0');
+  assert.equal(rotuloDoEixo(2500), '2,5 mil');
+  assert.equal(rotuloDoEixo(1250), '1,25 mil');
+  assert.equal(rotuloDoEixo(12500), '12,5 mil');
+  assert.equal(rotuloDoEixo(250000), '250 mil');
+  assert.equal(rotuloDoEixo(2500000), '2,5 mi');
+  assert.equal(rotuloDoEixo(500), '500');
+});
 
 test('topoDaEscala: o próximo número redondo (1, 2, 2,5, 5 × 10^n) acima do maior valor', () => {
   assert.equal(topoDaEscala(0), 1);

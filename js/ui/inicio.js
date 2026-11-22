@@ -127,7 +127,7 @@ function heroi(resumo, vazio, abrir) {
     h('div', { class: 'rotulo' }, 'Total investido'),
     h('div', { class: 'valor-grande' }, formatarBRL(resumo.total)),
     resumo.temGanho
-      ? h('p', { class: 'heroi-ganho' }, h('b', {}, `${comSinal(resumo.ganho)} (${pctComSinal(resumo.ganhoPct)})`), ' desde o primeiro saldo')
+      ? h('p', { class: 'heroi-ganho' }, h('b', {}, `${comSinal(resumo.ganho)}${resumo.ganhoPct != null ? ` (${pctComSinal(resumo.ganhoPct)})` : ''}`), ' desde o primeiro saldo')
       : h('p', { class: 'heroi-ganho' }, vazio ? 'Adicione os investimentos que você já tem para ver a carteira.' : 'O ganho aparece na segunda atualização dos saldos.'),
     h('div', { class: 'heroi-rodape' },
       h('span', { class: 'selo' }, resumo.ultimaAtualizacao ? `Saldos de ${dataCurta(resumo.ultimaAtualizacao)}` : 'Sem saldos ainda'),
@@ -207,14 +207,16 @@ function abaProventos({ p, estado, hoje }) {
   const prov = proventosDaCarteira(estado, hoje);
   // "R$" e o número nunca se separam na quebra de linha.
   const numero = (rotulo, valor, detalhe) => h('div', { class: 'cartao numero-kpi' }, h('span', { class: 'rotulo' }, rotulo), h('b', {}, valor.replace(/\s/g, ' ')), h('small', {}, detalhe));
-  const renda = cartaoRenda(p, prov.media);
+  // A média por mês é a do motor (a mesma de "Projeção e check-up" e da barra rumo à renda plena).
+  const media = p.proventosMedios;
+  const renda = cartaoRenda(p, media);
   return {
     renda,
-    media: prov.media,
+    media,
     itens: [
       h('div', { class: 'kpis' },
-        numero('Por mês', formatarBRL(prov.media), 'média'),
-        numero('Em 12 meses', formatarBRL(prov.total), prov.quantos < 12 ? `${plural(prov.quantos, 'mês', 'meses')} até agora` : 'total'),
+        numero('Por mês', formatarBRL(media), 'média de até 12 meses'),
+        numero('Em 12 meses', formatarBRL(prov.total), prov.quantos <= 0 ? 'o plano ainda não começou' : prov.quantos < 12 ? `${plural(prov.quantos, 'mês', 'meses')} até agora` : 'total'),
         numero('Rendimento', prov.rendimento == null ? '—' : formatarPct(prov.rendimento, 1), 'em 12 meses, sobre o total')),
       h('section', { class: 'cartao' }, h('h2', {}, 'Mês a mês'),
         prov.meses.some((m) => m.valor > 0) ? colunasProventos(prov.meses)
@@ -244,6 +246,13 @@ function folhaDosSaldos({ resumo, ctx, fechar, salvarNaFolha, folha }) {
   ];
 }
 
+// Mesma tela (abrir ou fechar uma folha, trocar de aba, dados de outro aparelho): redesenha sem rolar para o topo.
+export function atualizar(container, ctx) {
+  render(container, ctx);
+}
+
+let salvando = false; // um salvamento por vez: dois toques rápidos não gravam duas vezes (o GitHub demora)
+
 export function render(container, ctx) {
   const { estado, hoje } = ctx;
   const p = calcularPainel({ estado, hoje });
@@ -258,7 +267,13 @@ export function render(container, ctx) {
   };
   // Depois de salvar (pode demorar, no GitHub): fecha a folha se ela ainda está aberta; senão só redesenha.
   const salvarNaFolha = async (mutacao, texto, folha) => {
-    await ctx.salvar(mutacao);
+    if (salvando) return;
+    salvando = true;
+    try {
+      await ctx.salvar(mutacao);
+    } finally {
+      salvando = false;
+    }
     if (texto) ctx.aviso(texto, 'ok', 2500);
     const acao = depoisDeSalvar(location.hash, folha, 'inicio');
     if (acao === 'fechar') fechar();

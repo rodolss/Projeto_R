@@ -13,7 +13,13 @@ const grupoDe = (ativo) => (ativo.papel === 'carteira' ? ativo.classe ?? 'rendaF
 // O FGTS é só informativo: aparece na lista, mas não entra no total.
 const contaNoTotal = (ativo) => ativo.papel !== 'fgts';
 
-const saldosDo = (estado, id) => estado.saldos.filter((s) => s.ativoId === id).sort((a, b) => (a.data < b.data ? -1 : 1));
+// Um saldo por dia (o último digitado vale: uma correção no mesmo dia não vira "segunda atualização"), do mais antigo
+// ao mais novo.
+function saldosDo(estado, id) {
+  const porDia = new Map();
+  for (const s of estado.saldos) if (s.ativoId === id) porDia.set(s.data, s);
+  return [...porDia.values()].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+}
 
 // Aportes de um ativo com a data do registro do mês (um aporte do mesmo dia de um saldo conta depois dele, como no motor).
 function aportesDo(estado, id) {
@@ -120,21 +126,28 @@ export function evolucao(estado, hoje) {
 
 // ---------- cadastro (saiu dos Ajustes do plano para Carteira › Ativos) ----------
 // `grupo`: uma classe da carteira (rendaFixa, fiis, acoes, exterior) ou reserva, caixa, fora-do-plano, fgts.
-const papelDoGrupo = (grupo) => (CLASSES.includes(grupo) ? { papel: 'carteira', classe: grupo, tipoForaDoPlano: null }
-  : { papel: grupo, classe: null, tipoForaDoPlano: grupo === 'fora-do-plano' ? 'outro' : null });
+// Fora do plano, a poupança é reconhecida pelo nome (o check-up sugere tirar dinheiro dela).
+const papelDoGrupo = (grupo, nome = '') => (CLASSES.includes(grupo) ? { papel: 'carteira', classe: grupo, tipoForaDoPlano: null }
+  : { papel: grupo, classe: null, tipoForaDoPlano: grupo === 'fora-do-plano' ? (/poupan/i.test(nome) ? 'poupanca' : 'outro') : null });
+const grupoDoAtivo = (a) => (a.papel === 'carteira' ? a.classe ?? 'rendaFixa' : a.papel);
 
 export function adicionarAtivo(estado, { nome, grupo, saldo = null, cotas = null, hoje, novoId = () => globalThis.crypto.randomUUID() }) {
   const id = novoId();
   const limpo = nome.trim();
-  const ativo = { id, nome: limpo, ticker: limpo, ...papelDoGrupo(grupo) };
+  const ativo = { id, nome: limpo, ticker: limpo, ...papelDoGrupo(grupo, limpo) };
   const saldos = saldo != null ? [...estado.saldos, { ativoId: id, data: hoje, valor: centavos(saldo), cotas: cotas > 0 ? cotas : null }] : estado.saldos;
   return { estado: { ...estado, ativos: [...estado.ativos, ativo], saldos }, id };
 }
 
+// Sem mudar de grupo, só o nome muda (a poupança continua poupança).
 export function editarAtivo(estado, id, { nome, grupo }) {
   return {
     ...estado,
-    ativos: estado.ativos.map((a) => (a.id === id ? { ...a, ...(nome?.trim() ? { nome: nome.trim() } : {}), ...(grupo ? papelDoGrupo(grupo) : {}) } : a)),
+    ativos: estado.ativos.map((a) => (a.id !== id ? a : {
+      ...a,
+      ...(nome?.trim() ? { nome: nome.trim() } : {}),
+      ...(grupo && grupo !== grupoDoAtivo(a) ? papelDoGrupo(grupo, nome ?? a.nome) : {}),
+    })),
   };
 }
 

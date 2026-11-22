@@ -14,7 +14,7 @@ test('adicionarAtivo: fora da carteira (reserva, fora do plano) não tem classe;
   const reserva = adicionarAtivo(estadoBase(), { nome: 'CDB liquidez', grupo: 'reserva', hoje: HOJE, novoId: () => 'r2' });
   assert.deepEqual([reserva.estado.ativos.at(-1).papel, reserva.estado.ativos.at(-1).classe], ['reserva', null]);
   assert.equal(reserva.estado.saldos.length, estadoBase().saldos.length);
-  const fora = adicionarAtivo(estadoBase(), { nome: 'Poupança', grupo: 'fora-do-plano', hoje: HOJE, novoId: () => 'p' });
+  const fora = adicionarAtivo(estadoBase(), { nome: 'Cripto', grupo: 'fora-do-plano', hoje: HOJE, novoId: () => 'p' });
   assert.deepEqual([fora.estado.ativos.at(-1).papel, fora.estado.ativos.at(-1).tipoForaDoPlano], ['fora-do-plano', 'outro']);
 });
 
@@ -67,6 +67,21 @@ test('posicoes: com um saldo só não há ganho para mostrar; cotas somam as dos
   const fii = de(posicoes(estadoBase(), HOJE), 'fii');
   assert.deepEqual([fii.saldo, fii.aplicado, fii.ganho, fii.ganhoPct], [5500, 5500, null, null]);
   assert.deepEqual([fii.cotas, fii.valorCota, fii.cotasNoSaldo], [550, 10, 500]);
+});
+
+test('posicoes: dois saldos no mesmo dia são uma atualização só (vale o último): sem ganho falso', () => {
+  const estado = estadoBase();
+  estado.saldos.push({ ativoId: 'res', data: '2026-12-05', valor: 3300, cotas: null }); // a correção do mesmo dia
+  const res = de(posicoes(estado, HOJE), 'res');
+  assert.deepEqual([res.saldo, res.aplicado, res.ganho], [3300, 3300, null]);
+});
+
+test('editarAtivo: só o nome muda (a poupança continua poupança); adicionarAtivo reconhece a poupança pelo nome', () => {
+  const estado = { ...estadoBase(), ativos: [...estadoBase().ativos, { id: 'pp', nome: 'Poupança', ticker: 'Poupança', papel: 'fora-do-plano', classe: null, tipoForaDoPlano: 'poupanca' }] };
+  const editado = editarAtivo(estado, 'pp', { nome: 'Poupança do banco', grupo: 'fora-do-plano' });
+  assert.equal(editado.ativos.find((a) => a.id === 'pp').tipoForaDoPlano, 'poupanca');
+  const novo = adicionarAtivo(estadoBase(), { nome: 'Poupança Caixa', grupo: 'fora-do-plano', hoje: HOJE, novoId: () => 'n' });
+  assert.equal(novo.estado.ativos.at(-1).tipoForaDoPlano, 'poupanca');
 });
 
 test('posicoes: o histórico vai do mais novo ao mais antigo; no mesmo dia, o aporte vem antes do saldo', () => {

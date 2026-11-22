@@ -9,6 +9,14 @@ const NS = 'http://www.w3.org/2000/svg';
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const r1 = (v) => Math.round(v * 10) / 10;
 
+// As marcas do eixo, sem arredondar errado (2.500 é "2,5 mil": o abreviar() arredonda para "3 mil").
+export function rotuloDoEixo(v) {
+  const fmt = (x) => x.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  if (Math.abs(v) >= 1e6) return `${fmt(v / 1e6)} mi`;
+  if (Math.abs(v) >= 1e3) return `${fmt(v / 1e3)} mil`;
+  return fmt(v);
+}
+
 export const rotuloDoMes = (mes) => `${MESES[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`;
 
 // O próximo número redondo acima do maior valor (1, 2, 2,5, 5 × 10^n): o topo do eixo.
@@ -58,7 +66,7 @@ export function graficoEvolucao(pontos) {
   const linha = (campo) => pontos.map((p, k) => `${k ? 'L' : 'M'}${r1(x(k))},${r1(y(p[campo]))}`).join(' ');
   const grade = [0, topo / 2, topo].map((v) => [
     svg('line', { class: 'g-grade', x1: m.esq, x2: L - m.dir, y1: r1(y(v)), y2: r1(y(v)) }),
-    svg('text', { class: 'g-eixo', x: m.esq - 8, y: r1(y(v) + 4), 'text-anchor': 'end' }, abreviar(v)),
+    svg('text', { class: 'g-eixo', x: m.esq - 8, y: r1(y(v) + 4), 'text-anchor': 'end' }, rotuloDoEixo(v)),
   ]);
   const marcas = [0, Math.floor((n - 1) / 2), n - 1].filter((k, i, a) => a.indexOf(k) === i)
     .map((k) => svg('text', { class: 'g-eixo', x: r1(x(k)), y: A - 6, 'text-anchor': k === 0 ? 'start' : k === n - 1 ? 'end' : 'middle' }, rotuloDoMes(pontos[k].mes)));
@@ -90,7 +98,8 @@ export function graficoEvolucao(pontos) {
   const esconder = () => { b.esconder(); for (const el of [cruz, pontoP, pontoA]) el.setAttribute('visibility', 'hidden'); };
   desenho.addEventListener('pointermove', mostrar);
   desenho.addEventListener('pointerdown', mostrar);
-  desenho.addEventListener('pointerleave', esconder);
+  // No toque, o navegador dispara pointerleave logo depois de soltar: o balão fica até o próximo toque.
+  desenho.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') esconder(); });
   return h('div', { class: 'grafico-carteira' },
     h('div', { class: 'grafico-legenda' }, h('span', {}, h('i', { class: 'chave chave-patrimonio' }), 'Patrimônio'), h('span', {}, h('i', { class: 'chave chave-aplicado' }), 'Total aplicado')),
     caixa,
@@ -121,7 +130,7 @@ export function colunasProventos(meses) {
   const desenho = svg('svg', { viewBox: `0 0 ${L} ${A}`, class: 'g-svg', role: 'img', 'aria-label': `Proventos por mês, de ${rotuloDoMes(meses[0].mes)} a ${rotuloDoMes(meses[n - 1].mes)}` },
     ...[0, topo].map((v) => [
       svg('line', { class: 'g-grade', x1: m.esq, x2: L - m.dir, y1: r1(y(v)), y2: r1(y(v)) }),
-      svg('text', { class: 'g-eixo', x: m.esq - 8, y: r1(y(v) + 4), 'text-anchor': 'end' }, abreviar(v)),
+      svg('text', { class: 'g-eixo', x: m.esq - 8, y: r1(y(v) + 4), 'text-anchor': 'end' }, rotuloDoEixo(v)),
     ]),
     ...meses.map(coluna),
     meses[maior].valor > 0 && svg('text', { class: 'g-valor', x: r1(m.esq + faixa * (maior + 0.5)), y: r1(y(meses[maior].valor) - 6), 'text-anchor': 'middle' }, abreviar(meses[maior].valor)),
@@ -137,7 +146,11 @@ export function colunasProventos(meses) {
   };
   desenho.addEventListener('pointermove', mostrar);
   desenho.addEventListener('pointerdown', mostrar);
-  desenho.addEventListener('pointerleave', () => { b.esconder(); for (const c of desenho.querySelectorAll('.g-coluna')) c.classList.remove('apagada'); });
+  desenho.addEventListener('pointerleave', (e) => {
+    if (e.pointerType === 'touch') return; // no toque, o balão fica até o próximo toque
+    b.esconder();
+    for (const c of desenho.querySelectorAll('.g-coluna')) c.classList.remove('apagada');
+  });
   return h('div', { class: 'grafico-carteira' }, caixa,
     tabela('Proventos por mês', ['Mês', 'Proventos'], [...meses].reverse().map((p) => [rotuloDoMes(p.mes), formatarBRL(p.valor)])));
 }
