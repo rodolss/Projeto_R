@@ -373,6 +373,8 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     cadeado,
     h('div', { class: 'rotulo' }, `Cartão de ${dona?.nome ?? '—'}`),
     h('div', { class: 'valor-grande' }, formatarBRL(f.total)),
+    // Com algo marcado como "Já tenho" e a fatura ainda por pagar: quanto falta separar para pagá-la.
+    f.jaTenho > 0 && !pago && h('div', { class: 'suave' }, 'Falta separar ', h('b', {}, formatarBRL(f.faltaSeparar)), ` · já tenho ${formatarBRL(f.jaTenho)}`),
     h('div', { style: 'margin-top:4px' }, selo, pago && ' ', pago && h('span', { class: 'selo ok' }, 'Paga ✓')));
   total.classList.add('heroi'); // o número principal da tela: cartão em degradê (facelift)
 

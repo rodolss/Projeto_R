@@ -185,7 +185,7 @@ test('fatura do cartão: compras (mais nova primeiro), de todo mês, total e qua
   assert.equal(f.conferida, false);
   assert.equal(valorDaConta(casa, '2026-12', 'c2').valor, 150);
   assert.equal(faturaDoCartao(conferirFatura(casa, { mes: '2026-12', contaId: 'c2' }), K, '2026-12').conferida, true);
-  assert.deepEqual(faturaDoCartao(casaBase(), K, '2027-05'), { fatura: '2027-05', compras: [], fixas: [], total: 0, porPessoa: [], conferida: false });
+  assert.deepEqual(faturaDoCartao(casaBase(), K, '2027-05'), { fatura: '2027-05', compras: [], fixas: [], total: 0, porPessoa: [], conferida: false, jaTenho: 0, faltaSeparar: 0 });
 });
 
 test('editar compra à vista: muda tudo e pode trocar de fatura', () => {
@@ -573,4 +573,18 @@ test('mudar a data da parcelada: a 1ª vai para a fatura da data nova e as outra
     [[fat, '2026-11-25'], [somarMeses(fat, 1), '2026-11-25'], [somarMeses(fat, 2), '2026-11-25']]);
   // Para uma fatura anterior: nada muda.
   assert.equal(mudarDataDaParcelada(casa, { fatura: fat, compraId: casa.meses.find((m) => m.mes === fat).compras[0].id, data: '2026-10-20', cartaoId: K }), casa);
+});
+
+test('fatura: quanto já tenho no total e quanto falta separar para pagá-la (a parte da casa nunca tem "já tenho")', () => {
+  const novoId = (() => { let n = 0; return () => `fs${++n}`; })();
+  let casa = anotar(casaBase(), { data: '2026-11-19', nome: 'Mercado', valor: 150, para: 'casa', novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Farmácia', valor: 30, para: 'q1', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Blusa', valor: 80, para: 'p2', jaTenho: true, novoId });
+  casa = anotar(casa, { data: '2026-11-19', nome: 'Tênis', valor: 90, para: 'p2', novoId });
+  const f = faturaDoCartao(casa, K, '2026-12');
+  assert.equal(f.total, 350);
+  assert.equal(f.jaTenho, 110);
+  assert.equal(f.faltaSeparar, 240);
+  const vazia = faturaDoCartao(casaBase(), K, '2026-12');
+  assert.deepEqual([vazia.jaTenho, vazia.faltaSeparar], [0, 0]);
 });
