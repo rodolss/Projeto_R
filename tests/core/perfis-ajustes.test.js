@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarCasa } from '../../js/core/casa.js';
 import { adicionarPerfil, vincularAparelho, entrarNaDivisao, sairDaDivisao, detalheDoPerfil, podeApagarPerfil, apagarPerfil } from '../../js/core/perfis.js';
-import { adicionarCartao } from '../../js/core/cartao.js';
+import { adicionarCartao, anotarCompra } from '../../js/core/cartao.js';
 
 const ids = () => { let n = 0; return () => `id${++n}`; };
 
@@ -35,6 +35,20 @@ test('podeApagarPerfil: só o perfil criado por engano (sem cartão, aparelho ne
   const dividiu = sairDaDivisao(entrarNaDivisao(casa, 'p3', '2026-11'), 'p3', '2027-01');
   assert.equal(podeApagarPerfil(dividiu, 'p3'), false, 'dividiu em novembro e dezembro: fica no histórico');
   assert.equal(podeApagarPerfil(casa, 'nao-existe'), false);
+});
+
+test('podeApagarPerfil: quem administra nunca sai, mesmo sem aparelho, cartão ou divisão', () => {
+  const casa = { ...casaBase(), perfis: [...casaBase().perfis, { id: 'p9', nome: 'Zé', admin: true }] };
+  assert.equal(podeApagarPerfil(casa, 'p9'), false);
+});
+
+test('podeApagarPerfil: perfil que já recebeu compras no cartão de outra pessoa fica (o nome segue no histórico)', () => {
+  const { casa, id: cartaoId } = adicionarCartao(casaBase(), { donaId: 'p1', viraNoDia: 24, venceNoDia: 1 });
+  assert.equal(podeApagarPerfil(casa, 'p3'), true, 'antes das compras');
+  const avulsa = anotarCompra(casa, { cartaoId, data: '2026-11-10', fatura: '2026-12', nome: 'Tênis', valor: 100, para: 'p3', novoId: () => 'c1' });
+  assert.equal(podeApagarPerfil(avulsa, 'p3'), false, 'compra');
+  const todoMes = anotarCompra(casa, { cartaoId, fatura: '2026-12', nome: 'Curso', valor: 80, todoMes: true, para: 'p3', novoId: () => 'f1' });
+  assert.equal(podeApagarPerfil(todoMes, 'p3'), false, 'de todo mês');
 });
 
 test('apagarPerfil tira só o perfil que pode sair; os outros pedidos não mudam a casa', () => {

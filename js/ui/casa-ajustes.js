@@ -44,9 +44,11 @@ function desenhar(container, ctx) {
     if (abertaAqui) { abertaAqui = false; history.back(); } else location.replace('#/casa-ajustes');
   };
   // Depois de salvar (pode demorar, no GitHub): fecha a folha se ela ainda está aberta; senão só redesenha.
+  // `texto` pode ser uma função, chamada depois de salvar (o aviso depende do que a mudança conseguiu fazer).
   const salvarNaFolha = async (mutacao, texto, folha) => {
     await ctx.salvarCasa(mutacao);
-    if (texto) ctx.aviso(texto, 'ok', 2500);
+    const aviso = typeof texto === 'function' ? texto() : texto;
+    if (aviso) ctx.aviso(aviso, 'ok', 2500);
     const acao = depoisDeSalvar(location.hash, folha, 'casa-ajustes');
     if (acao === 'fechar') fechar();
     else if (acao === 'redesenhar') ctx.rerender();
@@ -340,11 +342,12 @@ function desenhar(container, ctx) {
     a.id === impressao && nomeDoPerfil(a.perfilId), !a.perfilId ? 'pedindo para entrar' : `desde ${dataBR(a.desde)}`, `código ${codigoDoAparelho(a.id)}`,
   ].filter(Boolean).join(' · ');
   const perfisEAparelhos = administra && [
-    ...pedidos.map((a) => h('section', { class: 'cartao casa-pedido', role: 'status' },
+    // O link "Perfis e aparelhos" do menu da foto rola até o primeiro item daqui (o pedido, se houver).
+    ...pedidos.map((a, k) => h('section', { class: 'cartao casa-pedido', role: 'status', id: k === 0 ? 'perfis' : null },
       seloCelular(),
       h('span', { class: 'texto' }, h('b', {}, 'Um aparelho novo quer entrar'), h('small', {}, `Código ${codigoDoAparelho(a.id)}: confira se é o mesmo que aparece nele.`)),
       botao('Ver', () => abrir(`aparelho-${a.id}`)))),
-    h('section', { class: 'cartao casa-lista', id: 'perfis' },
+    h('section', { class: 'cartao casa-lista', id: pedidos.length ? null : 'perfis' },
       h('h2', {}, 'Perfis'),
       h('div', {},
         ...perfis.map((p) => linhaDaLista({ selo: avatar(p), titulo: p.nome, detalhe: detalheDoPerfil(casa, p, impressao), aoTocar: () => abrir(`perfil-${p.id}`) })),
@@ -372,12 +375,19 @@ function desenhar(container, ctx) {
         if (nome === p.nome) { fechar(); return; }
         salvarNaFolha((c) => renomearPerfil(c, p.id, nome), 'Nome salvo.', folha);
       })),
-      podeApagarPerfil(casa, p.id) && botaoDoisToques('Apagar perfil', 'Toque de novo para apagar', () => salvarNaFolha((c) => apagarPerfil(c, p.id), `${p.nome} foi apagado.`, folha)),
+      podeApagarPerfil(casa, p.id) && botaoDoisToques('Apagar perfil', 'Toque de novo para apagar', () => {
+        let apagou = false; // com dados novos do outro celular, o perfil pode ter passado a ser usado
+        salvarNaFolha((c) => { const nova = apagarPerfil(c, p.id); apagou = nova !== c; return nova; }, () => {
+          if (!apagou) ctx.aviso(`${p.nome} passou a ser usado e não pode mais ser apagado.`, 'atencao', 3500);
+          return apagou && `${p.nome} foi apagado.`;
+        }, folha);
+      }),
     ];
   };
 
   const folhaDoNovoPerfil = (folha) => {
     let nome = '';
+    let criando = false; // dois toques rápidos não criam dois perfis
     return [
       h('h2', {}, 'Novo perfil'),
       h('p', { class: 'suave' }, 'Cada perfil vê só os próprios cartões e entra no app pelo celular dele. Ex.: um filho que tem cartão.'),
@@ -387,8 +397,12 @@ function desenhar(container, ctx) {
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Criar perfil', () => {
         if (!nome) { ctx.aviso('Escreva o nome.', 'atencao', 3000); return; }
         const igual = (x) => x.toLocaleLowerCase('pt-BR');
-        if (perfis.some((p) => igual(p.nome) === igual(nome))) { ctx.aviso('Já existe um perfil com esse nome.', 'atencao', 3000); return; }
-        salvarNaFolha((c) => adicionarPerfil(c, { nome }).casa, `Perfil criado. Para ${nome} dividir as contas, marque em Casa › Quem divide as contas.`, folha);
+        const jaExiste = (lista) => lista.some((p) => igual(p.nome) === igual(nome));
+        if (jaExiste(perfis)) { ctx.aviso('Já existe um perfil com esse nome.', 'atencao', 3000); return; }
+        if (criando) return;
+        criando = true;
+        salvarNaFolha((c) => (jaExiste(c.perfis ?? []) ? c : adicionarPerfil(c, { nome }).casa),
+          `Perfil criado. Para ${nome} dividir as contas, marque em Casa › Quem divide as contas.`, folha);
       })),
     ];
   };
@@ -399,14 +413,14 @@ function desenhar(container, ctx) {
     // Pedido de um aparelho novo de quem administra: já vem marcado o perfil que a escolha no aparelho não oferece.
     let escolhido = a.perfilId ?? (escondidos.length === 1 ? escondidos[0].id : null);
     const caixa = h('div', { class: 'opcoes', role: 'radiogroup', 'aria-label': 'De quem é este aparelho?' });
-    const desenhar = () => caixa.replaceChildren(...perfis.map((p) => h('button', {
+    const desenharOpcoes = () => caixa.replaceChildren(...perfis.map((p) => h('button', {
       type: 'button', class: 'opcao', role: 'radio', 'aria-checked': String(p.id === escolhido), disabled: este,
-      onclick: () => { escolhido = p.id; desenhar(); },
+      onclick: () => { escolhido = p.id; desenharOpcoes(); },
     },
     avatar(p),
     h('span', { class: 'texto' }, h('b', {}, p.nome), h('small', {}, detalheDoPerfil(casa, p, impressao))),
     h('span', { class: 'opcao-marca', 'aria-hidden': 'true' }))));
-    desenhar();
+    desenharOpcoes();
     return [
       h('h2', {}, tituloDoAparelho(a)),
       h('p', { class: 'suave' }, detalheDoAparelho(a)),

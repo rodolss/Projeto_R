@@ -45,12 +45,13 @@ export function detalheDoPerfil(casa, perfil, impressao) {
   return [perfil.admin && 'administra', aparelhos].filter(Boolean).join(' · ');
 }
 
-// Só sai o perfil criado por engano: sem cartão, sem aparelho, fora da divisão (nem com meses passados) e que não
-// administra. Assim nada some do histórico.
+// Só sai o perfil criado por engano: sem cartão, sem aparelho, fora da divisão (nem com meses passados), sem compra
+// "para" ele em nenhum cartão e que não administra. Assim nada some do histórico (nem o nome de quem recebeu a compra).
 export function podeApagarPerfil(casa, id) {
   const perfil = acharPerfil(casa, id);
   return Boolean(perfil) && !perfil.admin
-    && !(casa.cartoes ?? []).some((c) => c.donaId === id)
+    && !(casa.cartoes ?? []).some((c) => c.donaId === id || (c.fixas ?? []).some((f) => f.para === id))
+    && !casa.meses.some((m) => (m.compras ?? []).some((c) => c.para === id))
     && !(casa.aparelhos ?? []).some((a) => a.perfilId === id)
     && !casa.pessoas.some((p) => p.id === id);
 }
