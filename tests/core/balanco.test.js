@@ -5,6 +5,7 @@ import { migrarCasa, salvarValor, salvarSalario, conferirFatura } from '../../js
 import { anotarCompra, adicionarCartao } from '../../js/core/cartao.js';
 import { adicionarPerfil } from '../../js/core/perfis.js';
 import { definirSalario } from '../../js/core/salario.js';
+import { adicionarContaPessoal } from '../../js/core/contas-pessoais.js';
 
 const ids = (prefixo = 'k') => { let n = 0; return () => `${prefixo}${++n}`; };
 
@@ -157,4 +158,32 @@ test('balanço: o "já tenho" das compras da própria dona do cartão também sa
   casa = migrarCasa({ ...casa, meses: casa.meses.map((m) => ({ ...m, compras: (m.compras ?? []).map((c) => (c.id === blusa.id ? { ...c, jaTenho: true } : c)) })) });
   const k = balancoDoMes(casa, '2026-12', 'p2', '2026-12-20').cartoes[0];
   assert.deepEqual([k.seu, k.seuJaTenho], [90, 80]);
+});
+
+// Contas pessoais (desenho 2026-11-22-contas-pessoais): só de quem é dono; entram no saiu, fora da divisão.
+test('balanço: as contas pessoais do dono entram no saiu e diminuem a sobra; as dos outros, não', () => {
+  const sem = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
+  let casa = adicionarContaPessoal(sem, { nome: 'Empréstimo', donoId: 'p1', mes: '2026-12', valor: 300, parcelas: 12, novoId: () => 'e1' });
+  casa = adicionarContaPessoal(casa, { nome: 'Celular', donoId: 'p2', mes: '2026-12', valor: 70, novoId: () => 'l1' });
+  const antes = balancoDoMes(sem, '2026-12', 'p1', '2026-12-20');
+  const ana = balancoDoMes(casa, '2026-12', 'p1', '2026-12-20');
+  assert.equal(ana.pessoais.valor, 300);
+  assert.equal(ana.pessoais.aConfirmar, false);
+  assert.deepEqual(ana.pessoais.contas.map((c) => c.conta.id), ['e1']);
+  assert.equal(ana.saiu, antes.saiu + 300);
+  assert.equal(ana.sobra, antes.sobra - 300);
+  assert.equal(ana.contas.valor, antes.contas.valor, 'a parte da casa não muda');
+  assert.equal(balancoDoMes(sem, '2026-12', 'p1', '2026-12-20').pessoais.valor, 0);
+});
+
+test('balanço: conta pessoal prevista (a confirmar) põe o balanço em previsão', () => {
+  let casa = conferirFatura(casaBase(), { mes: '2026-12', contaId: 'c2' });
+  casa = salvarSalario(salvarSalario(casa, { mes: '2027-01', pessoaId: 'p1', valor: 6000 }), { mes: '2027-01', pessoaId: 'p2', valor: 4000 });
+  casa = salvarValor(casa, { mes: '2027-01', contaId: 'c1', valor: 200 });
+  casa = conferirFatura(casa, { mes: '2027-01', contaId: 'c2' });
+  assert.equal(balancoDoMes(casa, '2027-01', 'p1', '2027-01-20').previsao, false);
+  casa = adicionarContaPessoal(casa, { nome: 'Academia', donoId: 'p1', mes: '2026-12', valor: 100, novoId: () => 'a1' });
+  const jan = balancoDoMes(casa, '2027-01', 'p1', '2027-01-20');
+  assert.equal(jan.pessoais.aConfirmar, true);
+  assert.equal(jan.previsao, true);
 });

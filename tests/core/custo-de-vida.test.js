@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { custoDeVidaReal, orcamentoPelaCasa, ID_GASTO_REAL } from '../../js/core/custo-de-vida.js';
 import { migrarCasa, salvarValor, salvarSalario } from '../../js/core/casa.js';
 import { anotarCompra } from '../../js/core/cartao.js';
+import { adicionarContaPessoal } from '../../js/core/contas-pessoais.js';
 
 // Casa inventada: Ana (p1) ganha 6000 e Leo (p2) 4000 — a Ana paga 60% das contas. A Luz de ago, set e out: 200, 300, 400.
 function casaBase() {
@@ -54,4 +55,18 @@ test('orçamento pela casa: vira o gasto real, guarda as categorias digitadas e 
   assert.deepEqual(depois.orcamentoManual, estado.orcamento);
   assert.equal(depois.orcamento[0].mes, '2026-12');
   assert.equal(orcamentoPelaCasa(estado, { casa: null, pessoaId: 'p1', hoje: HOJE }), estado); // sem casa: nada muda
+});
+
+// Contas pessoais (desenho 2026-11-22-contas-pessoais): as de todo mês entram no custo de vida; as com fim, não.
+test('custo de vida real: conta pessoal sem fim entra; com fim (empréstimo), não', () => {
+  let casa = casaBase();
+  casa = adicionarContaPessoal(casa, { nome: 'Academia', donoId: 'p1', mes: '2026-10', valor: 100, novoId: () => 'a1' });
+  casa = adicionarContaPessoal(casa, { nome: 'Empréstimo', donoId: 'p1', mes: '2026-10', valor: 300, parcelas: 10, novoId: () => 'e1' });
+  const r = custoDeVidaReal(casa, 'p1', HOJE);
+  const out = r.meses.find((m) => m.mes === '2026-10');
+  assert.equal(out.pessoais, 100);
+  assert.equal(out.valor, out.contas + out.cartao + 100);
+  assert.equal(r.meses.find((m) => m.mes === '2026-09').pessoais, 0);
+  assert.equal(r.pessoais, 33.33);
+  assert.equal(custoDeVidaReal(casa, 'p2', HOJE).pessoais, 0, 'as da Ana não entram no do Leo');
 });
