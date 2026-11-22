@@ -9,8 +9,17 @@ O usuário não conhece investimentos e quer ordens objetivas: "compre X cotas d
 isentos de IR e reinvestir tudo até a aposentadoria. Estratégia fixa: **50% fundos imobiliários (FIIs) e 50% ações boas
 pagadoras**, comprados direto (não ETF). Reserva de emergência antes (o motor cuida). **Nunca vender.**
 
-Os dados são pessoais e ficam no repositório privado: trabalhe numa pasta da pasta de rascunho da sessão, nunca no
-repositório público, e não cite valores do usuário em commits, PRs ou arquivos do repositório público.
+Os dados são pessoais e ficam no repositório privado: trabalhe numa pasta da pasta de rascunho da sessão (na nuvem:
+`/tmp/onde-investir`), nunca no repositório público, e não cite valores do usuário em commits, PRs ou arquivos do
+repositório público. **Não faça commit nem push no repositório público.**
+
+## Modo automático (rotina na nuvem, todo dia 26 às 19h — desenho `2026-11-22-onde-investir-agendado`)
+Ninguém está olhando: **não pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`). Se faltar algo
+para montar as ordens (`quantoInvestir.incompleto`, preço que não achou), grave mesmo assim a recomendação **sem
+ordens**, com `semOrdens` dizendo em uma frase o que falta e que basta pedir `/onde-investir` (ou rodar a rotina) depois
+de completar — o cartão da Carteira mostra esse texto. Se `enviar` disser que o app gravou no meio, repita baixar →
+gravar → enviar, até 3 vezes. Qualquer outro erro: pare e termine com o erro (o registro da execução mostra). A revisão
+de 90 dias da lista também é sua: troque só com motivo forte e explique a troca no `resumo`.
 
 ## Passos
 
@@ -20,13 +29,16 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
    node scripts/onde-investir.mjs contexto --pasta <rascunho>/onde-investir
    ```
    O contexto traz o mês das ordens (`mesDoInvestimento`: o do próximo Dia de pagamento — o mês do calendário enquanto
-   ele não foi registrado, porque o Dia de pagamento registra o mês do calendário), quanto investir (a sobra do
-   Balanço menos 10% de lazer; `previsao: true` se o mês ainda não fechou), quanto vai para a carteira depois da reserva
-   e da caixa (`divisaoDoMotor.paraCarteira`: **é esse o valor das ordens**), a carteira atual e a lista atual.
-   - Se o mês do calendário já fechou e o usuário não vai fazer o Dia de pagamento dele (ex.: começou a usar no mês
-     seguinte), rode de novo com `--mes <mesEmFoco>`. Na dúvida, pergunte qual Dia de pagamento ele vai fazer.
-   - `quantoInvestir.incompleto`: diga ao usuário o que falta no Balanço e pare.
-   - `paraCarteira` zero (tudo foi para a reserva): diga isso; as ordens ficam vazias, mas ainda grave a lista.
+   ele não foi registrado, porque o Dia de pagamento registra o mês do calendário —, nunca antes do mês da última
+   análise), quanto investir (a sobra do Balanço menos 10% de lazer; `previsao: true` se o mês ainda não fechou), quanto
+   vai para a carteira depois da reserva e da caixa (`divisaoDoMotor.paraCarteira`: **é esse o valor das ordens**), a
+   carteira atual, a lista atual e a liquidez mínima (`liquidezMinima`).
+   - Pedido à mão, com o mês do calendário já fechado e sem o Dia de pagamento dele: rode de novo com
+     `--mes <mesEmFoco>`. Na dúvida, pergunte qual Dia de pagamento ele vai fazer (no modo automático, não pergunte).
+   - `quantoInvestir.incompleto`: sem ordens, com `semOrdens` ("Faltam os salários de <mês> no Balanço; ..."). Num
+     pedido à mão, diga também ao usuário o que falta.
+   - `paraCarteira` zero (tudo foi para a reserva): as ordens ficam vazias (o cartão diz que vai para a reserva), mas
+     ainda grave a lista.
 
 2. **A lista da carteira** (estável): monte só se `listaAtual` for nula, se `ultimaAnalise.geradaEm` tiver mais de
    90 dias ou se o usuário pedir revisão. Senão, mantenha a lista (mudanças só com motivo forte, dito ao usuário).
@@ -40,6 +52,16 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
      do mesmo setor no máximo.
    - `fatia` de cada ativo: a parte dele no total da carteira (os FIIs somam 0,5 e as ações 0,5).
    - `motivo`: uma frase simples, sem jargão ("galpões alugados para grandes empresas, rendimento todo mês").
+   - **Só o que ele consegue comprar** (pessoa física comum, sem R$ 1 milhão aplicado). Fora da lista:
+     1. fundo ou papel só para investidor **qualificado ou profissional** (veja o público-alvo no regulamento ou na
+        página do fundo);
+     2. o que não se compra direto na bolsa, na hora: IPO, oferta, subscrição, fundo fechado para entrada, negociação
+        suspensa, recuperação judicial;
+     3. cota ou ação cujo preço não cabe no dinheiro de um lado (FIIs ou ações) de um mês típico;
+     4. pouco negociado: média diária abaixo de `liquidezMinima` (R$ 1 milhão nos FIIs, R$ 5 milhões nas ações).
+     Registre a conferência em cada ativo: `"conferido": { "publicoGeral": true, "liquidezDiaria": <média diária em
+     R$>, "em": "AAAA-MM-DD" }`. `gravar` recusa ativo sem conferência, com liquidez abaixo do mínimo ou conferido há mais
+     de 120 dias: na revisão de 90 dias (ou se faltar), confira de novo cada um.
 
 3. **As ordens do mês**
    - Busque o preço de hoje de cada ativo da lista (cotação na B3).
@@ -50,14 +72,20 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
      o Dia de pagamento põe na caixa de oportunidade (Tesouro Selic), sozinho.
    - A `classe` de cada ordem é a mesma do ativo na lista.
    - `motivo` de cada ordem: por que ela recebe dinheiro este mês ("o lado dos FIIs está abaixo de 50%").
+   - **Avisos práticos** (em `avisos`, quando houver ordens): ação em menos de 100 unidades se compra no mercado
+     fracionário, com o código terminado em F (ex.: TAEE11F); a corretora pode pedir o questionário de perfil de
+     investidor antes da primeira compra de FII ou ação; sem FII nem ação na `carteiraAtual`, é preciso uma conta numa
+     corretora (as de taxa zero bastam).
 
 4. **Gravar e enviar**
    Escreva `<rascunho>/onde-investir/recomendacao.json`:
    ```json
    { "mes": "AAAA-MM", "geradaEm": "AAAA-MM-DD", "valor": <paraCarteira>,
      "estrategia": { "fiis": 0.5, "acoes": 0.5 },
-     "lista": [{ "ticker": "XXXX11", "nome": "...", "classe": "fiis|acoes", "fatia": 0.06, "motivo": "..." }],
+     "lista": [{ "ticker": "XXXX11", "nome": "...", "classe": "fiis|acoes", "fatia": 0.06, "motivo": "...",
+                 "conferido": { "publicoGeral": true, "liquidezDiaria": 8500000, "em": "AAAA-MM-DD" } }],
      "ordens": [{ "ticker": "XXXX11", "nome": "...", "classe": "fiis|acoes", "cotas": 10, "preco": 95.4, "valor": 954, "motivo": "..." }],
+     "semOrdens": "só quando não há ordens por algo que falta (veja o modo automático)",
      "resumo": "duas ou três frases do porquê, para leigo",
      "avisos": ["preços de AAAA-MM-DD; confira antes de comprar", "..."] }
    ```
@@ -66,8 +94,9 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
    node scripts/onde-investir.mjs enviar --pasta <rascunho>/onde-investir
    ```
    `gravar` valida (cotas inteiras, valor = cotas × preço, soma dentro do valor, ordens só da lista e na classe dela,
-   só fiis/acoes) e também põe a carteira-alvo do app em 50/50. Se `enviar` disser que o app gravou no meio, repita
-   baixar → gravar → enviar; qualquer outro erro do GitHub, mostre ao usuário e pare. Apague a pasta de rascunho no fim.
+   só fiis/acoes, a conferência de cada ativo) e também põe a carteira-alvo do app em 50/50. Se `enviar` disser que o
+   app gravou no meio, repita baixar → gravar → enviar (até 3 vezes); qualquer outro erro do GitHub, mostre ao usuário e
+   pare. Apague a pasta de rascunho no fim.
 
 5. **Responder ao usuário**, objetivo: a lista de ordens ("Compre 10 cotas de XXXX11 — ≈ R$ 954"), o total, o que fica
    para a reserva, e que a Carteira e o Dia de pagamento já mostram. Lembre: preços mudam durante o dia (compre perto do
