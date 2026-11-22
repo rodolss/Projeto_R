@@ -28,6 +28,8 @@ const TITULOS = [
   [/^Chave nova/, 'chave'],
   [/^Como (a divisão|criar)/, 'info'],
   [/^Perfis e aparelhos/, 'celular'],
+  [/^Perfis$/, 'pessoas'],
+  [/^Aparelhos$/, 'celular'],
   [/^Premissas/, 'alvo'],
   [/^Carteira-alvo/, 'alvo'],
   [/^(Investimentos|Investir|Onde aplicar)/, 'investir', 'mercado'],
