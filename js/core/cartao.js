@@ -242,7 +242,9 @@ export function faturaDoCartao(casa, cartaoId, fatura) {
     })
     .filter((p) => p.valor !== 0);
   const conferida = Boolean(cartao) && Object.prototype.hasOwnProperty.call(reg?.valores ?? {}, cartao.contaId);
-  return { fatura, compras, fixas, total, porPessoa, conferida };
+  // Para pagar a fatura: o que já está guardado ou já voltou ("já tenho") e o que ainda falta separar.
+  const jaTenho = somar(itens.filter((x) => x.jaTenho));
+  return { fatura, compras, fixas, total, porPessoa, conferida, jaTenho, faltaSeparar: centavos(total - jaTenho) };
 }
 
 // À vista: muda tudo (e pode ir para outra fatura). Parcela: nome, valor e para quem, desta em diante.
