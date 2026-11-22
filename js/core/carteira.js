@@ -59,11 +59,13 @@ export function posicoes(estado, hoje) {
       dataSaldo: p.ultimo?.data ?? null,
       comAportesDepois: depois.some((a) => a.valor),
       cotas,
+      cotasNoSaldo: p.ultimo?.cotas > 0 ? p.ultimo.cotas : null, // as do último saldo, quando os aportes depois vieram sem cotas
       valorCota: p.ultimo?.cotas > 0 ? centavos(p.ultimo.valor / p.ultimo.cotas) : null,
+      // Do mais novo para o mais antigo; no mesmo dia, o aporte vem antes do saldo (conta depois dele).
       historico: [
         ...saldos.map((s) => ({ tipo: 'saldo', data: s.data, valor: s.valor, cotas: s.cotas ?? null })),
         ...aportes.filter((a) => a.valor).map((a) => ({ tipo: a.valor > 0 ? 'aporte' : 'resgate', data: a.data, valor: a.valor, cotas: a.cotas })),
-      ].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0)),
+      ].sort((a, b) => (a.data !== b.data ? (a.data < b.data ? 1 : -1) : (a.tipo === 'saldo') - (b.tipo === 'saldo'))),
     };
   });
 }

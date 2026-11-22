@@ -39,6 +39,7 @@ const TITULOS = [
   [/^Lembretes/, 'sino'],
   [/^(Atualizar saldos|Copie os saldos)/, 'moeda'],
   [/^Seu plano/, 'alvo'],
+  [/^Divisão da carteira/, 'grafico'],
   [/^Plano de aposentadoria/, 'investir', 'mercado'],
   [/^De onde vem/, 'recibo'],
 ];

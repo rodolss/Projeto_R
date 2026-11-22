@@ -66,7 +66,14 @@ test('posicoes: saldo = último saldo + aportes depois; aplicado = primeiro sald
 test('posicoes: com um saldo só não há ganho para mostrar; cotas somam as dos aportes depois do saldo', () => {
   const fii = de(posicoes(estadoBase(), HOJE), 'fii');
   assert.deepEqual([fii.saldo, fii.aplicado, fii.ganho, fii.ganhoPct], [5500, 5500, null, null]);
-  assert.deepEqual([fii.cotas, fii.valorCota], [550, 10]);
+  assert.deepEqual([fii.cotas, fii.valorCota, fii.cotasNoSaldo], [550, 10, 500]);
+});
+
+test('posicoes: o histórico vai do mais novo ao mais antigo; no mesmo dia, o aporte vem antes do saldo', () => {
+  const rf = de(posicoes(estadoBase(), HOJE), 'rf');
+  assert.deepEqual(rf.historico.map((x) => `${x.data} ${x.tipo}`), [
+    '2027-01-06 aporte', '2027-01-06 saldo', '2026-12-05 aporte', '2026-12-05 saldo',
+  ]);
 });
 
 test('posicoes: ativo sem saldo digitado vale a soma dos aportes', () => {
