@@ -87,7 +87,18 @@ const campoCotas = (valor, aoMudar) => h('label', { class: 'campo' }, h('span', 
 // cotação); "É outro tipo" mostra o formulário de antes (Tesouro, CDB, o que tem saldo digitado).
 function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
   const { hoje } = ctx;
-  const corpo = h('div', { class: 'novo-papel' });
+  const corpo = h('div', { class: 'novo-papel' }); // o conteúdo da aba escolhida
+  // As duas abas do topo: ações, FIIs e ETFs (busca, valor calculado) e renda fixa e outros (saldo digitado).
+  const abas = h('div', { class: 'segmentos', style: 'grid-template-columns: 1fr 1fr', role: 'tablist', 'aria-label': 'Tipo de investimento' });
+  const desenharAbas = (atual) => abas.replaceChildren(...[['bolsa', 'Ações e fundos'], ['outros', 'Renda fixa e outros']].map(([id, nome]) => h('button', {
+    type: 'button', role: 'tab', 'aria-selected': String(id === atual), class: id === atual ? 'ativo' : '',
+    onclick: () => { if (id !== atual) (id === 'bolsa' ? mostrarBusca() : mostrarOutros()); },
+  }, nome)));
+  const explicacao = (texto) => h('p', { class: 'suave pequeno' }, texto);
+  function mostrarOutros() {
+    desenharAbas('outros');
+    corpo.replaceChildren(explicacao('Tesouro Direto, CDB, LCI, poupança, cripto e o que não é ação nem fundo da bolsa: você digita o saldo que está na corretora.'), ...formularioManual());
+  }
 
   const formularioManual = () => {
     const novo = { nome: '', grupo: 'rendaFixa', saldo: null, cotas: null };
@@ -104,7 +115,6 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
         if (!novo.nome) { ctx.aviso('Escreva o nome do investimento.', 'atencao', 3000); return; }
         salvarNaFolha((e) => adicionarAtivo(e, { ...novo, cotas: COM_COTAS.has(novo.grupo) ? novo.cotas : null, hoje }).estado, `${novo.nome} entrou na carteira.`, folha);
       })),
-      h('button', { type: 'button', class: 'botao-link', onclick: () => mostrarBusca() }, 'Voltar para a busca de ações e fundos'),
     ];
   };
 
@@ -132,7 +142,7 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
         const lista = await buscarSugestoes(texto, { fetch: (...a) => globalThis.fetch(...a) });
         if (minha !== vez) return;
         resultados.replaceChildren(...(lista.length ? lista.map(linhaResultado)
-          : [aviso('Não achei. Confira o código ou a internet. Se for Tesouro, CDB ou outro tipo, use o botão de baixo.')]));
+          : [aviso('Não achei. Confira o código ou a internet. Se for Tesouro, CDB ou outro tipo, use a aba "Renda fixa e outros".')]));
       }, 350);
     };
 
@@ -171,6 +181,7 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
       h('input', { class: 'entrada', type: 'search', autocomplete: 'off', autocapitalize: 'characters', placeholder: 'Ex.: ITUB4, MXRF11, Itaú', 'aria-label': 'Procurar ação, fundo imobiliário ou ETF', oninput: (e) => procurar(e.target.value.trim()) }),
       h('span', { class: 'campo-dica' }, 'Ações, fundos imobiliários e ETFs da bolsa. O app consulta o preço no brapi.dev usando só o código do papel (ex.: ITUB4).'));
 
+    desenharAbas('bolsa');
     corpo.replaceChildren(
       caixaBusca, resultados, detalhes,
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Adicionar', () => {
@@ -185,11 +196,11 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
         salvarNaFolha((e) => novoPapel(e, { ticker: s.ticker, nome: s.nome, grupo: s.grupo, cotas: sel.cotas, preco: sel.pago, cotacao: s.preco, hoje }).estado,
           `${s.ticker} entrou na carteira.`, folha);
       })),
-      h('button', { type: 'button', class: 'botao-link', onclick: () => corpo.replaceChildren(...formularioManual()) }, 'É outro tipo de investimento (Tesouro, CDB…)'));
+    );
   }
 
   mostrarBusca();
-  return [h('h2', {}, 'Novo investimento'), corpo];
+  return [h('h2', {}, 'Novo investimento'), abas, corpo];
 }
 
 // O conteúdo da folha aberta (ou null): `ativo-<id>`, `editar-<id>` ou `novo-ativo`.
