@@ -11,6 +11,7 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
+import { recomendacaoDoMes, aplicadoDasOrdens } from '../core/recomendacao.js';
 import { salarioParaODia, rascunhoComBalanco } from '../core/salario.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
@@ -101,6 +102,11 @@ function desenhar(container, ctx) {
     return regraDaSobra({ casa: ctx.casa, estado, pessoaId: ctx.perfil.visto.id, mes, hoje });
   })();
   const pelaSobra = Boolean(regra && !regra.semCasa && !regra.incompleto);
+  // As ordens da análise do mês (/onde-investir), quando há dinheiro para a carteira: elas substituem a sugestão por classe.
+  const ordensDoMes = (rr) => {
+    const rec = recomendacaoDoMes(estado, mes);
+    return rec && rec.ordens.length && rr.sugestoes.length ? rec : null;
+  };
   const resposta = () => calcularMes({
     estado, recebido: r.recebido ?? 0, tipoExtra: r.tipoExtra, proventos: r.proventos ?? 0, saldosAtualizados: saldosDoRascunho(), hoje,
     investirDefinido: pelaSobra ? regra.investir : null, lazerPct: LAZER, semExtra: pelaSobra && Boolean(doBalanco),
@@ -300,15 +306,24 @@ function desenhar(container, ctx) {
       rr.provisao > 0 && aviso('info', `Separe ${formatarBRL(rr.provisao)} deste mês para as despesas anuais: o 13º e as férias não cobrem todas (deixe na conta ou no Tesouro Selic).`),
       rr.guardarParaProximoMes > 0 && aviso('info', `Guarde ${formatarBRL(rr.guardarParaProximoMes)} para o mês que vem (adiantamento das férias: o próximo salário vem menor).`),
     ].filter(Boolean));
+    // Com a análise do mês (/onde-investir no Claude Code: desenho 2026-11-22-onde-investir), a parte da carteira vira as
+    // ordens dela, em cotas; sem ela, a sugestão por classe do motor.
+    const rec = ordensDoMes(rr);
+    const paraCarteira = rr.sugestoes.reduce((s, x) => s + x.valor, 0);
     const destinos = [
       rr.paraReserva > 0 && linha('Reserva de emergência', formatarBRL(rr.paraReserva), 'Tesouro Selic · vem antes de qualquer investimento'),
       rr.paraCaixa > 0 && linha('Caixa de oportunidade', formatarBRL(rr.paraCaixa), 'Tesouro Selic · guardado para comprar quando o mercado cair'),
       rr.daCaixaParaCarteira > 0 && linha('Da caixa para a carteira', formatarBRL(rr.daCaixaParaCarteira), 'O mercado caiu: hora de usar a caixa de oportunidade'),
-      ...rr.sugestoes.map((s) => linha(s.ticker, formatarBRL(s.valor), s.frase + (s.cotasAprox ? ` · ≈ ${s.cotasAprox} ${s.cotasAprox === 1 ? 'cota' : 'cotas'}` : ''))),
+      ...(rec
+        ? rec.ordens.map((o) => linha(`Compre ${o.cotas} ${o.cotas === 1 ? 'cota' : 'cotas'} de ${o.ticker}`, `≈ ${formatarBRL(o.valor)}`, `${o.nome} · ${o.motivo}`))
+        : rr.sugestoes.map((s) => linha(s.ticker, formatarBRL(s.valor), s.frase + (s.cotasAprox ? ` · ≈ ${s.cotasAprox} ${s.cotasAprox === 1 ? 'cota' : 'cotas'}` : '')))),
     ].filter(Boolean);
     if (destinos.length) {
+      const porque = rec ? rec.resumo : rr.porque;
       blocos.push(cartao(h('h2', {}, 'Onde aplicar'), ...destinos,
-        rr.porque && h('div', { style: 'margin-top:8px' }, aviso('ok', h('b', {}, 'Por quê? '), rr.porque)),
+        rec && Math.abs(paraCarteira - rec.valor) > 1 && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
+          `A análise de ${dataCurta(rec.geradaEm)} usou ${formatarBRL(rec.valor)} para a carteira; hoje são ${formatarBRL(paraCarteira)}. Compre o que couber, ou peça /onde-investir de novo no Claude Code.`),
+        porque && h('div', { style: 'margin-top:8px' }, aviso('ok', h('b', {}, 'Por quê? '), porque)),
         h('p', { class: 'suave pequeno', style: 'margin-top:8px' }, AVISO_EXEMPLOS)));
     }
     if (rr.avisos.includes('saldos-desatualizados')) {
@@ -337,7 +352,7 @@ function desenhar(container, ctx) {
     const aplicado = usarSalvo
       ? existente.aplicado.filter((a) => a.valor > 0).map((a) => ({ ativoId: a.ativoId, nome: nomeAtivo(a.ativoId), valor: a.valor }))
       : [
-        ...rr.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor })),
+        ...(ordensDoMes(rr) ? aplicadoDasOrdens(ordensDoMes(rr)) : rr.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor }))),
         rr.paraReserva > 0 && { destino: 'reserva', nome: 'Reserva de emergência', valor: rr.paraReserva },
         rr.paraCaixa > 0 && { destino: 'caixa', nome: 'Caixa de oportunidade', valor: rr.paraCaixa },
       ].filter(Boolean);
@@ -352,7 +367,7 @@ function desenhar(container, ctx) {
       await ctx.salvar((e) => registrarAplicacao(e, {
         mes, data: hoje, recebido: r.recebido, tipoExtra: r.tipoExtra, proventos: r.proventos ?? 0,
         saldosAtualizados: editando ? null : saldosDoRascunho(), resposta: rr,
-        aplicado: aplicado.map(({ ativoId, destino, valor }) => ({ ativoId, destino, valor: valor ?? 0 })),
+        aplicado: aplicado.map(({ ativoId, destino, valor, cotas }) => ({ ativoId, destino, valor: valor ?? 0, cotas: cotas ?? null })),
         transferidoDaCaixa: transferencia.valor ?? 0,
       }));
       apagarRascunho();

@@ -912,6 +912,20 @@ a.barra-item:active { background: var(--cartao-2); }
 .para-investir p { margin: 0; }
 .para-investir-media { margin-top: 8px !important; font-size: 14px; }
 .para-investir .botoes { margin-top: 12px; }
+/* Onde investir (desenho 2026-11-22-onde-investir): as ordens da análise, uma por linha, com o selo do ativo. */
+.onde-investir h2 { margin-bottom: 2px; }
+.onde-investir > p { margin: 6px 0 0; }
+.ordens { display: flex; flex-direction: column; margin: 10px 0 4px; }
+.ordem { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--borda); }
+.ordem:first-child { border-top: 0; }
+.ordem .texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ordem .texto small { color: var(--suave); font-size: 13px; line-height: 1.35; }
+.ordem .quanto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ordens-total { font-size: 14px; }
+.grupo-recomendado h3 { margin: 14px 0 2px; font-size: 15px; }
+.avisos-recomendacao { margin-top: 8px; }
+.avisos-recomendacao summary { font-size: 13px; color: var(--suave); cursor: pointer; }
+.avisos-recomendacao p { margin: 6px 0 0; }
 .fora-da-carteira h3 { margin: 0 0 4px; font-size: 14px; color: var(--suave); }
 /* Ativos: grupo com total; cada ativo com um selo de iniciais na cor da classe. */
 .grupo-topo { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; }
