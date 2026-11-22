@@ -118,7 +118,7 @@ function desenhar(container, ctx) {
       `Marque quem divide as contas. Vale de ${desde} em diante; os meses antes continuam como estão. Nomes e perfis novos ficam em Aparelhos e perfis.`));
 
   const contas = h('section', { class: 'cartao casa-lista' },
-    h('h2', {}, 'Contas'),
+    h('h2', {}, 'Contas da casa'),
     h('div', {},
       ...ativas.map((conta) => linhaDaLista({
         selo: iconeCategoria(categoriaDaConta(conta)), titulo: conta.nome, detalhe: comoSePreenche(conta), aoTocar: () => abrir(`conta-${conta.id}`),

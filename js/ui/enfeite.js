@@ -8,7 +8,7 @@ import { reduzMovimento } from './movimento.js';
 const TITULOS = [
   [/^Entrou/, 'entrou', 'salario'],
   [/^Saiu/, 'saiu', 'saida'],
-  [/^Contas$/, 'recibo'],
+  [/^Contas da casa$/, 'recibo'],
   [/^Contas pessoais/, 'carteira'],
   [/^Salário/, 'carteira', 'salario'],
   [/^Compras/, 'sacola', 'compras'],

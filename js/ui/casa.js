@@ -264,7 +264,7 @@ function desenharMes(container, ctx) {
       }, `Ver ${plural(r.semValor.length, 'conta sem valor', 'contas sem valor')}`)])
     : [];
   const listaContas = h('section', { class: 'cartao casa-lista' },
-    h('h2', {}, 'Contas'),
+    h('h2', {}, 'Contas da casa'),
     visto && r.contas.length > 0 && h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Abra a conta e toque em "Pago" depois de pagar.'),
     h('div', {}, ...linhasContas, ...semValor),
     !casa.contas.some((c) => !c.arquivada) && h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma conta cadastrada. Cadastre em Ajustes.'));
