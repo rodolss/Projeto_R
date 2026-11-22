@@ -5,7 +5,7 @@
 import { papelAutomatico, aplicarCotacoes } from '../core/cotacoes.js';
 import { tituloCalculado, aplicarRendaFixa } from '../core/renda-fixa.js';
 import { atualizarCotacoes, precisaAtualizar } from '../dados/cotacoes-remoto.js';
-import { buscarTesouro, buscarCdi, precisaCdi } from '../dados/renda-fixa-remoto.js';
+import { buscarTesouro, buscarCdi, precisaCdi, PRIMEIRO_DIA } from '../dados/renda-fixa-remoto.js';
 import { folhaAberta } from './rotas.js';
 
 const CHAVES = { cotacoes: 'projetoR.cotacoes', tesouro: 'projetoR.tesouro', cdi: 'projetoR.cdi' };
@@ -60,7 +60,9 @@ export async function atualizarEmSegundoPlano(ctx) {
   const daBolsa = ativos.filter((a) => papelAutomatico(a) && a.fonte !== 'tesouro').map((a) => a.ticker);
   const temTesouro = ativos.some((a) => papelAutomatico(a) && a.fonte === 'tesouro');
   const calculados = ativos.filter(tituloCalculado);
-  const desde = calculados.flatMap((a) => a.aplicacoes.map((x) => x.data)).sort()[0] ?? null;
+  // Ao Banco Central vai só o ano da aplicação mais antiga (1º de janeiro), nunca a data exata.
+  const maisAntiga = calculados.flatMap((a) => a.aplicacoes.map((x) => x.data)).sort()[0] ?? null;
+  const desde = maisAntiga ? (`${maisAntiga.slice(0, 4)}-01-01` < PRIMEIRO_DIA ? PRIMEIRO_DIA : `${maisAntiga.slice(0, 4)}-01-01`) : null;
   const guardadas = lerCotacoes();
   const cdiGuardado = ler(CHAVES.cdi, null);
   const tarefas = {
@@ -79,8 +81,11 @@ export async function atualizarEmSegundoPlano(ctx) {
     }
     const tesouro = tarefas.tesouro ? await carregarTesouro() : lerTesouro();
     if (tarefas.cdi) {
-      const serie = await buscarCdi({ fetch, desde, ate: ctx.hoje, guardada: cdiGuardado?.serie ?? {} });
-      if (serie !== (cdiGuardado?.serie ?? {})) gravar(CHAVES.cdi, { serie, atualizadoEm: new Date().toISOString() });
+      const guardada = cdiGuardado?.serie ?? {};
+      const cobria = cdiGuardado?.desde && cdiGuardado.desde <= desde;
+      const serie = await buscarCdi({ fetch, desde, ate: ctx.hoje, guardada, guardadaDesde: cdiGuardado?.desde ?? null });
+      // Erro devolve a própria série guardada: não grava (fica para a próxima tentativa).
+      if (serie !== guardada) gravar(CHAVES.cdi, { serie, desde: cobria ? cdiGuardado.desde : desde, atualizadoEm: new Date().toISOString() });
     }
     // O preço do Tesouro entra como uma cotação com o nome do título.
     const precos = { ...cotacoes };

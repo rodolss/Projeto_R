@@ -20,7 +20,7 @@ test('CDI: série diária do Banco Central em AAAA-MM-DD; junta com a guardada e
   const urls = [];
   const fetch = async (url) => { urls.push(url); return resposta([{ data: '20/11/2026', valor: '0.050788' }, { data: '23/11/2026', valor: '0.050788' }]); };
   const guardada = { '2026-01-02': 0.05, '2026-11-19': 0.05 };
-  const serie = await buscarCdi({ fetch, desde: '2026-01-02', ate: '2026-11-24', guardada });
+  const serie = await buscarCdi({ fetch, desde: '2026-01-02', ate: '2026-11-24', guardada, guardadaDesde: '2026-01-01' });
   assert.deepEqual(serie, { '2026-01-02': 0.05, '2026-11-19': 0.05, '2026-11-20': 0.050788, '2026-11-23': 0.050788 });
   assert.match(urls[0], /bcdata\.sgs\.12\/dados\?formato=json&dataInicial=19\/11\/2026&dataFinal=24\/11\/2026/);
   // Sem nada guardado (ou guardado depois de quando precisa): pede desde a aplicação.
@@ -39,12 +39,29 @@ test('CDI: período longo vai em pedaços (o Banco Central limita a 10 anos); er
   assert.deepEqual(await buscarCdi({ fetch: async () => resposta({}, 404), desde: '2026-11-01', ate: '2026-11-24', guardada }), guardada);
 });
 
-test('precisa do CDI: sem série, série que não cobre a aplicação mais antiga, ou atualizada há mais de 12 horas', () => {
+test('precisa do CDI: sem série, série pedida depois da aplicação mais antiga, ou atualizada há mais de 12 horas', () => {
   const agora = new Date('2026-11-24T12:00:00.000Z');
-  const guardado = { serie: { '2026-01-02': 0.05 }, atualizadoEm: '2026-11-24T08:00:00.000Z' };
+  const guardado = { serie: { '2026-01-02': 0.05 }, desde: '2026-01-01', atualizadoEm: '2026-11-24T08:00:00.000Z' };
   assert.equal(precisaCdi(guardado, '2026-01-05', agora), false);
   assert.equal(precisaCdi(guardado, '2025-06-01', agora), true);
   assert.equal(precisaCdi({ ...guardado, atualizadoEm: '2026-11-23T08:00:00.000Z' }, '2026-01-05', agora), true);
   assert.equal(precisaCdi(null, '2026-01-05', agora), true);
   assert.equal(precisaCdi(guardado, null, agora), false, 'sem título calculado, não precisa');
+});
+
+test('revisão: aplicação poucos dias antes do começo da série guardada busca de novo desde ela (nenhum dia útil fica de fora)', async () => {
+  const urls = [];
+  const fetch = async (url) => { urls.push(url); return resposta([]); };
+  const guardado = { serie: { '2026-11-17': 0.05, '2026-11-19': 0.05 }, desde: '2026-11-17', atualizadoEm: new Date().toISOString() };
+  assert.equal(precisaCdi(guardado, '2026-11-12'), true);
+  await buscarCdi({ fetch, desde: '2026-11-12', ate: '2026-11-24', guardada: guardado.serie, guardadaDesde: guardado.desde });
+  assert.match(urls[0], /dataInicial=12\/11\/2026/);
+});
+
+test('revisão: data absurda (ano 0024 ou 1500) nunca vira um pedido de séculos: o CDI começa no máximo em 2000', async () => {
+  const urls = [];
+  const fetch = async (url) => { urls.push(url); return resposta([]); };
+  await buscarCdi({ fetch, desde: '0024-12-01', ate: '2026-11-24', guardada: {} });
+  assert.match(urls[0], /dataInicial=01\/01\/2000/);
+  assert.equal(urls.length, 3);
 });

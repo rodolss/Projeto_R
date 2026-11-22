@@ -10,6 +10,7 @@ import { papelAutomatico, grupoDoTipo, novoPapel, registrarCompra } from '../cor
 import { buscarSugestoes } from '../dados/cotacoes-remoto.js';
 import { lerCotacoes, guardarCotacao, carregarTesouro, precoDoTesouro, lerTesouro, seriesDaRendaFixa } from './cotacoes-aparelho.js';
 import { tituloCalculado, novoTituloCalculado, registrarAplicacao, aplicarRendaFixa, liquidoEstimado } from '../core/renda-fixa.js';
+import { PRIMEIRO_DIA } from '../dados/renda-fixa-remoto.js';
 
 // Números digitados do jeito brasileiro ("0,47", "1.250,50"); com ponto e sem vírgula, o ponto é a vírgula ("0.47").
 export function numeroBr(texto) {
@@ -18,6 +19,9 @@ export function numeroBr(texto) {
   const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
+// Data de aplicação: no formato do campo (AAAA-MM-DD), de 2000 até hoje (um ano digitado errado, como "0024", estragaria
+// as contas do CDI).
+export const dataValida = (data, hoje) => /^\d{4}-\d{2}-\d{2}$/.test(String(data ?? '')) && data >= PRIMEIRO_DIA && data <= hoje;
 const dataLonga = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const numeroCurto = (n) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
@@ -223,7 +227,7 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
     };
     desenharIndexadores();
     const data = (rotulo, valor, aoMudar, dica) => h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, rotulo),
-      h('input', { class: 'entrada', type: 'date', value: valor ?? '', ...(valor ? { max: hoje } : {}), oninput: (e) => aoMudar(e.target.value || null) }),
+      h('input', { class: 'entrada', type: 'date', value: valor ?? '', ...(valor ? { min: PRIMEIRO_DIA, max: hoje } : {}), oninput: (e) => aoMudar(e.target.value || null) }),
       dica && h('span', { class: 'campo-dica' }, dica));
     return [
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Tipo'), chips),
@@ -238,7 +242,7 @@ function folhaNovoInvestimento({ ctx, resumo, fechar, salvarNaFolha, folha }) {
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), botao('Adicionar', () => {
         if (!novo.nome) { ctx.aviso('Escreva um nome (ex.: CDB do banco e o ano).', 'atencao', 3000); return; }
         if (!(novo.valor > 0)) { ctx.aviso('Digite quanto você aplicou.', 'atencao', 3000); return; }
-        if (!novo.data || novo.data > hoje) { ctx.aviso('A data da aplicação precisa ser hoje ou antes.', 'atencao', 3000); return; }
+        if (!dataValida(novo.data, hoje)) { ctx.aviso('Confira a data da aplicação: de 2000 até hoje.', 'atencao', 3500); return; }
         if (!novo.taxa) { ctx.aviso('Digite a taxa.', 'atencao', 3000); return; }
         const rendaFixa = { tipo: novo.tipo, indexador: novo.indexador, taxa: novo.taxa / 100, vencimento: novo.vencimento };
         salvarNaFolha((e) => novoTituloCalculado(e, { nome: novo.nome, grupo: novo.grupo, rendaFixa, valor: novo.valor, data: novo.data, series: seriesDaRendaFixa(e), hoje }).estado,
@@ -477,10 +481,10 @@ function folhaDoTitulo(p, { ctx, fechar, salvarNaFolha, folha, id }) {
     h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Mudou alguma coisa?'), sentido),
     campoMoeda({ rotulo: 'Quanto?', aoMudar: (v) => { mud.valor = v; } }),
     h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Quando?'),
-      h('input', { class: 'entrada', type: 'date', value: hoje, max: hoje, oninput: (e) => { mud.data = e.target.value || null; } })),
+      h('input', { class: 'entrada', type: 'date', value: hoje, min: PRIMEIRO_DIA, max: hoje, oninput: (e) => { mud.data = e.target.value || null; } })),
     h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true }), botao('Registrar', () => {
       if (!(mud.valor > 0)) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
-      if (!mud.data || mud.data > hoje) { ctx.aviso('A data precisa ser hoje ou antes.', 'atencao', 3000); return; }
+      if (!dataValida(mud.data, hoje)) { ctx.aviso('Confira a data: de 2000 até hoje.', 'atencao', 3500); return; }
       if (mud.resgate && mud.valor > p.saldo + 0.005) { ctx.aviso(`O valor de hoje é ${formatarBRL(p.saldo)}.`, 'atencao', 3500); return; }
       salvarNaFolha((e) => aplicarRendaFixa(registrarAplicacao(e, id, { valor: mud.resgate ? -mud.valor : mud.valor, data: mud.data }), seriesDaRendaFixa(e), hoje),
         mud.resgate ? 'Resgate registrado.' : 'Aplicação registrada.', folha);

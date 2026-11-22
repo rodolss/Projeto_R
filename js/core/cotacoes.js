@@ -19,19 +19,37 @@ export const papelDoGrupo = (grupo) => (CLASSES.includes(grupo) ? { papel: 'cart
 // FII e fundos de índice vêm do tipo da API; o que não se sabe é ação.
 export const grupoDoTipo = ({ type, subType } = {}) => (type === 'fund' && subType === 'fii' ? 'fiis' : 'acoes');
 
-const aportesDo = (estado, id) => estado.meses.flatMap((m) => (m.aplicado ?? [])
-  .filter((a) => a.ativoId === id).map((a) => ({ data: m.data ?? `${m.mes}-31`, valor: a.valor, cotas: a.cotas ?? 0 })));
+// O preço de uma cota (ou título) perto de uma data: o do último saldo do dia com cotas até ela (o saldo do dia é
+// cotas × preço), senão o primeiro depois, senão o preço pago numa compra. Sem nenhum: null.
+function precoNaData(estado, ativo, data) {
+  const comCotas = estado.saldos.filter((s) => s.ativoId === ativo.id && s.cotas > 0 && s.valor > 0)
+    .sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+  const saldo = comCotas.filter((s) => s.data <= data).at(-1) ?? comCotas[0];
+  if (saldo) return saldo.valor / saldo.cotas;
+  const compra = (ativo.compras ?? []).filter((c) => c.preco > 0 && c.data <= data).at(-1) ?? (ativo.compras ?? []).find((c) => c.preco > 0);
+  return compra?.preco ?? null;
+}
+
+// Os aportes do Dia de pagamento neste papel. Sem a quantidade (o Tesouro na reserva recebe só o valor, e a transferência
+// da caixa sai em valor), as cotas saem do preço perto da data: o dinheiro nunca some da conta.
+function aportesDo(estado, ativo) {
+  return estado.meses.flatMap((m) => (m.aplicado ?? []).filter((a) => a.ativoId === ativo.id).map((a) => {
+    const data = m.data ?? `${m.mes}-31`;
+    const preco = a.cotas == null && a.valor ? precoNaData(estado, ativo, data) : null;
+    return { data, valor: a.valor, cotas: a.cotas ?? (preco ? a.valor / preco : 0) };
+  }));
+}
 
 // As cotas de hoje: as compras e vendas anotadas aqui e as dos aportes do Dia de pagamento.
 export const cotasDoPapel = (estado, ativo) => quantidade((ativo.compras ?? []).reduce((s, c) => s + c.cotas, 0)
-  + aportesDo(estado, ativo.id).reduce((s, a) => s + a.cotas, 0));
+  + aportesDo(estado, ativo).reduce((s, a) => s + a.cotas, 0));
 
 // O custo do que ainda se tem, na ordem em que aconteceu: compra soma cotas × preço pago; venda tira a parte proporcional
 // do custo. Compra sem preço pago deixa o custo desconhecido (null): o app não inventa ganho.
 export function custoDoPapel(estado, ativo) {
   const eventos = [
     ...(ativo.compras ?? []).map((c) => ({ data: c.data, cotas: c.cotas, valor: c.cotas > 0 && c.preco != null ? c.cotas * c.preco : null, semPreco: c.cotas > 0 && c.preco == null })),
-    ...aportesDo(estado, ativo.id).map((a) => ({ data: a.data, cotas: a.cotas, valor: a.valor, semPreco: false })),
+    ...aportesDo(estado, ativo).map((a) => ({ data: a.data, cotas: a.cotas, valor: a.valor, semPreco: false })),
   ].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   let cotas = 0;
   let custo = 0;
