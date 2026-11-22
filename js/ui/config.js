@@ -3,9 +3,9 @@ import { h, campoMoeda, cartao, botao, aviso, textoConexao, AVISO_EXEMPLOS } fro
 import { formatarBRL } from '../core/formato.js';
 import { formatarMes, diffMeses } from '../core/meses.js';
 import { CLASSES } from '../core/alocacao.js';
-import { migrar, novoId } from '../core/esquema.js';
+import { migrar } from '../core/esquema.js';
 import { ultimoMes } from '../core/ipca.js';
-import { PAPEIS, NOMES_CLASSE_CURTOS } from './boas-vindas.js';
+import { NOMES_CLASSE_CURTOS } from './boas-vindas.js';
 import { montarLembretes, descreverProximo } from '../core/lembretes.js';
 import {
   noApp, lerConfig, salvarConfig, reagendar, agoraLocal, enviarAoApp, perguntarPermissao, pedirPermissao, testar, aoReceber,
@@ -138,48 +138,10 @@ export function render(container, ctx) {
     })));
   atualizarSoma();
 
-  // ---------- Investimentos ----------
-  const ativos = estado.ativos.map((a) => ({ ...a }));
-  const removidos = new Set();
-  const novo = { nome: '', papel: 'carteira', classe: 'rendaFixa', tipoForaDoPlano: 'poupanca', saldo: null };
-  const seletor = (opcoes, valor, aoMudar, rotulo) => h('select', { class: 'entrada', 'aria-label': rotulo, onchange: (e) => aoMudar(e.target.value) },
-    ...opcoes.map(([v, t]) => h('option', { value: v, selected: v === valor }, t)));
-  const opcoesClasse = CLASSES.map((c) => [c, NOMES_CLASSE_CURTOS[c]]);
-  const opcoesPapel = PAPEIS.map((p) => [p.id, p.nome]);
+  // ---------- Investimentos (desenho 2026-11-22-carteira): o cadastro mudou para Carteira › Ativos ----------
   const cartaoAtivos = cartao(h('h2', {}, 'Investimentos'),
-    ...(ativos.length ? ativos.map((a) => h('div', { class: 'linha', style: 'flex-wrap:wrap' },
-      h('div', { class: 'nome' }, h('span', {}, a.nome)),
-      h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
-        seletor(opcoesPapel, a.papel, (v) => { a.papel = v; }, `Papel de ${a.nome}`),
-        seletor(opcoesClasse, a.classe ?? 'rendaFixa', (v) => { a.classe = v; }, `Classe de ${a.nome}`),
-        h('label', { class: 'marcar' }, h('input', { type: 'checkbox', onchange: (e) => { if (e.target.checked) removidos.add(a.id); else removidos.delete(a.id); } }), 'remover'))))
-      : [h('p', { class: 'suave' }, 'Nenhum investimento cadastrado.')]),
-    h('h3', { style: 'margin-top:12px' }, 'Adicionar'),
-    h('div', { style: 'display:flex;flex-direction:column;gap:8px' },
-      h('input', { class: 'entrada', placeholder: 'Nome (ex.: CDB banco X, BOVA11)', oninput: (e) => { novo.nome = e.target.value.trim(); } }),
-      seletor(opcoesPapel, novo.papel, (v) => { novo.papel = v; }, 'Papel do novo investimento'),
-      seletor(opcoesClasse, novo.classe, (v) => { novo.classe = v; }, 'Classe do novo investimento (se for carteira)'),
-      seletor([['poupanca', 'Poupança'], ['outro', 'Outro']], novo.tipoForaDoPlano, (v) => { novo.tipoForaDoPlano = v; }, 'Tipo (se for fora do plano)'),
-      campoMoeda({ rotulo: 'Saldo hoje (opcional)', valor: null, aoMudar: (v) => { novo.saldo = v; } })),
-    h('div', { class: 'botoes', style: 'margin-top:8px' }, botao('Salvar investimentos', () => {
-      salvarComAviso((e) => {
-        const lista = ativos.filter((a) => !removidos.has(a.id)).map((a) => ({
-          ...a, classe: a.papel === 'carteira' ? (a.classe ?? 'rendaFixa') : null,
-          tipoForaDoPlano: a.papel === 'fora-do-plano' ? (a.tipoForaDoPlano ?? 'outro') : null,
-        }));
-        const saldos = e.saldos.filter((s) => !removidos.has(s.ativoId));
-        if (novo.nome) {
-          const id = novoId();
-          lista.push({
-            id, nome: novo.nome, ticker: novo.nome, papel: novo.papel,
-            classe: novo.papel === 'carteira' ? novo.classe : null,
-            tipoForaDoPlano: novo.papel === 'fora-do-plano' ? novo.tipoForaDoPlano : null,
-          });
-          if (novo.saldo != null) saldos.push({ ativoId: id, data: hoje, valor: novo.saldo, cotas: null });
-        }
-        return { ...e, ativos: lista, saldos };
-      }, 'Investimentos salvos.');
-    })));
+    h('p', { class: 'suave' }, `${estado.ativos.length ? `${estado.ativos.length} cadastrados.` : 'Nenhum cadastrado ainda.'} Adicione, edite e atualize os saldos na Carteira, aba Ativos.`),
+    h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: '#/inicio?aba=ativos' }, 'Abrir a carteira')));
 
   // ---------- Conexão ----------
   const conexao = { token: '', dono: ctx.conexao?.dono ?? ctx.donoSugerido };
