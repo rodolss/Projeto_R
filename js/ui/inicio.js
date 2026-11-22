@@ -17,6 +17,7 @@ import { lerRascunho } from './mes-rascunho.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { resumoDaCarteira, evolucao, proventosDaCarteira } from '../core/carteira.js';
 import { potencialDeInvestimento } from '../core/investir-sobra.js';
+import { mesPadraoDaCasa } from './casa.js';
 import { graficoEvolucao, colunasProventos, barraDivisao } from './carteira-graficos.js';
 import { abaAtivos, folhaDeAtivos, NOMES_GRUPO } from './carteira-ativos.js';
 
@@ -28,8 +29,7 @@ const ABAS = [['resumo', 'Resumo'], ['ativos', 'Ativos'], ['proventos', 'Provent
 
 // Cartão do dia do pagamento: acompanha a aba Mês (registrado, pela metade ou para abrir).
 // Na visão única, sem a etapa do salário (vem do Balanço: desenho 2026-11-21-salario-no-balanco), como na tela do Mês.
-function cartaoPagamento(estado, hoje, ctx) {
-  const mes = hoje.slice(0, 7);
+function cartaoPagamento(estado, hoje, ctx, mes = hoje.slice(0, 7)) {
   const entrada = estado.meses.find((m) => m.mes === mes);
   const c = cartaoDoPagamento({ entrada, rascunho: lerRascunho(mes), semSalario: Boolean(ctx.unica && ctx.perfil?.visto) });
   if (c.tipo === 'registrado') {
@@ -49,11 +49,15 @@ function cartaoPagamento(estado, hoje, ctx) {
 // O quanto investir este mês (desenho 2026-11-22-para-investir): a sobra do Balanço do mês anterior menos o lazer — a
 // mesma conta do Dia de pagamento —, e o potencial (a média dos últimos meses). Substitui o "Dia de pagamento?"; com o
 // mês já registrado (ou fora da visão única, sem o Balanço), fica o cartão do pagamento.
+// O mês é o mês em foco (como nas telas da casa): com o mês do calendário todo pago e fechado, já é o seguinte. O Dia de
+// pagamento registra o mês do calendário, então um mês em foco à frente mostra o valor, mas ainda sem "Investir agora".
 function cartaoParaInvestir(estado, hoje, ctx) {
-  const mes = hoje.slice(0, 7);
+  if (!ctx.unica || !ctx.perfil?.visto || !ctx.casa) return cartaoPagamento(estado, hoje, ctx);
+  const mes = mesPadraoDaCasa(ctx);
+  const adiantado = mes > hoje.slice(0, 7);
   const entrada = estado.meses.find((m) => m.mes === mes);
-  const c = cartaoDoPagamento({ entrada, rascunho: lerRascunho(mes), semSalario: true });
-  if (c.tipo === 'registrado' || !ctx.unica || !ctx.perfil?.visto || !ctx.casa) return cartaoPagamento(estado, hoje, ctx);
+  const c = cartaoDoPagamento({ entrada, rascunho: adiantado ? null : lerRascunho(mes), semSalario: true });
+  if (c.tipo === 'registrado') return cartaoPagamento(estado, hoje, ctx, mes);
   const { atual, media, quantos } = potencialDeInvestimento({ casa: ctx.casa, estado, pessoaId: ctx.perfil.visto.id, mes, hoje });
   const anterior = nomeDoMes(atual.mes);
   const corpo = atual.incompleto
@@ -71,7 +75,10 @@ function cartaoParaInvestir(estado, hoje, ctx) {
     h('div', { class: 'rotulo' }, `Para investir em ${nomeDoMes(mes)}`),
     ...corpo,
     quantos >= 2 && h('p', { class: 'para-investir-media' }, 'Seu potencial: ', h('b', {}, `${formatarBRL(media)} por mês`), ` (média de ${quantos} meses)`),
-    h('div', { class: 'botoes' }, h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar o Dia de pagamento' : 'Investir agora')));
+    adiantado
+      ? [h('p', { class: 'suave pequeno para-investir-media' }, `O Dia de pagamento de ${nomeDoMes(mes)} abre em ${nomeDoMes(mes)}.`),
+        h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: `#/casa-balanco?mes=${atual.mes}` }, `Ver o balanço de ${anterior}`))]
+      : h('div', { class: 'botoes' }, h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar o Dia de pagamento' : 'Investir agora')));
 }
 
 const abreviado = (v) => `R$ ${abreviar(v)}`;
