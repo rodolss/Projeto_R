@@ -19,6 +19,8 @@ import { travaDoMes } from './fechado.js';
 import { seletorDePeriodo, gradeDeMeses } from './seletor-periodo.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
+import { contasPessoaisDoMes, valorDaContaPessoal, adicionarContaPessoal, confirmarPrevisao, faltamParcelas } from '../core/contas-pessoais.js';
+import { textoDasParcelas, campoDoFim } from './conta-pessoal.js';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 export const nomeDoMes = (mes) => MESES[Number(mes.slice(5, 7)) - 1];
@@ -267,6 +269,31 @@ function desenharMes(container, ctx) {
     h('div', {}, ...linhasContas, ...semValor),
     !casa.contas.some((c) => !c.arquivada) && h('p', { class: 'suave', style: 'padding:0 16px 12px' }, 'Nenhuma conta cadastrada. Cadastre em Ajustes.'));
 
+  // Contas pessoais (desenho 2026-11-22-contas-pessoais): só as de quem vê, fora da divisão (sem perfil, não há dono).
+  const pessoais = visto ? contasPessoaisDoMes(casa, mes, visto.id) : null;
+  const tocarPessoal = (id) => () => (fechado ? avisarTravado() : abrir(id === 'nova' ? 'nova-pessoal' : `pessoal-${id}`));
+  const detalhePessoal = (c) => {
+    const selos = [estaPago(casa, mes, c.conta.id) && h('span', { class: 'selo ok' }, 'Pago ✓'), c.situacao === 'a-confirmar' && h('span', { class: 'selo' }, 'a confirmar')].filter(Boolean);
+    const texto = [c.situacao === 'a-confirmar' && `igual a ${quando(c.deOnde, mes)}`, textoDasParcelas(c.faltam)].filter(Boolean).join(' · ');
+    const partes = [...selos.flatMap((s) => [s, ' ']), texto].filter(Boolean);
+    return partes.length ? partes : null;
+  };
+  const listaPessoais = pessoais && h('section', { class: 'cartao casa-lista' },
+    h('h2', { class: 'titulo-com-soma' }, 'Contas pessoais', pessoais.total > 0 && h('span', { class: 'soma-fixas', title: 'Soma das suas contas pessoais do mês' }, formatarBRL(pessoais.total))),
+    h('p', { class: 'suave pequeno', style: 'padding:0 16px 8px' }, 'Só suas: não entram na divisão da casa.'),
+    h('div', {},
+      ...pessoais.contas.map((c) => linha({
+        titulo: c.conta.nome, detalhe: detalhePessoal(c), valor: formatarBRL(c.valor), aConfirmar: c.situacao === 'a-confirmar',
+        aoTocar: tocarPessoal(c.conta.id), cat: categoriaDaConta(c.conta),
+      })),
+      ...pessoais.semValor.map((conta) => linha({
+        titulo: conta.nome, detalhe: 'sem valor neste mês', valor: '—', vazio: true, aoTocar: tocarPessoal(conta.id), cat: categoriaDaConta(conta),
+      })),
+      h('button', { type: 'button', class: 'casa-linha linha-acao', onclick: tocarPessoal('nova') },
+        h('span', { class: 'icone-cat cat-casa', 'aria-hidden': 'true' }, icone('mais')),
+        h('span', { class: 'texto' }, h('b', {}, 'Adicionar conta pessoal'), h('small', {}, 'Ex.: empréstimo, academia')),
+        h('span', { class: 'seta', 'aria-hidden': 'true' }, '›'))));
+
   const listaSalarios = h('section', { class: 'cartao casa-lista' },
     h('h2', {}, 'Salários'),
     h('div', {}, ...r.pessoas.map((p) => linha({
@@ -280,7 +307,7 @@ function desenharMes(container, ctx) {
 
   container.replaceChildren(...[
     // Com perfil, o salário se digita e se vê no Balanço: a lista de salários só fica no aparelho sem perfil.
-    cabecalho, total, ...divisao, listaContas, !visto && listaSalarios,
+    cabecalho, total, ...divisao, listaContas, listaPessoais, !visto && listaSalarios,
   ].filter(Boolean));
 
   // ---------- folhas ----------
@@ -289,12 +316,13 @@ function desenharMes(container, ctx) {
   const titulo = (texto) => h('h2', { 'data-sem-recarregar': '' }, texto); // valor digitado ainda não salvo: a atualização automática espera
 
   // O botão "Pago" (ou "desfazer") do fim da folha de uma conta. Com tudo do mês pago, abre o mês seguinte.
-  function botaoPago(conta, folha) {
+  // `antes`: o que mais muda ao marcar como pago (a conta pessoal prevista confirma o valor).
+  function botaoPago(conta, folha, antes = null) {
     const pago = pagaConta(conta);
     return h('div', { class: 'cartao-conferir' },
       h('div', { class: 'botoes' }, botao(pago ? 'Conta paga ✓ (desfazer)' : 'Pago', async (e) => {
         e.currentTarget.disabled = true;
-        const grava = (c) => marcarPago(c, { mes, marca: marcaDe(conta), pago: !pago });
+        const grava = (c) => marcarPago(!pago && antes ? antes(c) : c, { mes, marca: marcaDe(conta), pago: !pago });
         const nova = grava(casa);
         await ctx.salvarCasa(grava);
         if (!pago && visto && tudoPago(nova, mes, visto.id)) {
@@ -309,7 +337,7 @@ function desenharMes(container, ctx) {
       !pago && h('p', { class: 'nota' }, 'Use depois de pagar: a lista e o Balanço mostram como paga.'));
   }
 
-  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha, pagoDe = null }) {
+  function folhaValor({ texto, situacao, valorAtual, anterior, dica, aoSalvar, aoTirar, folha, pagoDe = null, antesDoPago = null }) {
     let valor = situacao === 'vazio' ? null : valorAtual;
     const salvar = botao('Salvar', async () => {
       if (valor == null) { ctx.aviso('Digite o valor.', 'atencao', 3000); return; }
@@ -328,7 +356,42 @@ function desenharMes(container, ctx) {
         type: 'button', class: 'botao-link',
         onclick: async () => { await ctx.salvarCasa(aoTirar); ctx.aviso('Valor tirado. O app volta a prever.', 'ok', 3000); terminar(folha); },
       }, 'Tirar o valor deste mês'),
-      pagoDe && botaoPago(pagoDe, folha),
+      pagoDe && botaoPago(pagoDe, folha, antesDoPago),
+    ];
+  }
+
+  // A conta pessoal no mês: o valor (Salvar, Tirar) e o "Pago", que numa previsão também confirma o valor previsto.
+  function folhaPessoal(conta, folha) {
+    const v = valorDaContaPessoal(casa, mes, conta);
+    const parcelas = textoDasParcelas(faltamParcelas(conta, mes));
+    return folhaValor({
+      folha, pagoDe: conta, texto: `${conta.nome} de ${nome}`, situacao: v.situacao, valorAtual: v.valor,
+      anterior: valorDaContaPessoal(casa, mesAnterior, conta),
+      dica: parcelas ? `${maiuscula(parcelas)}. Só sua: não entra na divisão da casa.` : 'Só sua: não entra na divisão da casa.',
+      aoSalvar: (c, valor) => salvarValor(c, { mes, contaId: conta.id, valor }),
+      aoTirar: (c) => salvarValor(c, { mes, contaId: conta.id, valor: null }),
+      antesDoPago: (c) => confirmarPrevisao(c, { mes, conta }),
+    });
+  }
+
+  // Conta pessoal nova: nome, o valor deste mês (se já souber) e se ela tem fim.
+  function folhaNovaPessoal(folha) {
+    const nova = { nome: '', valor: null, parcelas: null };
+    const adicionar = botao('Adicionar', async () => {
+      if (!nova.nome) { ctx.aviso('Escreva o nome da conta.', 'atencao', 3000); return; }
+      adicionar.disabled = true;
+      await ctx.salvarCasa((c) => adicionarContaPessoal(c, { nome: nova.nome, donoId: visto.id, mes, valor: nova.valor, parcelas: nova.parcelas }));
+      ctx.aviso('Conta pessoal adicionada.', 'ok', 2500);
+      terminar(folha);
+    });
+    return [
+      titulo('Nova conta pessoal'),
+      h('p', { class: 'suave pequeno' }, 'Uma conta só sua, que se repete todo mês e não é no cartão. Ela não entra na divisão da casa.'),
+      h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Nome'),
+        h('input', { class: 'entrada', type: 'text', autocomplete: 'off', placeholder: 'Ex.: empréstimo, academia', oninput: (e) => { nova.nome = e.target.value.trim(); } })),
+      campoMoeda({ rotulo: `Valor de ${nome}`, dica: 'Se ainda não souber, deixe em branco e digite depois.', aoMudar: (v) => { nova.valor = v; } }),
+      campoDoFim({ parcelas: null, mes, aoMudar: (n) => { nova.parcelas = n; } }),
+      h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), adicionar),
     ];
   }
 
@@ -505,17 +568,21 @@ function desenharMes(container, ctx) {
   const [tipo, id] = aberta ? [aberta.split('-')[0], aberta.slice(aberta.indexOf('-') + 1)] : [];
   const conta = casa.contas.find((c) => c.id === id);
   const pessoa = casa.pessoas.find((p) => p.id === id);
+  // Só as contas pessoais de quem vê (a de outro perfil não abre nem pelo endereço).
+  const pessoal = visto && tipo === 'pessoal' ? (casa.contasPessoais ?? []).find((c) => c.id === id && c.donoId === visto.id) : null;
   const conteudo = fechado && tipo !== 'parte' ? null
     : tipo === 'parte' && conta && (casa.cartoes ?? []).some((c) => c.contaId === conta.id) ? folhaParte(conta)
     : tipo === 'conta' && conta ? folhaConta(conta, aberta)
     : tipo === 'cartao' && conta ? folhaCartao(conta, aberta)
+    : pessoal ? folhaPessoal(pessoal, aberta)
+    : aberta === 'nova-pessoal' && visto ? folhaNovaPessoal(aberta)
       : tipo === 'salario' && pessoa ? folhaSalario(pessoa, aberta) : null;
   if (!conteudo) {
     abertaAqui = false;
     esconderFolha();
     return;
   }
-  const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: conta?.nome ?? pessoa?.nome ?? 'Conta' });
+  const painel = mostrarFolha({ conteudo: conteudo.filter(Boolean), aoFechar: fechar, rotulo: conta?.nome ?? pessoal?.nome ?? pessoa?.nome ?? 'Conta' });
   // Conta e salário: foco no campo, para digitar logo. Cartão: na folha, sem abrir o teclado por cima da lista.
   const alvo = tipo === 'cartao' || tipo === 'parte' ? painel : painel.querySelector('input') ?? painel;
   setTimeout(() => alvo.focus({ preventScroll: true }), 50);

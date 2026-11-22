@@ -9,6 +9,7 @@ const TITULOS = [
   [/^Entrou/, 'entrou', 'salario'],
   [/^Saiu/, 'saiu', 'saida'],
   [/^Contas$/, 'recibo'],
+  [/^Contas pessoais/, 'carteira'],
   [/^Salário/, 'carteira', 'salario'],
   [/^Compras/, 'sacola', 'compras'],
   [/^Todo mês/, 'repetir', 'assinatura'],
