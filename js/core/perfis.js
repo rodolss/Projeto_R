@@ -90,14 +90,13 @@ function proximaMudanca(casa, id, mes) {
   return viradas.find((m) => divideNoMes(pessoa, m) !== divideNoMes(pessoa, mes)) ?? null;
 }
 
-// A lista "Quem divide as contas" dos Ajustes: quem divide no mês (com o perfil, que tem a foto); quem administra
-// vê também os outros perfis, depois, para marcar. `muda`: o mês de uma entrada ou saída já marcada para depois.
+// A lista "Quem divide as contas" dos Ajustes: quem divide no mês (com o perfil, que tem a foto). Quem administra vê
+// todos os perfis, na ordem deles, para marcar (marcar alguém não o faz pular de lugar). `muda`: o mês de uma entrada
+// ou saída já marcada para depois.
 export function quemDivideNosAjustes(casa, mes, { administra }) {
-  const item = (pessoa, divide) => ({ pessoa, divide, muda: proximaMudanca(casa, pessoa.id, mes) });
-  const dividem = pessoasNoMes(casa, mes).map((p) => item(acharPerfil(casa, p.id) ?? p, true));
-  if (!administra) return dividem;
-  const fora = (casa.perfis ?? []).filter((p) => !dividem.some((x) => x.pessoa.id === p.id)).map((p) => item(p, false));
-  return [...dividem, ...fora];
+  const dividem = pessoasNoMes(casa, mes);
+  const item = (pessoa) => ({ pessoa, divide: dividem.some((p) => p.id === pessoa.id), muda: proximaMudanca(casa, pessoa.id, mes) });
+  return administra ? (casa.perfis ?? []).map(item) : dividem.map((p) => item(acharPerfil(casa, p.id) ?? p));
 }
 
 // O perfil de uma pessoa da casa muda o nome dela junto.

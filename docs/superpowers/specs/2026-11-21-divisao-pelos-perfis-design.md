@@ -30,8 +30,8 @@ marcá-lo para dividir; as duas pessoas de hoje são os perfis que já existem (
 - Núcleo: `divideNoMes(pessoa, mes)`, `pessoasNoMes(casa, mes)`; `resumoDoMes` divide entre quem divide no mês.
   `entrarNaDivisao` / `sairDaDivisao` (perfis.js) mexem nos períodos; desfazer no mesmo mês apaga o período.
   O resumo do ano junta cada pessoa pelo id (não pela posição).
-- Ajustes › Casa: quem administra vê todos os perfis ("divide as contas" / "não divide"); tocar abre a folha com
-  o nome e a escolha "Divide as contas" / "Não divide", em botões com exemplo, dizendo de que mês vale.
-  Quem não administra vê só quem divide, como antes.
+- Ajustes › Casa: quem administra vê todos os perfis, na ordem deles, cada um com uma marca de selecionar; tocar
+  marca ou desmarca e salva na hora (do mês em foco em diante). O nome não se muda aqui: nomes e perfis novos ficam
+  em Aparelhos e perfis (pedido do usuário, versão 82). Quem não administra vê só quem divide, sem mexer.
 - Mês: um card "X paga" por pessoa; com número ímpar de cards, o último ocupa a linha inteira; terceira cor.
 - Balanço sem perfis: os chips são de quem divide no mês.

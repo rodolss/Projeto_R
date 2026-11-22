@@ -93,6 +93,13 @@ test('quemDivideNosAjustes: quem administra vê todos os perfis, primeiro quem d
   assert.equal(quemDivideNosAjustes(casa, '2026-12', { administra: true })[0].pessoa.admin, true, 'vem o perfil (com foto e "administra")');
 });
 
+test('quemDivideNosAjustes: para quem administra, a ordem é a dos perfis (marcar alguém não o faz pular de lugar)', () => {
+  let casa = adicionarPerfil(casaComCris(), { nome: 'Bruno', novoId: () => 'p4' }).casa;
+  casa = entrarNaDivisao(casa, 'p4', '2026-11');
+  assert.deepEqual(quemDivideNosAjustes(casa, '2026-11', { administra: true }).map((x) => x.pessoa.id), ['p1', 'p2', 'p3', 'p4']);
+  assert.deepEqual(quemDivideNosAjustes(casa, '2026-11', { administra: false }).map((x) => x.pessoa.id), ['p1', 'p2', 'p4']);
+});
+
 test('resumoDoAno junta cada pessoa pelo id: a Cris, que entrou em março, soma só os meses dela', () => {
   let casa = entrarNaDivisao(casaComCris(), 'p3', '2026-03');
   for (const mes of ['2026-01', '2026-02', '2026-03', '2026-04']) casa = salvarValor(casa, { mes, contaId: 'id1', valor: 600 });
