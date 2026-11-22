@@ -16,6 +16,7 @@ import { folhaAberta, parametroDoHash, depoisDeSalvar } from './rotas.js';
 import { cartaoConectar } from './conectar.js';
 import { mesEmFoco, marcaDaConta, estaPago, marcarPago, tudoPago } from '../core/pagamentos.js';
 import { travaDoMes } from './fechado.js';
+import { seletorDePeriodo, gradeDeMeses } from './seletor-periodo.js';
 import { mediaDasContas } from '../core/media-contas.js';
 import { detalheDaContaNoMes, aoTocarConta } from '../core/perfis.js';
 
@@ -43,6 +44,21 @@ export function mesDaTela(hash, hoje, padrao = null) {
 
 // O mês em foco para quem vê a casa (um perfil): ver js/core/pagamentos.js.
 export const mesPadraoDaCasa = (ctx) => mesEmFoco(ctx.casa, ctx.hoje, ctx.perfil?.visto?.id ?? null);
+
+// O seletor de mês do Mês e do Balanço (os mesmos limites): do primeiro mês com dados (ou o atual) até 12 meses depois do
+// atual. Fora do mês em foco, o atalho "Ir para <mês>" leva de volta a ele.
+export const limitesDoMes = ({ primeiro, mesAtual }) => ({ min: primeiro < mesAtual ? primeiro : mesAtual, max: somarMeses(mesAtual, 12) });
+
+export function seletorDoMes({ mes, primeiro, mesAtual, foco, irPara }) {
+  const { min, max } = limitesDoMes({ primeiro, mesAtual });
+  return seletorDePeriodo({
+    rotulo: tituloDoMes(mes),
+    anterior: { aria: 'Mês anterior', desligado: mes <= min, ir: () => irPara(somarMeses(mes, -1)) },
+    proximo: { aria: 'Próximo mês', desligado: mes >= max, ir: () => irPara(somarMeses(mes, 1)) },
+    grade: gradeDeMeses({ atual: mes, min, max, irPara }),
+    atalho: mes !== foco && { texto: `Ir para ${nomeDoMes(foco)}`, ir: () => irPara(foco) },
+  });
+}
 
 // A folha foi aberta por um toque nesta sessão? Então fechar = voltar no histórico (some a entrada criada).
 let abertaAqui = false;
@@ -150,16 +166,9 @@ function desenharMes(container, ctx) {
 
   // ---------- cabeçalho com as setas ----------
   const primeiro = primeiroMes(casa) ?? mesAtual;
-  const podeVoltar = mes > (primeiro < mesAtual ? primeiro : mesAtual);
-  const podeAvancar = mes < somarMeses(mesAtual, 12);
-  const cabecalho = h('div', { class: 'casa-mes' },
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Mês anterior', disabled: !podeVoltar, onclick: () => irPara(somarMeses(mes, -1)) }, '‹'),
-    h('h1', {}, tituloDoMes(mes)),
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próximo mês', disabled: !podeAvancar, onclick: () => irPara(somarMeses(mes, 1)) }, '›'));
   // O mês em foco: o atual, ou o seguinte enquanto o atual está todo pago e fechado (é o que a tela abre).
   const mesDoFoco = mesPadraoDaCasa(ctx);
-  const voltarAoAtual = mes !== mesDoFoco
-    && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(mesDoFoco) }, `Voltar para ${nomeDoMes(mesDoFoco)}`);
+  const cabecalho = seletorDoMes({ mes, primeiro, mesAtual, foco: mesDoFoco, irPara });
 
   // ---------- total e divisão ----------
   const situacaoTotal = r.aConfirmar
@@ -271,7 +280,7 @@ function desenharMes(container, ctx) {
 
   container.replaceChildren(...[
     // Com perfil, o salário se digita e se vê no Balanço: a lista de salários só fica no aparelho sem perfil.
-    cabecalho, voltarAoAtual, total, ...divisao, listaContas, !visto && listaSalarios,
+    cabecalho, total, ...divisao, listaContas, !visto && listaSalarios,
   ].filter(Boolean));
 
   // ---------- folhas ----------

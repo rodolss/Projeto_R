@@ -10,13 +10,11 @@ import { definirSalario, extraDoMes } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
-import { nomeDoMes, mesDaTela, mesPadraoDaCasa } from './casa.js';
+import { nomeDoMes, mesDaTela, mesPadraoDaCasa, seletorDoMes } from './casa.js';
 import { estaPago, marcaDoCartao, contasPagas } from '../core/pagamentos.js';
 import { travaDoMes } from './fechado.js';
 import { iconeCategoria } from './icones.js';
 
-const maiuscula = (t) => t[0].toUpperCase() + t.slice(1);
-const tituloDoMes = (mes) => `${maiuscula(nomeDoMes(mes))} de ${mes.slice(0, 4)}`;
 const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const quando = (deOnde, mes) => (diffMeses(deOnde, mes) <= 11 ? nomeDoMes(deOnde) : `${nomeDoMes(deOnde)} de ${deOnde.slice(0, 4)}`);
 
@@ -107,16 +105,8 @@ function desenhar(container, ctx) {
 
   // ---------- cabeçalho com as setas (os mesmos limites do Mês) ----------
   const primeiro = primeiroMes(casa) ?? mesAtual;
-  const podeVoltar = mes > (primeiro < mesAtual ? primeiro : mesAtual);
-  const podeAvancar = mes < somarMeses(mesAtual, 12);
-  const cabecalho = h('div', { class: 'casa-mes' },
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Mês anterior', disabled: !podeVoltar, onclick: () => irPara(somarMeses(mes, -1)) }, '‹'),
-    h('h1', {}, tituloDoMes(mes)),
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próximo mês', disabled: !podeAvancar, onclick: () => irPara(somarMeses(mes, 1)) }, '›'));
   // O mês em foco: o atual, ou o seguinte enquanto o atual está todo pago e fechado (é o que a tela abre).
-  const mesDoFoco = mesPadraoDaCasa(ctx);
-  const voltarAoAtual = mes !== mesDoFoco
-    && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(mesDoFoco) }, `Voltar para ${nomeDoMes(mesDoFoco)}`);
+  const cabecalho = seletorDoMes({ mes, primeiro, mesAtual, foco: mesPadraoDaCasa(ctx), irPara });
   const quemDivide = pessoasNoMes(casa, mes); // quem entrou ou saiu da divisão aparece só nos meses em que divide
   const escolha = !visto && quemDivide.length > 1 && h('div', { class: 'chips balanco-quem', role: 'group', 'aria-label': 'De quem é o balanço' },
     ...quemDivide.map((p) => h('button', {
@@ -219,7 +209,7 @@ function desenhar(container, ctx) {
 
   // O plano no mês atual e, fechado o atual (tudo pago), no mês seguinte que a tela abre; só na visão única e no balanço de quem administra.
   const plano = ctx.unica && ctx.estado && (mes === mesAtual || mes === mesPadraoDaCasa(ctx)) && pessoaId === visto?.id && cartaoDoPlano(ctx, b);
-  container.replaceChildren(...[cabecalho, voltarAoAtual, escolha, sobra, entrou, saiu, outras, plano].filter(Boolean));
+  container.replaceChildren(...[cabecalho, escolha, sobra, entrou, saiu, outras, plano].filter(Boolean));
 
   // ---------- a folha do salário (o único lugar onde ele se digita) ----------
   const terminar = () => {

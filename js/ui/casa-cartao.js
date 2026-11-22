@@ -18,6 +18,7 @@ import { botaoDoCofrinho, conteudoDoCofrinho } from './casa-cofrinho.js';
 import { folhaAberta, parametroDoHash, depoisDeSalvar, resolverRota } from './rotas.js';
 import { nomeDoMes } from './casa.js';
 import { travaDoMes } from './fechado.js';
+import { seletorDePeriodo, gradeDeMeses } from './seletor-periodo.js';
 import { cartoesVisiveis } from '../core/perfis.js';
 import { etiquetasDosNomes, juntasDaCasa, semAcento, tagsDoNome } from '../core/tags.js';
 import { graficoDasEtiquetas } from './casa-etiquetas.js';
@@ -338,10 +339,15 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
 
   // ---------- cabeçalho ----------
   const primeira = [primeiraFatura(casa, cfg.id) ?? aberta, aberta].sort()[0];
-  const cabecalho = h('div', { class: 'casa-mes' },
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Fatura anterior', disabled: fatura <= primeira, onclick: () => irPara(somarMeses(fatura, -1)) }, '‹'),
-    h('h1', {}, `Fatura de ${nomeDoMes(fatura)}`),
-    h('button', { type: 'button', class: 'seta-mes', 'aria-label': 'Próxima fatura', disabled: fatura >= somarMeses(aberta, 12), onclick: () => irPara(somarMeses(fatura, 1)) }, '›'));
+  // Seletor de fatura (desenho 2026-11-22-seletor-de-mes): pílula no centro; tocar no nome abre a grade dos meses.
+  const ultima = somarMeses(aberta, 12);
+  const cabecalho = seletorDePeriodo({
+    rotulo: `Fatura de ${nomeDoMes(fatura)}`,
+    anterior: { aria: 'Fatura anterior', desligado: fatura <= primeira, ir: () => irPara(somarMeses(fatura, -1)) },
+    proximo: { aria: 'Próxima fatura', desligado: fatura >= ultima, ir: () => irPara(somarMeses(fatura, 1)) },
+    grade: gradeDeMeses({ atual: fatura, min: primeira, max: ultima, irPara }),
+    atalho: fatura !== aberta && { texto: 'Ir para a fatura aberta', ir: () => irPara(aberta) },
+  });
   const sub = h('p', { class: 'suave cartao-sub' },
     `Compras de ${dataCurta(periodo.de)} a ${dataCurta(periodo.ate)} · vence ${dataComAno(periodo.vence)}`);
   // Com mais de um cartão, o cabeçalho de cada mês mostra a soma das faturas de todos (os que este perfil vê).
@@ -350,8 +356,6 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     ? Math.round(cartoesDaSoma.reduce((t, k) => t + faturaDoCartao(casa, k.id, fatura).total, 0) * 100) / 100 : null;
   const somaNoCabecalho = somaDosCartoes != null
     && h('p', { class: 'suave cartao-sub', 'data-soma-cartoes': '' }, `Soma dos ${cartoesDaSoma.length} cartões em ${nomeDoMes(fatura)}: `, h('b', {}, formatarBRL(somaDosCartoes)));
-  const voltar = fatura !== aberta
-    && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(aberta) }, 'Voltar para a fatura aberta');
 
   const anotar = !travado && h('div', { class: 'botoes' }, botao('+ Anotar compra', () => abrir('anotar')));
 
@@ -501,7 +505,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
       cofrinho, nomeDaFatura: (m) => nomeDaFatura(m, hoje), aoVoltar: voltarDoCofrinho, aoAbrirItem: abrirDoCofrinho,
     }));
   } else {
-    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, somaNoCabecalho, sub, voltar, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao(),
+    container.replaceChildren(...[trocaDeCartao(casaVisivel, cfg.id), cabecalho, somaNoCabecalho, sub, anotar, total, deQuem, compras, fixas, botaoCofrinho, conferir, botaoPago, outroCartao(),
       // O fim da tela: as 5 etiquetas em que este cartão mais gastou nos últimos 12 meses (até a fatura aberta).
       graficoDasEtiquetas({ casa, cartaoId: cfg.id, ate: aberta, juntas: juntasDaCasa(casa), dona: dona?.nome ?? null })].filter(Boolean));
   }
