@@ -27,11 +27,14 @@ export function distribuirAporte({ valores, pesos, aporte }) {
   return Object.fromEntries(CLASSES.map((c) => [c, aporte > 0 && somaDeficits > 0 ? deficits[c] * (aporte / somaDeficits) : 0]));
 }
 
+// Reais inteiros em cada classe; os centavos que sobram vão para a maior parte (nunca para uma classe que não recebe
+// nada: com a renda fixa em 0%, ela não ganha uma sugestão de centavos).
 export function arredondarDistribuicao(dist) {
   const total = soma(dist);
+  const maior = CLASSES.reduce((m, c) => ((dist[c] ?? 0) > (dist[m] ?? 0) ? c : m), CLASSES[0]);
   const resultado = {};
-  for (const c of CLASSES) if (c !== 'rendaFixa') resultado[c] = Math.floor(dist[c] ?? 0);
-  resultado.rendaFixa = Math.round((total - soma(resultado)) * 100) / 100;
+  for (const c of CLASSES) if (c !== maior) resultado[c] = Math.floor(dist[c] ?? 0);
+  resultado[maior] = Math.round((total - soma(resultado)) * 100) / 100;
   return Object.fromEntries(CLASSES.map((c) => [c, resultado[c]]));
 }
 

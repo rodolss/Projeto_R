@@ -332,6 +332,16 @@ export function calcularMes({
 }
 
 function resolverDestino(estado, destino) {
+  // Uma ordem da recomendação (desenho 2026-11-22-onde-investir): o destino é o código; acha o investimento (sem
+  // diferenciar maiúsculas) ou cria na primeira compra, na classe da ordem.
+  if (destino && typeof destino === 'object') {
+    const codigo = String(destino.ticker).trim().toUpperCase();
+    const achado = estado.ativos.find((a) => a.papel === 'carteira' && String(a.ticker ?? a.nome).trim().toUpperCase() === codigo);
+    if (achado) return achado.id;
+    const criado = { id: novoId(), nome: codigo, ticker: codigo, papel: 'carteira', classe: destino.classe, tipoForaDoPlano: null };
+    estado.ativos.push(criado);
+    return criado.id;
+  }
   const NOMES = { reserva: 'Reserva (Tesouro Selic)', caixa: 'Caixa de oportunidade (Tesouro Selic)' };
   const existente = destino === 'reserva' || destino === 'caixa'
     ? estado.ativos.find((a) => a.papel === destino)

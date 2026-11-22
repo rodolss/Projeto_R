@@ -1,13 +1,13 @@
 // Service worker: o app abre na hora e sem internet. Estratégia cache-first por versão: cada versão do site tem o
 // seu cache, baixado inteiro na instalação; a página abre dele e a versão nova chega com o próximo service worker.
 // APIs externas (GitHub, IPCA) nunca passam pelo cache.
-const VERSAO = 'projeto-r-v88'; // igual a js/versao.js (um teste confere)
+const VERSAO = 'projeto-r-v89'; // igual a js/versao.js (um teste confere)
 const CASCA = [
   './', './index.html', './css/app.css', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png',
   './fontes/inter-latin.woff2', './fontes/sora-latin.woff2',
   './js/app.js', './js/versao.js',
-  './js/core/alocacao.js', './js/core/aporte.js', './js/core/balanco.js', './js/core/cartao.js', './js/core/casa.js', './js/core/casa-ano.js', './js/core/carteira.js', './js/core/checkup.js', './js/core/desempenho.js',
+  './js/core/alocacao.js', './js/core/aporte.js', './js/core/balanco.js', './js/core/cartao.js', './js/core/casa.js', './js/core/casa-ano.js', './js/core/carteira.js', './js/core/recomendacao.js', './js/core/checkup.js', './js/core/desempenho.js',
   './js/core/esquema.js', './js/core/financas.js', './js/core/formato.js', './js/core/investir-sobra.js', './js/core/ipca.js',
   './js/core/lembretes.js', './js/core/lista-mes.js', './js/core/marcos.js', './js/core/meses.js', './js/core/perfis.js', './js/core/metas.js', './js/core/motor.js', './js/core/projecao.js',
   './js/core/pagamentos.js', './js/core/media-contas.js', './js/core/protecao.js', './js/core/salario.js', './js/core/simulador.js', './js/core/tags.js', './js/core/ortografia.js', './js/core/gastos-por-etiqueta.js', './js/core/categorias.js', './js/core/custo-de-vida.js',

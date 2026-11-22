@@ -2,9 +2,9 @@
 // investido no topo e três vistas em abas: Resumo (meta, evolução, divisão contra a meta), Ativos (lista por classe,
 // detalhe do ativo) e Proventos. A aba fica no endereço (?aba=) com location.replace: trocar não entra no histórico.
 // As folhas (?folha=) entram, e o voltar do celular as fecha.
-import { h, aviso, botao, cartao, campoMoeda, mostrarFolha, esconderFolha } from './dom.js';
+import { h, aviso, botao, cartao, campoMoeda, mostrarFolha, esconderFolha, AVISO_EXEMPLOS } from './dom.js';
 import { anel, abreviar } from './grafico.js';
-import { formatarBRL, formatarDuracao, formatarPct } from '../core/formato.js';
+import { formatarBRL, formatarDuracao, formatarPct, formatarPctCurto } from '../core/formato.js';
 import { formatarMes, diffMeses } from '../core/meses.js';
 import { calcularPainel, registrarSaldos } from '../core/motor.js';
 import { precisaRevisarOrcamento } from '../core/metas.js';
@@ -18,8 +18,9 @@ import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { resumoDaCarteira, evolucao, proventosDaCarteira } from '../core/carteira.js';
 import { potencialDeInvestimento } from '../core/investir-sobra.js';
 import { mesPadraoDaCasa } from './casa.js';
+import { recomendacaoDoMes } from '../core/recomendacao.js';
 import { graficoEvolucao, colunasProventos, barraDivisao } from './carteira-graficos.js';
-import { abaAtivos, folhaDeAtivos, NOMES_GRUPO } from './carteira-ativos.js';
+import { abaAtivos, folhaDeAtivos, NOMES_GRUPO, seloDoAtivo } from './carteira-ativos.js';
 
 let comemorando = false; // vale entre renders: impede duas comemorações ao mesmo tempo
 let abertaAqui = false; // a folha foi aberta por um toque nesta sessão: fechar = voltar no histórico
@@ -79,6 +80,67 @@ function cartaoParaInvestir(estado, hoje, ctx) {
       ? [h('p', { class: 'suave pequeno para-investir-media' }, `O Dia de pagamento de ${nomeDoMes(mes)} abre em ${nomeDoMes(mes)}.`),
         h('div', { class: 'botoes' }, h('a', { class: 'botao secundario', href: `#/casa-balanco?mes=${atual.mes}` }, `Ver o balanço de ${anterior}`))]
       : h('div', { class: 'botoes' }, h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar o Dia de pagamento' : 'Investir agora')));
+}
+
+// Onde investir (desenho 2026-11-22-onde-investir): as ordens da análise feita no Claude Code (/onde-investir), gravadas
+// no estado. Sem a análise do mês, diz como pedir.
+// A análise vale para o mês em foco ou para o do calendário (o Dia de pagamento registra o mês do calendário). Com o mês
+// já registrado, as ordens viram "investido" (para ninguém comprar duas vezes).
+function cartaoOndeInvestir(estado, mes, abrir, mesCalendario) {
+  const rec = recomendacaoDoMes(estado, mes) ?? recomendacaoDoMes(estado, mesCalendario);
+  const nome = nomeDoMes(rec?.mes ?? mes);
+  if (rec && estado.meses.some((m) => m.mes === rec.mes)) {
+    return h('section', { class: 'cartao onde-investir' },
+      h('h2', {}, `Investido em ${nome} ✓`),
+      h('p', { class: 'suave' }, `As compras de ${nome} já foram registradas no Dia de pagamento. Para o próximo mês, peça `, h('b', {}, '/onde-investir'), ' no Claude Code perto do dia do salário.'),
+      h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
+  }
+  if (!rec) {
+    return h('section', { class: 'cartao onde-investir' },
+      h('h2', {}, `Onde investir em ${nome}`),
+      h('p', { class: 'suave' }, estado.recomendacao
+        ? `A última análise foi para ${nomeDoMes(estado.recomendacao.mes)}. Para as ordens de ${nome}, peça no Claude Code: `
+        : 'Peça no Claude Code: ', h('b', {}, '/onde-investir'),
+      '. Ele busca os preços do dia e diz o que comprar: fundos imobiliários e ações que pagam renda isenta.'),
+      estado.recomendacao && h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
+  }
+  const total = rec.ordens.reduce((s, o) => s + o.valor, 0);
+  return h('section', { class: 'cartao onde-investir' },
+    h('h2', {}, `Onde investir em ${nome}`),
+    h('p', { class: 'suave pequeno' }, `Análise de ${dataCurta(rec.geradaEm)}, com os preços daquele dia.`),
+    rec.ordens.length
+      ? h('div', { class: 'ordens' }, ...rec.ordens.map((o) => h('div', { class: 'ordem' },
+        seloDoAtivo(o.ticker, o.classe),
+        h('span', { class: 'texto' }, h('b', {}, `Compre ${o.cotas} ${o.cotas === 1 ? 'cota' : 'cotas'} de ${o.ticker}`), h('small', {}, `${o.nome} · ${o.motivo}`)),
+        h('span', { class: 'quanto' }, `≈ ${formatarBRL(o.valor)}`))))
+      : h('p', {}, h('b', {}, 'Este mês o dinheiro vai para a reserva de emergência.')),
+    rec.ordens.length > 0 && h('p', { class: 'ordens-total' }, 'Total: ', h('b', {}, formatarBRL(total)), ` de ${formatarBRL(rec.valor)} para a carteira`),
+    rec.resumo && h('p', { class: 'suave' }, rec.resumo),
+    h('details', { class: 'avisos-recomendacao' }, h('summary', {}, 'Avisos'),
+      ...[...(rec.avisos ?? []), AVISO_EXEMPLOS].map((a) => h('p', { class: 'suave pequeno' }, a))),
+    h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
+}
+
+// A lista estável da carteira de renda isenta, com a fatia e o porquê de cada um.
+function folhaCarteiraRecomendada(estado, fechar) {
+  const rec = estado.recomendacao;
+  if (!rec) return null;
+  const grupo = (classe, titulo) => {
+    const itens = rec.lista.filter((a) => a.classe === classe);
+    return itens.length > 0 && h('div', { class: 'grupo-recomendado' }, h('h3', {}, `${titulo} · ${formatarPct(rec.estrategia?.[classe] ?? 0, 0)}`),
+      ...itens.map((a) => h('div', { class: 'ordem' }, seloDoAtivo(a.ticker, a.classe),
+        h('span', { class: 'texto' }, h('b', {}, `${a.ticker} · ${a.nome}`), h('small', {}, a.motivo)),
+        h('span', { class: 'quanto' }, formatarPctCurto(a.fatia ?? 0)))));
+  };
+  return [
+    h('h2', {}, 'Carteira recomendada'),
+    h('p', { class: 'suave' }, `Renda isenta de imposto: metade em fundos imobiliários, metade em ações de empresas que pagam bons dividendos. Montada em ${dataCurta(rec.geradaEm)}; revista a cada 3 meses. Nunca vende: o que entra é reinvestido.`),
+    grupo('fiis', 'Fundos imobiliários'),
+    grupo('acoes', 'Ações'),
+    h('p', { class: 'suave pequeno' }, 'A porcentagem ao lado é a fatia de cada um no total da carteira.'),
+    h('p', { class: 'suave pequeno' }, AVISO_EXEMPLOS),
+    h('div', { class: 'botoes' }, botao('Fechar', fechar, { secundario: true })),
+  ];
 }
 
 const abreviado = (v) => `R$ ${abreviar(v)}`;
@@ -193,7 +255,8 @@ function cartaoEvolucao(pontosTodos) {
 }
 
 function cartaoDivisao(resumo) {
-  const alocacao = resumo.alocacao.map((a) => ({ ...a, nome: NOMES_GRUPO[a.classe] }));
+  // Classes fora da estratégia (meta 0) e sem dinheiro não aparecem (a renda isenta tem só fundos imobiliários e ações).
+  const alocacao = resumo.alocacao.filter((a) => a.meta > 0 || a.valor > 0).map((a) => ({ ...a, nome: NOMES_GRUPO[a.classe] }));
   // Só o que pede atenção ganha texto: abaixo (o próximo aporte vai para cá) ou acima da meta.
   const situacao = (a) => (resumo.carteira <= 0 ? null : a.abaixo ? 'abaixo da meta: o próximo aporte vai para cá' : a.pct > a.meta + 0.005 ? 'acima da meta' : null);
   const fora = resumo.grupos.filter((g) => ['reserva', 'caixa', 'fora-do-plano'].includes(g.id));
@@ -214,7 +277,8 @@ function cartaoDivisao(resumo) {
     h('a', { class: 'botao-link link-meta', href: '#/config' }, 'Mudar a meta'));
 }
 
-function abaResumo({ p, resumo, estado, hoje, ctx }) {
+function abaResumo({ p, resumo, estado, hoje, ctx, abrir }) {
+  const mesDoFoco = ctx.unica && ctx.casa ? mesPadraoDaCasa(ctx) : hoje.slice(0, 7);
   const topo = h('section', { class: 'inicio-topo' },
     h('p', { class: 'rotulo' }, 'Sua renda plena'),
     h('div', { class: 'anel', html: anel({ fracao: p.marcos.rendaPlena.atingido ? 1 : (p.metas.rendaPlena > 0 ? p.patrimonio / p.metas.rendaPlena : 0) }) },
@@ -225,6 +289,7 @@ function abaResumo({ p, resumo, estado, hoje, ctx }) {
     topo,
     itens: [
       cartaoParaInvestir(estado, hoje, ctx),
+      cartaoOndeInvestir(estado, mesDoFoco, abrir, hoje.slice(0, 7)),
       topo,
       fileiraDeMarcos(p),
       fraseDoAlvo(p),
@@ -328,7 +393,7 @@ export function render(container, ctx) {
   let conteudo;
   if (aba === 'ativos') conteudo = abaAtivos({ resumo, abrir });
   else if (aba === 'proventos') ({ renda, itens: conteudo, media: mediaProventos } = abaProventos({ p, estado, hoje }));
-  else ({ topo, itens: conteudo } = abaResumo({ p, resumo, estado, hoje, ctx }));
+  else ({ topo, itens: conteudo } = abaResumo({ p, resumo, estado, hoje, ctx, abrir }));
 
   container.replaceChildren(...[h('h1', { class: 'so-leitor' }, 'Carteira'), heroi(resumo, vazio, abrir), abas, ...conteudo].filter(Boolean));
   if (renda) contar(renda.valor, mediaProventos, formatarBRL);
@@ -336,7 +401,8 @@ export function render(container, ctx) {
   // ---------- folha aberta (vem do endereço) ----------
   const folha = folhaAberta(location.hash);
   const opcoes = { ctx, resumo, fechar, salvarNaFolha, folha };
-  const conteudoFolha = folha && (folha === 'saldos' ? folhaDosSaldos(opcoes) : folhaDeAtivos(folha, opcoes));
+  const conteudoFolha = folha && (folha === 'saldos' ? folhaDosSaldos(opcoes)
+    : folha === 'carteira-recomendada' ? folhaCarteiraRecomendada(estado, fechar) : folhaDeAtivos(folha, opcoes));
   if (!conteudoFolha) {
     abertaAqui = false;
     esconderFolha();
