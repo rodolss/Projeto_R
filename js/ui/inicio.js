@@ -21,6 +21,8 @@ import { mesPadraoDaCasa } from './casa.js';
 import { recomendacaoDoMes, motivoSemOrdens } from '../core/recomendacao.js';
 import { graficoEvolucao, colunasProventos, barraDivisao } from './carteira-graficos.js';
 import { abaAtivos, folhaDeAtivos, NOMES_GRUPO, seloDoAtivo } from './carteira-ativos.js';
+import { atualizarEmSegundoPlano } from './cotacoes-aparelho.js';
+import { papelAutomatico } from '../core/cotacoes.js';
 
 let comemorando = false; // vale entre renders: impede duas comemorações ao mesmo tempo
 let abertaAqui = false; // a folha foi aberta por um toque nesta sessão: fechar = voltar no histórico
@@ -333,7 +335,7 @@ function folhaDosSaldos({ resumo, ctx, fechar, salvarNaFolha, folha }) {
   return [
     h('h2', {}, 'Atualizar saldos'),
     h('p', { class: 'suave' }, 'Copie os valores como estão na corretora agora. Só os que você digitar são salvos.'),
-    ...resumo.posicoes.map((p) => campoMoeda({
+    ...resumo.posicoes.filter((p) => !papelAutomatico(p.ativo)).map((p) => campoMoeda({
       rotulo: p.ativo.nome, dica: `No app: ${formatarBRL(p.saldo)}${p.dataSaldo ? ` (saldo de ${dataCurta(p.dataSaldo)})` : ''}`,
       aoMudar: (v) => { if (v == null) delete edicoes[p.ativo.id]; else edicoes[p.ativo.id] = v; },
     })),
@@ -395,6 +397,7 @@ export function render(container, ctx) {
 
   container.replaceChildren(...[h('h1', { class: 'so-leitor' }, 'Carteira'), heroi(resumo, vazio, abrir), abas, ...conteudo].filter(Boolean));
   if (renda) contar(renda.valor, mediaProventos, formatarBRL);
+  atualizarEmSegundoPlano(ctx); // cotação dos papéis automáticos (em segundo plano; só se passou de 15 minutos)
 
   // ---------- folha aberta (vem do endereço) ----------
   const folha = folhaAberta(location.hash);

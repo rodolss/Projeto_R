@@ -6,6 +6,7 @@ Planejador pessoal de aposentadoria. Ao abrir, o app mostra **quanto falta para 
 - **Regras transparentes, sem prever o mercado:** reserva de emergência primeiro, rebalanceamento só com aportes (nunca vende), trajetória até a meta e uma caixa de oportunidade usada nas quedas.
 - **Marcos no caminho:** reserva de emergência, Independência (pagar o custo de vida) e renda plena, com comemoração quando cada um chega.
 - **Simulador "E se…?":** arraste quanto investe, o salário e o custo de vida e veja quanto falta em 4 cenários de mercado (ruim, moderado, normal e bom) e quanto seria preciso para chegar no alvo.
+- **Cotação automática:** em Carteira › Ativos, ações, FIIs e ETFs se cadastram procurando pelo código ou nome e dizendo só quantas cotas você tem; o app calcula o valor em reais pela cotação (brapi.dev, sem chave; só o código do papel sai do aparelho) e atualiza ao abrir a Carteira, no máximo a cada 15 minutos. "Comprei mais" e "Vendi" ajustam a quantidade, e o preço que você pagou (opcional) dá o ganho. A cotação fica só no aparelho.
 - **Os investimentos sugeridos são exemplos, não uma recomendação profissional.**
 
 ## Contas da casa

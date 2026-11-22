@@ -3,6 +3,7 @@
 // A meta da renda plena continua no motor, em reais de hoje.
 import { somarMeses, diffMeses } from './meses.js';
 import { CLASSES } from './alocacao.js';
+import { papelAutomatico, cotasDoPapel, custoDoPapel } from './cotacoes.js';
 
 const centavos = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const fimDoMes = (mes) => `${mes}-31`;
@@ -55,21 +56,28 @@ export function posicoes(estado, hoje) {
     const depois = p.ultimo ? aportes.filter((a) => a.data >= p.ultimo.data && a.data <= hoje) : [];
     const cotas = p.ultimo?.cotas > 0 && depois.every((a) => a.cotas != null || !a.valor)
       ? p.ultimo.cotas + depois.reduce((s, a) => s + (a.cotas ?? 0), 0) : null;
+    // Papel automático (cotação do dia): o aplicado é o custo das compras; sem o preço pago de alguma, não há ganho.
+    const custo = papelAutomatico(ativo) ? custoDoPapel(estado, ativo) : undefined;
+    const auto = custo !== undefined;
+    const aplicado = auto ? (custo ?? p.saldo) : p.aplicado;
+    const ganhoFinal = auto ? (custo == null ? null : centavos(p.saldo - custo)) : ganho;
     return {
       ativo,
       grupo: grupoDe(ativo),
       saldo: p.saldo,
-      aplicado: p.aplicado,
-      ganho,
-      ganhoPct: temGanho && p.aplicado > 0 ? ganho / p.aplicado : null,
+      aplicado,
+      ganho: ganhoFinal,
+      ganhoPct: ganhoFinal != null && aplicado > 0 ? ganhoFinal / aplicado : null,
       dataSaldo: p.ultimo?.data ?? null,
       comAportesDepois: depois.some((a) => a.valor),
-      cotas,
+      cotas: auto ? cotasDoPapel(estado, ativo) : cotas,
       cotasNoSaldo: p.ultimo?.cotas > 0 ? p.ultimo.cotas : null, // as do último saldo, quando os aportes depois vieram sem cotas
       valorCota: p.ultimo?.cotas > 0 ? centavos(p.ultimo.valor / p.ultimo.cotas) : null,
       // Do mais novo para o mais antigo; no mesmo dia, o aporte vem antes do saldo (conta depois dele).
+      // Papel automático: as compras e vendas (os saldos diários são só o valor do dia, não vão para o histórico).
       historico: [
-        ...saldos.map((s) => ({ tipo: 'saldo', data: s.data, valor: s.valor, cotas: s.cotas ?? null })),
+        ...(auto ? ativo.compras.map((c) => ({ tipo: c.cotas > 0 ? 'compra' : 'venda', data: c.data, valor: c.preco != null ? centavos(Math.abs(c.cotas) * c.preco) : null, cotas: c.cotas, preco: c.preco ?? null }))
+          : saldos.map((s) => ({ tipo: 'saldo', data: s.data, valor: s.valor, cotas: s.cotas ?? null }))),
         ...aportes.filter((a) => a.valor).map((a) => ({ tipo: a.valor > 0 ? 'aporte' : 'resgate', data: a.data, valor: a.valor, cotas: a.cotas })),
       ].sort((a, b) => (a.data !== b.data ? (a.data < b.data ? 1 : -1) : (a.tipo === 'saldo') - (b.tipo === 'saldo'))),
     };
