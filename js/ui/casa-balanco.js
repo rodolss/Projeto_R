@@ -4,7 +4,7 @@
 // perfis, botões para escolher a pessoa. Endereço: #/casa-balanco?mes=AAAA-MM[&pessoa=pX].
 import { h, cartao, botao, campoMoeda, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
-import { somarMeses, diffMeses } from '../core/meses.js';
+import { diffMeses } from '../core/meses.js';
 import { primeiroMes, salarioNoMes, pessoasNoMes } from '../core/casa.js';
 import { definirSalario, extraDoMes } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
@@ -35,8 +35,9 @@ export function textoDoPlano({ situacao, falta = 0 }) {
 }
 
 // Na visão única (quem administra, com o planejador), o Balanço é a primeira aba: no mês atual (ou no seguinte, se o atual já está todo pago), o plano junto.
-// Investir a sobra (desenho 2026-11-20-investir-a-sobra): a sobra deste mês vai para o Dia de pagamento do mês
-// seguinte — 10% para lazer, o resto para investir —, e é isso que se compara com o que o plano pede.
+// Investir a sobra (desenho 2026-11-22-sobra-do-proprio-mes): a sobra deste mês vai para o Dia de pagamento deste mês
+// (o salário cai no dia 27, quando as contas e as faturas do mês já fecharam) — 10% para lazer, o resto para
+// investir —, e é isso que se compara com o que o plano pede.
 function cartaoDoPlano(ctx, b) {
   let painel;
   try {
@@ -51,7 +52,7 @@ function cartaoDoPlano(ctx, b) {
   const pede = Number.isFinite(alvo) && alvo > 0;
   const completo = dadosCompletos(b);
   const divisao = divisaoDaSobra(b.sobra);
-  const proximo = nomeDoMes(somarMeses(b.mes, 1));
+  const doMes = nomeDoMes(b.mes);
   const texto = textoDoPlano(compararComPlano({ sobra: b.sobra <= 0 ? b.sobra : divisao.investir, pmtNec: alvo, completo }));
   return h('section', { class: 'cartao balanco-plano' },
     h('div', { class: 'rotulo' }, 'Seu plano'),
@@ -59,7 +60,7 @@ function cartaoDoPlano(ctx, b) {
       ? h('p', {}, h('b', {}, 'Renda plena conquistada ✓'))
       : h('p', {}, h('b', {}, `Renda plena em ${formatarDuracao(painel.projecaoM2?.meses)}`), ' no ritmo de hoje.'),
     completo && b.sobra > 0 && h('p', {},
-      `Desta sobra${b.previsao ? ' (previsão)' : ''}, no Dia de pagamento de ${proximo}: `, h('b', {}, formatarBRL(divisao.investir)), ' para investir e ',
+      `Desta sobra${b.previsao ? ' (previsão)' : ''}, no Dia de pagamento de ${doMes}: `, h('b', {}, formatarBRL(divisao.investir)), ' para investir e ',
       h('b', {}, formatarBRL(divisao.lazer)), ` para lazer (${Math.round(LAZER * 100)}%).`),
     pede && h('p', { class: 'suave' }, `Para chegar no alvo, o plano pede ${formatarBRL(alvo)} por mês.`),
     texto && h('p', {}, texto),
@@ -243,9 +244,8 @@ function desenhar(container, ctx) {
       type: 'button', class: 'botao-link',
       onclick: (e) => gravar((c) => definirSalario(c, { mes, pessoaId, salario: null, extra: null }), 'Salário tirado. O app volta a prever.', e.currentTarget),
     }, 'Tirar o salário deste mês');
-    // O a mais vai pela sobra no Dia de pagamento do mês seguinte: se ele já foi registrado, não entra mais.
-    const proximo = somarMeses(mes, 1);
-    const proximoRegistrado = (ctx.estado?.meses ?? []).some((m) => m.mes === proximo);
+    // O a mais vai pela sobra no Dia de pagamento deste mês: se ele já foi registrado, não entra mais.
+    const jaRegistrado = (ctx.estado?.meses ?? []).some((m) => m.mes === mes);
     return [
       h('h2', { 'data-sem-recarregar': '' }, `Seu salário de ${nomeDoMes(mes)}`),
       atual.situacao === 'a-confirmar' && h('p', { class: 'suave' }, `Previsão: igual a ${quando(atual.deOnde, mes)}. Confira e salve o valor certo.`),
@@ -256,10 +256,10 @@ function desenhar(container, ctx) {
       }),
       campoMoeda({
         rotulo: 'A mais neste mês (se veio)', valor: novo.extra, id: 'a-mais-do-mes',
-        dica: `13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra${ctx.unica ? ' e é investido no próximo Dia de pagamento' : ''}. Férias: o adiantamento não conta aqui — no mês seguinte, digite o salário de sempre.`,
+        dica: `13º, o 1/3 das férias, PLR, bônus. Não muda a divisão das contas; entra na sobra${ctx.unica ? ` e é investido no Dia de pagamento de ${nomeDoMes(mes)}` : ''}. Férias: o adiantamento não conta aqui — no mês seguinte, digite o salário de sempre.`,
         aoMudar: (v) => { novo.extra = v; },
       }),
-      proximoRegistrado && h('p', { class: 'suave pequeno' }, `O Dia de pagamento de ${nomeDoMes(proximo)} já foi registrado: um a mais digitado agora não entra mais nele.`),
+      ctx.unica && jaRegistrado && h('p', { class: 'suave pequeno' }, `O Dia de pagamento de ${nomeDoMes(mes)} já foi registrado: um a mais digitado agora não entra mais nele.`),
       h('div', { class: 'botoes' }, botao('Cancelar', fechar, { secundario: true }), salvar),
       tirar,
     ];
