@@ -55,6 +55,15 @@ export function validarRecomendacao(r) {
     erros.push(...errosDaConferencia(a, r.geradaEm));
   }
   if (r.semOrdens !== undefined && !(typeof r.semOrdens === 'string' && r.semOrdens.trim())) erros.push('semOrdens, quando vem, precisa ser um texto');
+  // Os excluídos (com o motivo) vão de um mês para o outro: a análise automática não traz de volta o que já descartou.
+  if (r.excluidos !== undefined && !Array.isArray(r.excluidos)) erros.push('excluidos, quando vem, precisa ser uma lista');
+  for (const x of Array.isArray(r.excluidos) ? r.excluidos : []) {
+    if (!x?.ticker || !x.motivo || !DATA.test(x.em ?? '')) erros.push(`${x?.ticker ?? '?'}: excluído precisa de ticker, motivo e em (AAAA-MM-DD)`);
+    else {
+      const voltou = lista.find((a) => igualCodigo(a.ticker, x.ticker));
+      if (voltou) erros.push(`${voltou.ticker}: está nos excluídos (${x.motivo}); tire-o da lista ou dos excluídos, com motivo`);
+    }
+  }
   for (const o of ordens) {
     const naLista = lista.find((a) => igualCodigo(a.ticker, o.ticker));
     if (!naLista) erros.push(`${o.ticker}: a ordem está fora da lista da carteira`);

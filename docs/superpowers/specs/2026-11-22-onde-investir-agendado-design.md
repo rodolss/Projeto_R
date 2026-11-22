@@ -11,6 +11,13 @@ condição (fundo só para investidor qualificado, oferta fechada, cota cara dem
 - **Na nuvem (rotina do Claude Code)** — escolhida pelo usuário: roda com o PC desligado; conta na assinatura. O `gh`
   vem instalado e o proxy do GitHub dá acesso aos repositórios ligados à rotina (o público e o de dados), sem chave
   guardada. Precisa do app do GitHub do Claude instalado nos dois repositórios (passo do usuário).
+  **Descoberto no primeiro teste:** o proxy deixa LER pela API (`gh api`), mas recusa GRAVAR por ela (403 "not
+  permitted through this proxy"); gravar só por `git push`. Por isso `enviar --clone <clone do Projeto_R-dados>`
+  (`scripts/envio-git.mjs`): confere que o clone é do repositório de dados, compara o sha do `dados.json` com o do
+  "baixar" (o app gravou no meio → conflito) e empurra só esse arquivo para o `main`.
+- **Excluídos com motivo** (também do primeiro teste): a rodada automática não lembrava por que a Sanepar tinha sido
+  descartada e a trouxe de volta. A recomendação passa a carregar `excluidos` ({ ticker, motivo, em }), levados de mês
+  a mês; `validarRecomendacao` recusa lista com ativo excluído.
 
 ## Decisões
 - **Quando**: todo dia 26, às 19h de Brasília (22h UTC; cron `0 22 26 * *`), depois do fechamento da bolsa; ele compra
@@ -39,10 +46,11 @@ ferramentas Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch e Skill. O 
 
 > Rode a skill do projeto /onde-investir (`.claude/skills/onde-investir/SKILL.md`) em **modo automático**: ninguém vai
 > responder perguntas. Trabalhe em `/tmp/onde-investir` e rode os comandos do script a partir da raiz do repositório
-> Projeto_R. Pesquise na web os dados de hoje (preço de fechamento, público-alvo, média negociada por dia) para conferir
-> a lista e montar as ordens. Não faça commit, push nem PR em nenhum repositório: a única gravação é o `enviar` do
-> script. Não escreva valores do usuário fora do repositório de dados. Termine com um resumo curto: o mês, as ordens (ou
-> o motivo de não haver) e se o envio deu certo.
+> Projeto_R; envie com `enviar --pasta /tmp/onde-investir --clone <clone do Projeto_R-dados>` (o proxy só deixa gravar
+> por git). Pesquise na web os dados de hoje (preço de fechamento, público-alvo, média negociada por dia) para conferir
+> a lista e montar as ordens. Não faça commit, push nem PR por conta própria em nenhum repositório: a única gravação é
+> o `enviar` do script. Não escreva valores do usuário fora do repositório de dados. Termine com um resumo curto: o mês,
+> as ordens (ou o motivo de não haver), se a lista foi conferida ou trocada e se o envio deu certo.
 
 ## Fora
 Notificação no celular; rodar de novo sozinho depois que o Balanço for completado (ele pede `/onde-investir` ou roda a

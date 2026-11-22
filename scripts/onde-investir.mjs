@@ -5,7 +5,7 @@
 //   node scripts/onde-investir.mjs baixar   --pasta <dir> [--dono <usuário>]
 //   node scripts/onde-investir.mjs contexto --pasta <dir> [--hoje AAAA-MM-DD] [--mes AAAA-MM]
 //   node scripts/onde-investir.mjs gravar   --pasta <dir> --recomendacao <arquivo.json>
-//   node scripts/onde-investir.mjs enviar   --pasta <dir> [--dono <usuário>]
+//   node scripts/onde-investir.mjs enviar   --pasta <dir> [--dono <usuário>] [--clone <clone do Projeto_R-dados>]
 //
 // O GitHub pela `gh` (já autenticada). "enviar" usa o sha do "baixar": se o app gravou no meio, o GitHub recusa — baixe
 // de novo, grave de novo e envie (nada se perde).
@@ -24,6 +24,7 @@ import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesD
 import { somarMeses } from '../js/core/meses.js';
 import { donoDaUrl } from './github-dono.mjs';
 import { dentroDe } from './caminhos.mjs';
+import { enviarPorGit } from './envio-git.mjs';
 
 const REPO = 'Projeto_R-dados';
 const args = process.argv.slice(2);
@@ -90,6 +91,7 @@ if (comando === 'baixar') {
     divisaoAtual: carteira.alocacao.filter((a) => a.valor > 0 || ESTRATEGIA_RENDA_ISENTA[a.classe]).map((a) => ({ classe: a.classe, valor: a.valor, pct: Math.round(a.pct * 1000) / 10 })),
     listaAtual: estado.recomendacao?.lista ?? null,
     revisarLista: precisaRevisarLista(estado.recomendacao?.lista, hoje),
+    excluidos: estado.recomendacao?.excluidos ?? [],
     ultimaAnalise: estado.recomendacao ? { mes: estado.recomendacao.mes, geradaEm: estado.recomendacao.geradaEm } : null,
     liquidezMinima: LIQUIDEZ_MINIMA,
   }, null, 2));
@@ -107,6 +109,18 @@ if (comando === 'baixar') {
   const { 'dados.json': sha } = lerJson('sha.json');
   const conteudo = Buffer.from(readFileSync(join(pasta, 'dados.json'), 'utf8')).toString('base64');
   const mes = lerJson('dados.json').recomendacao?.mes ?? '';
+  // Na nuvem do Claude Code, o proxy só deixa gravar por git: --clone <pasta do clone do Projeto_R-dados>.
+  if (opcao('clone')) {
+    let r;
+    try {
+      r = enviarPorGit({ clone: opcao('clone'), conteudo: readFileSync(join(pasta, 'dados.json'), 'utf8'), shaEsperado: sha, mensagem: `Onde investir: recomendação de ${mes}` });
+    } catch (erro) {
+      falhar(`O envio por git falhou: ${`${erro.stderr ?? ''}`.trim() || erro.message}`);
+    }
+    if (r === 'conflito') falhar('O app gravou no meio (o dados.json mudou). Rode baixar, gravar e enviar de novo.');
+    console.log(r === 'sem mudança' ? `Nada mudou: o dados.json de ${usuario}/${REPO} já tem esta recomendação.` : `Enviado por git para ${usuario}/${REPO}: a Carteira mostra a recomendação de ${mes} na próxima sincronização.`);
+    process.exit(0);
+  }
   // O corpo vai pela entrada padrão: na linha de comando, o Windows recusa textos grandes (o arquivo cresce todo mês).
   try {
     execFileSync('gh', ['api', '-X', 'PUT', `repos/${usuario}/${REPO}/contents/dados.json`, '--input', '-', '--silent'], {
@@ -115,6 +129,7 @@ if (comando === 'baixar') {
   } catch (erro) {
     const detalhe = `${erro.stderr ?? ''}${erro.stdout ?? ''}`.trim();
     if (/\b(409|422)\b|does not match|is at/i.test(detalhe)) falhar('O app gravou no meio (o sha mudou). Rode baixar, gravar e enviar de novo.');
+    if (/not permitted through this proxy/i.test(detalhe)) falhar('Na nuvem, o proxy não deixa gravar pela API: rode enviar com --clone <pasta do clone do Projeto_R-dados>.');
     falhar(`O GitHub recusou: ${detalhe || erro.message}`);
   }
   console.log(`Enviado para ${usuario}/${REPO}: a Carteira mostra a recomendação de ${mes} na próxima sincronização.`);

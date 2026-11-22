@@ -56,7 +56,14 @@ pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`).
    - **8 a 10 ações** de setores perenes: bancos, energia elétrica (transmissão, geração), saneamento, seguros,
      telecom; empresas lucrativas, com dividendos pagos há muitos anos, dívida controlada e boa liquidez; prefira as
      que pagam mais em dividendo que em JCP (JCP tem 15% de IR); no máximo 20% do lado das ações em uma empresa e dois
-     do mesmo setor no máximo.
+     do mesmo setor no máximo (energia elétrica é um setor só: transmissão e geração contam juntas).
+   - **Excluídos** (`excluidos` do `contexto`): ativos já descartados, com o motivo. Leve-os adiante na recomendação
+     (`"excluidos": [{ "ticker": "...", "motivo": "...", "em": "AAAA-MM-DD" }]`) e não os traga de volta antes de 12
+     meses, a não ser com fato novo que resolva o motivo (explique no `resumo` e tire-o dos excluídos). Ao tirar um
+     ativo da lista, ponha-o nos excluídos com o motivo. `gravar` recusa lista com ativo excluído.
+     Exclusões já decididas (copie para `excluidos` se ainda não estiverem lá):
+     - SAPR11 e SAPR4 (Sanepar), em 2026-11-22: lucro caiu 71% no 1T26, a agência reguladora barrou R$ 4 bi em
+       dividendos e boa parte do provento é JCP.
    - `fatia` de cada ativo: a parte dele no total da carteira (os FIIs somam 0,5 e as ações 0,5).
    - `motivo`: uma frase simples, sem jargão ("galpões alugados para grandes empresas, rendimento todo mês").
    - **Só o que ele consegue comprar** (pessoa física comum, sem R$ 1 milhão aplicado). Fora da lista:
@@ -91,6 +98,7 @@ pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`).
      "estrategia": { "fiis": 0.5, "acoes": 0.5 },
      "lista": [{ "ticker": "XXXX11", "nome": "...", "classe": "fiis|acoes", "fatia": 0.06, "motivo": "...",
                  "conferido": { "publicoGeral": true, "liquidezDiaria": 8500000, "em": "AAAA-MM-DD" } }],
+     "excluidos": [{ "ticker": "XXXX3", "motivo": "...", "em": "AAAA-MM-DD" }],
      "ordens": [{ "ticker": "XXXX11", "nome": "...", "classe": "fiis|acoes", "cotas": 10, "preco": 95.4, "valor": 954, "motivo": "..." }],
      "semOrdens": "só quando não há ordens por algo que falta (veja o modo automático)",
      "resumo": "duas ou três frases do porquê, para leigo",
@@ -100,6 +108,9 @@ pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`).
    node scripts/onde-investir.mjs gravar --pasta <rascunho>/onde-investir --recomendacao <rascunho>/onde-investir/recomendacao.json
    node scripts/onde-investir.mjs enviar --pasta <rascunho>/onde-investir
    ```
+   **Na nuvem** (rotina), o proxy deixa ler pela API mas só gravar por git: envie com
+   `--clone <pasta do clone do Projeto_R-dados>` (a rotina o clona ao lado do Projeto_R). O script confere que o clone
+   é do repositório de dados, que ninguém gravou no meio, e empurra só o `dados.json` para o `main`.
    `gravar` valida (cotas inteiras, valor = cotas × preço, soma dentro do valor, ordens só da lista e na classe dela,
    só fiis/acoes, a conferência de cada ativo) e também põe a carteira-alvo do app em 50/50. Se `enviar` disser que o
    app gravou no meio, repita baixar → gravar → enviar (até 3 vezes); qualquer outro erro do GitHub, mostre ao usuário e
