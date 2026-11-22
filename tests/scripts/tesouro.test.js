@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { titulosDoDia, nomeDoTitulo } from '../../scripts/tesouro.mjs';
+import { titulosDoDia, nomeDoTitulo, atualizarCatalogo } from '../../scripts/tesouro.mjs';
 
 // Pedaço inventado do PrecoTaxaTesouroDireto.csv: separador ";", vírgula decimal, datas dd/mm/aaaa, dias misturados.
 const CSV = [
@@ -34,4 +34,24 @@ test('nomes: ano do vencimento, menos Renda+ (−19) e Educa+ (−4), como o Tes
 test('arquivo vazio ou estranho: erro claro (a tarefa agendada não grava lixo)', () => {
   assert.throws(() => titulosDoDia(''), /tesouro-vazio/);
   assert.throws(() => titulosDoDia('a;b;c\n1;2;3'), /tesouro-formato/);
+});
+
+test('atualizar: usa o arquivo oficial quando dá; se o Tesouro recusa (servidor de fora do Brasil), calcula pela ANBIMA', async () => {
+  const resposta = (texto, status = 200) => ({ ok: status === 200, status, arrayBuffer: async () => new TextEncoder().encode(texto).buffer });
+  const ANB = 'Titulo@Data Referencia@Codigo SELIC@Data Base/Emissao@Data Vencimento@Tx. Compra@Tx. Venda@Tx. Indicativas@PU\r\nLFT@20261119@210100@20000701@20290301@0,05@0,05@0,0536@20310,268931\r\n';
+  const catalogo = { data: '2026-11-18', titulos: [{ nome: 'Tesouro Selic 2029', tipo: 'Tesouro Selic', vencimento: '2029-03-01', preco: 20300, taxa: 0.06 }] };
+  const oficial = await atualizarCatalogo({ fetch: async () => resposta(CSV), catalogo, hoje: new Date('2026-11-22T12:00:00Z') });
+  assert.equal(oficial.fonte, 'tesouro');
+  assert.equal(oficial.titulos.length, 4);
+  const pedidos = [];
+  const fetch = async (url) => {
+    pedidos.push(url);
+    if (url.includes('tesourotransparente')) throw new Error('fetch failed');
+    return url.endsWith('ms261119.txt') ? resposta(ANB) : resposta('', 404);
+  };
+  const r = await atualizarCatalogo({ fetch, catalogo, hoje: new Date('2026-11-22T12:00:00Z') });
+  assert.equal(r.fonte, 'anbima');
+  assert.equal(r.data, '2026-11-19');
+  assert.equal(r.titulos[0].preco, 20310.27);
+  assert.deepEqual(pedidos.slice(1).map((u) => u.slice(-12)), ['ms261122.txt', 'ms261121.txt', 'ms261120.txt', 'ms261119.txt']);
 });
