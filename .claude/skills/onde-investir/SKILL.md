@@ -19,9 +19,12 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
    node scripts/onde-investir.mjs baixar --pasta <rascunho>/onde-investir
    node scripts/onde-investir.mjs contexto --pasta <rascunho>/onde-investir
    ```
-   O contexto traz o mês do investimento (o mês em foco), quanto investir (a sobra do Balanço menos 10% de lazer;
-   `previsao: true` se o mês ainda não fechou), quanto vai para a carteira depois da reserva e da caixa
-   (`divisaoDoMotor.paraCarteira`: **é esse o valor das ordens**), a carteira atual e a lista atual.
+   O contexto traz o mês das ordens (`mesDoInvestimento`: o do próximo Dia de pagamento — o mês do calendário enquanto
+   ele não foi registrado, porque o Dia de pagamento registra o mês do calendário), quanto investir (a sobra do
+   Balanço menos 10% de lazer; `previsao: true` se o mês ainda não fechou), quanto vai para a carteira depois da reserva
+   e da caixa (`divisaoDoMotor.paraCarteira`: **é esse o valor das ordens**), a carteira atual e a lista atual.
+   - Se o mês do calendário já fechou e o usuário não vai fazer o Dia de pagamento dele (ex.: começou a usar no mês
+     seguinte), rode de novo com `--mes <mesEmFoco>`. Na dúvida, pergunte qual Dia de pagamento ele vai fazer.
    - `quantoInvestir.incompleto`: diga ao usuário o que falta no Balanço e pare.
    - `paraCarteira` zero (tudo foi para a reserva): diga isso; as ordens ficam vazias, mas ainda grave a lista.
 
@@ -42,8 +45,10 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
    - Busque o preço de hoje de cada ativo da lista (cotação na B3).
    - Distribua `paraCarteira`: primeiro aproxime FIIs e ações de 50% cada; dentro de cada lado, compre os mais abaixo
      da `fatia` e, empatados, os mais baratos (P/VP menor nos FIIs, dividend yield sustentável maior nas ações).
-   - **Cotas inteiras**; `valor = cotas × preço`; a soma **não passa** de `paraCarteira`. Prefira poucas ordens (3 a 6)
-     a dezenas de compras pequenas; o que sobrar fica para o mês seguinte.
+   - **Cotas inteiras**; `valor = cotas × preço` (com o preço arredondado a centavos); a soma **não passa** de
+     `paraCarteira`. Prefira poucas ordens (3 a 6) a dezenas de compras pequenas; o que as cotas inteiras não cobrirem
+     o Dia de pagamento põe na caixa de oportunidade (Tesouro Selic), sozinho.
+   - A `classe` de cada ordem é a mesma do ativo na lista.
    - `motivo` de cada ordem: por que ela recebe dinheiro este mês ("o lado dos FIIs está abaixo de 50%").
 
 4. **Gravar e enviar**
@@ -60,9 +65,9 @@ repositório público, e não cite valores do usuário em commits, PRs ou arquiv
    node scripts/onde-investir.mjs gravar --pasta <rascunho>/onde-investir --recomendacao <rascunho>/onde-investir/recomendacao.json
    node scripts/onde-investir.mjs enviar --pasta <rascunho>/onde-investir
    ```
-   `gravar` valida (cotas inteiras, valor = cotas × preço, soma dentro do valor, ordens só da lista, só fiis/acoes) e
-   também põe a carteira-alvo do app em 50/50. Se `enviar` for recusado, o app gravou no meio: repita baixar → gravar →
-   enviar. Apague a pasta de rascunho no fim.
+   `gravar` valida (cotas inteiras, valor = cotas × preço, soma dentro do valor, ordens só da lista e na classe dela,
+   só fiis/acoes) e também põe a carteira-alvo do app em 50/50. Se `enviar` disser que o app gravou no meio, repita
+   baixar → gravar → enviar; qualquer outro erro do GitHub, mostre ao usuário e pare. Apague a pasta de rascunho no fim.
 
 5. **Responder ao usuário**, objetivo: a lista de ordens ("Compre 10 cotas de XXXX11 — ≈ R$ 954"), o total, o que fica
    para a reserva, e que a Carteira e o Dia de pagamento já mostram. Lembre: preços mudam durante o dia (compre perto do

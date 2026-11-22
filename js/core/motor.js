@@ -336,7 +336,7 @@ function resolverDestino(estado, destino) {
   // diferenciar maiúsculas) ou cria na primeira compra, na classe da ordem.
   if (destino && typeof destino === 'object') {
     const codigo = String(destino.ticker).trim().toUpperCase();
-    const achado = estado.ativos.find((a) => String(a.ticker ?? a.nome).trim().toUpperCase() === codigo);
+    const achado = estado.ativos.find((a) => a.papel === 'carteira' && String(a.ticker ?? a.nome).trim().toUpperCase() === codigo);
     if (achado) return achado.id;
     const criado = { id: novoId(), nome: codigo, ticker: codigo, papel: 'carteira', classe: destino.classe, tipoForaDoPlano: null };
     estado.ativos.push(criado);

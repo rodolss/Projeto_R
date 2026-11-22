@@ -11,7 +11,7 @@ import { TIPOS_EXTRA } from '../core/protecao.js';
 import { calcularMes, registrarAplicacao, registrarSaldos, calcularPainel, saldosAtuais } from '../core/motor.js';
 import { LAZER } from '../core/balanco.js';
 import { regraDaSobra } from '../core/investir-sobra.js';
-import { recomendacaoDoMes, aplicadoDasOrdens } from '../core/recomendacao.js';
+import { recomendacaoDoMes, aplicadoDasOrdens, restoDasOrdens } from '../core/recomendacao.js';
 import { salarioParaODia, rascunhoComBalanco } from '../core/salario.js';
 import {
   rascunhoVazio, rascunhoDoRegistro, situacao, ultimoRegistroAntes, saldoDigitadoNoMes, totalAplicado,
@@ -310,6 +310,9 @@ function desenhar(container, ctx) {
     // ordens dela, em cotas; sem ela, a sugestão por classe do motor.
     const rec = ordensDoMes(rr);
     const paraCarteira = rr.sugestoes.reduce((s, x) => s + x.valor, 0);
+    const proventosDoMes = r.proventos ?? 0;
+    // O que as cotas inteiras não cobrem (e os proventos do mês, que a análise ainda não conhecia) vai para a caixa.
+    const resto = rec ? restoDasOrdens(rec, paraCarteira) : 0;
     const destinos = [
       rr.paraReserva > 0 && linha('Reserva de emergência', formatarBRL(rr.paraReserva), 'Tesouro Selic · vem antes de qualquer investimento'),
       rr.paraCaixa > 0 && linha('Caixa de oportunidade', formatarBRL(rr.paraCaixa), 'Tesouro Selic · guardado para comprar quando o mercado cair'),
@@ -317,12 +320,15 @@ function desenhar(container, ctx) {
       ...(rec
         ? rec.ordens.map((o) => linha(`Compre ${o.cotas} ${o.cotas === 1 ? 'cota' : 'cotas'} de ${o.ticker}`, `≈ ${formatarBRL(o.valor)}`, `${o.nome} · ${o.motivo}`))
         : rr.sugestoes.map((s) => linha(s.ticker, formatarBRL(s.valor), s.frase + (s.cotasAprox ? ` · ≈ ${s.cotasAprox} ${s.cotasAprox === 1 ? 'cota' : 'cotas'}` : '')))),
+      rec && resto >= 0.01 && linha('Caixa de oportunidade (o resto)', formatarBRL(resto),
+        `O que as cotas inteiras não cobrem${proventosDoMes > 0 ? ' e os proventos do mês' : ''}: fica no Tesouro Selic e conta para a meta`),
     ].filter(Boolean);
     if (destinos.length) {
       const porque = rec ? rec.resumo : rr.porque;
+      const semProventos = paraCarteira - proventosDoMes; // a análise não conhecia os proventos do mês
       blocos.push(cartao(h('h2', {}, 'Onde aplicar'), ...destinos,
-        rec && Math.abs(paraCarteira - rec.valor) > 1 && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
-          `A análise de ${dataCurta(rec.geradaEm)} usou ${formatarBRL(rec.valor)} para a carteira; hoje são ${formatarBRL(paraCarteira)}. Compre o que couber, ou peça /onde-investir de novo no Claude Code.`),
+        rec && semProventos < rec.valor - 1 && h('p', { class: 'suave pequeno', style: 'margin-top:8px' },
+          `A análise de ${dataCurta(rec.geradaEm)} usou ${formatarBRL(rec.valor)} para a carteira; hoje são ${formatarBRL(semProventos)}. Compre uma cota a menos onde não couber, ou peça /onde-investir de novo no Claude Code.`),
         porque && h('div', { style: 'margin-top:8px' }, aviso('ok', h('b', {}, 'Por quê? '), porque)),
         h('p', { class: 'suave pequeno', style: 'margin-top:8px' }, AVISO_EXEMPLOS)));
     }
@@ -349,10 +355,13 @@ function desenhar(container, ctx) {
     // Reconfirmar sem mudar nada parte do que já foi salvo, e não de uma sugestão nova.
     const usarSalvo = r.editando && existente && r.recebido === existente.recebido && r.tipoExtra === (existente.tipoExtra ?? null)
       && (r.proventos ?? 0) === (existente.proventos ?? 0);
+    const rec = ordensDoMes(rr);
+    const restoParaCaixa = rec ? restoDasOrdens(rec, rr.sugestoes.reduce((s, x) => s + x.valor, 0)) : 0;
     const aplicado = usarSalvo
-      ? existente.aplicado.filter((a) => a.valor > 0).map((a) => ({ ativoId: a.ativoId, nome: nomeAtivo(a.ativoId), valor: a.valor }))
+      ? existente.aplicado.filter((a) => a.valor > 0).map((a) => ({ ativoId: a.ativoId, nome: nomeAtivo(a.ativoId), valor: a.valor, cotas: a.cotas ?? null }))
       : [
-        ...(ordensDoMes(rr) ? aplicadoDasOrdens(ordensDoMes(rr)) : rr.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor }))),
+        ...(rec ? aplicadoDasOrdens(rec) : rr.sugestoes.map((s) => ({ destino: s.classe, nome: s.ticker, valor: s.valor }))),
+        restoParaCaixa >= 0.01 && { destino: 'caixa', nome: 'Caixa de oportunidade (o resto das ordens)', valor: restoParaCaixa },
         rr.paraReserva > 0 && { destino: 'reserva', nome: 'Reserva de emergência', valor: rr.paraReserva },
         rr.paraCaixa > 0 && { destino: 'caixa', nome: 'Caixa de oportunidade', valor: rr.paraCaixa },
       ].filter(Boolean);
@@ -378,7 +387,10 @@ function desenhar(container, ctx) {
     confirmacao.replaceChildren(h('div', { 'data-sem-recarregar': '' }, cartao(
       h('h3', {}, temAlgo ? 'Quanto você aplicou de fato?' : 'Registrar o mês'),
       temAlgo && h('p', { class: 'suave pequeno' }, 'Se aplicou um valor diferente do sugerido, corrija aqui.'),
-      ...aplicado.map((a) => h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: a.nome, valor: a.valor, aoMudar: (v) => { a.valor = v; } }))),
+      // Nas ordens, as cotas compradas também (o preço muda no dia: às vezes cabe uma cota a menos).
+      ...aplicado.map((a) => h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: a.nome, valor: a.valor, aoMudar: (v) => { a.valor = v; } }),
+        a.cotas != null && h('label', { class: 'campo', style: 'margin-top:4px' }, h('span', { class: 'campo-rotulo' }, 'Cotas compradas'),
+          h('input', { class: 'entrada', type: 'number', min: '0', step: '1', inputmode: 'numeric', value: a.cotas, style: 'max-width:120px', oninput: (e) => { a.cotas = e.target.value === '' ? null : Number(e.target.value); } })))),
       transferencia.valor > 0 && h('div', { style: 'margin-top:8px' }, campoMoeda({ rotulo: 'Transferido da caixa de oportunidade', valor: transferencia.valor, aoMudar: (v) => { transferencia.valor = v; } })),
       h('div', { class: 'botoes', style: 'margin-top:12px' }, botao('Cancelar', () => confirmacao.replaceChildren(), { secundario: true }), confirmar))));
     confirmacao.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -3,7 +3,7 @@
 // uma pasta temporária (use a pasta de rascunho da sessão, nunca uma pasta do repositório público).
 //
 //   node scripts/onde-investir.mjs baixar   --pasta <dir> [--dono <usuário>]
-//   node scripts/onde-investir.mjs contexto --pasta <dir> [--hoje AAAA-MM-DD]
+//   node scripts/onde-investir.mjs contexto --pasta <dir> [--hoje AAAA-MM-DD] [--mes AAAA-MM]
 //   node scripts/onde-investir.mjs gravar   --pasta <dir> --recomendacao <arquivo.json>
 //   node scripts/onde-investir.mjs enviar   --pasta <dir> [--dono <usuário>]
 //
@@ -11,7 +11,8 @@
 // de novo, grave de novo e envie (nada se perde).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { migrar } from '../js/core/esquema.js';
 import { migrarCasa } from '../js/core/casa.js';
 import { mesEmFoco } from '../js/core/pagamentos.js';
@@ -19,7 +20,8 @@ import { regraDaSobra } from '../js/core/investir-sobra.js';
 import { calcularMes } from '../js/core/motor.js';
 import { LAZER } from '../js/core/balanco.js';
 import { resumoDaCarteira } from '../js/core/carteira.js';
-import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA } from '../js/core/recomendacao.js';
+import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesDoProximoPagamento } from '../js/core/recomendacao.js';
+import { somarMeses } from '../js/core/meses.js';
 
 const REPO = 'Projeto_R-dados';
 const args = process.argv.slice(2);
@@ -37,6 +39,10 @@ function falhar(texto) {
 }
 
 if (!pasta) falhar('Falta --pasta <dir> (use a pasta de rascunho da sessão).');
+// Os dados são pessoais: nunca dentro do repositório público (que não os ignora).
+const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const dentro = relative(raiz, resolve(pasta));
+if (!dentro.startsWith('..') && !isAbsolute(dentro)) falhar(`--pasta está dentro do repositório público (${raiz}): use a pasta de rascunho da sessão.`);
 
 if (comando === 'baixar') {
   mkdirSync(pasta, { recursive: true });
@@ -54,15 +60,23 @@ if (comando === 'baixar') {
   const estado = migrar(lerJson('dados.json'));
   const casa = migrarCasa(lerJson('casa.json'));
   const admin = (casa.perfis ?? []).find((p) => p.admin) ?? null;
-  const mes = mesEmFoco(casa, hoje, admin?.id ?? null);
+  // O mês das ordens é o do próximo Dia de pagamento (ele registra o mês do calendário); --mes escolhe outro (ex.: o mês
+  // do calendário já fechou e o usuário não vai registrar o Dia de pagamento dele).
+  const mesFoco = mesEmFoco(casa, hoje, admin?.id ?? null);
+  const mes = opcao('mes') ?? mesDoProximoPagamento(estado, hoje);
   const regra = regraDaSobra({ casa, estado, pessoaId: admin?.id, mes, hoje });
-  // O motor divide o valor: reserva de emergência primeiro, caixa de oportunidade na queda, o resto para a carteira.
-  const divisao = regra.incompleto ? null : calcularMes({ estado, recebido: 0, hoje, investirDefinido: regra.investir, lazerPct: LAZER, semExtra: true });
+  // O motor divide o valor: reserva de emergência primeiro, caixa de oportunidade na queda, o resto para a carteira. A
+  // data vai dentro do mês das ordens (o motor deixa de fora o registro desse mês, e conta os de antes).
+  const diaDoMes = mes === hoje.slice(0, 7) ? hoje : `${mes}-01`;
+  const divisao = regra.incompleto ? null : calcularMes({ estado, recebido: 0, hoje: diaDoMes, investirDefinido: regra.investir, lazerPct: LAZER, semExtra: true });
   const paraCarteira = divisao ? Math.round(divisao.sugestoes.reduce((s, x) => s + x.valor, 0) * 100) / 100 : null;
   const carteira = resumoDaCarteira(estado, hoje);
   console.log(JSON.stringify({
     hoje,
     mesDoInvestimento: mes,
+    mesEmFoco: mesFoco,
+    mesDoCalendarioRegistrado: (estado.meses ?? []).some((m) => m.mes === hoje.slice(0, 7)),
+    proximoMes: somarMeses(hoje.slice(0, 7), 1),
     quantoInvestir: regra.incompleto ? { incompleto: true, motivo: `faltam os salários de ${regra.mes} no Balanço` }
       : { sobra: regra.sobra, previsao: regra.previsao, lazer: regra.lazer, investir: regra.investir },
     divisaoDoMotor: divisao && { paraReserva: divisao.paraReserva, paraCaixa: divisao.paraCaixa, daCaixaParaCarteira: divisao.daCaixaParaCarteira, paraCarteira },
@@ -87,10 +101,15 @@ if (comando === 'baixar') {
   const { 'dados.json': sha } = lerJson('sha.json');
   const conteudo = Buffer.from(readFileSync(join(pasta, 'dados.json'), 'utf8')).toString('base64');
   const mes = lerJson('dados.json').recomendacao?.mes ?? '';
+  // O corpo vai pela entrada padrão: na linha de comando, o Windows recusa textos grandes (o arquivo cresce todo mês).
   try {
-    gh('api', '-X', 'PUT', `repos/${usuario}/${REPO}/contents/dados.json`, '-f', `message=Onde investir: recomendação de ${mes}`, '-f', `content=${conteudo}`, '-f', `sha=${sha}`, '--silent');
-  } catch {
-    falhar('O GitHub recusou (o app gravou no meio?). Rode baixar, gravar e enviar de novo.');
+    execFileSync('gh', ['api', '-X', 'PUT', `repos/${usuario}/${REPO}/contents/dados.json`, '--input', '-', '--silent'], {
+      input: JSON.stringify({ message: `Onde investir: recomendação de ${mes}`, content: conteudo, sha }), encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (erro) {
+    const detalhe = `${erro.stderr ?? ''}${erro.stdout ?? ''}`.trim();
+    if (/\b(409|422)\b|does not match|is at/i.test(detalhe)) falhar('O app gravou no meio (o sha mudou). Rode baixar, gravar e enviar de novo.');
+    falhar(`O GitHub recusou: ${detalhe || erro.message}`);
   }
   console.log(`Enviado para ${usuario}/${REPO}: a Carteira mostra a recomendação de ${mes} na próxima sincronização.`);
 } else {

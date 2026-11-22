@@ -31,8 +31,8 @@ test('carteira vazia segue os pesos', () => {
   assert.deepEqual(distribuirAporte({ valores: zeros, pesos, aporte: 1000 }), { rendaFixa: 400, fiis: 250, acoes: 250, exterior: 100 });
 });
 test('aporte zero', () => assert.deepEqual(distribuirAporte({ valores: v, pesos, aporte: 0 }), zeros));
-test('arredondamento sobra na renda fixa', () => {
-  assert.deepEqual(arredondarDistribuicao({ rendaFixa: 100, fiis: 62.5, acoes: 62.5, exterior: 275 }), { rendaFixa: 101, fiis: 62, acoes: 62, exterior: 275 });
+test('arredondamento: os centavos que sobram vão para a maior parte (desenho 2026-11-22-onde-investir)', () => {
+  assert.deepEqual(arredondarDistribuicao({ rendaFixa: 100, fiis: 62.5, acoes: 62.5, exterior: 275 }), { rendaFixa: 100, fiis: 62, acoes: 62, exterior: 276 });
 });
 test('cotas aproximadas', () => {
   const s = sugestaoPorAtivo({ distribuicao: { ...zeros, exterior: 275 }, carteiraAlvo: CARTEIRA_PADRAO, precos: { exterior: 100 } });

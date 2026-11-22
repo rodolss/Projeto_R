@@ -84,9 +84,17 @@ function cartaoParaInvestir(estado, hoje, ctx) {
 
 // Onde investir (desenho 2026-11-22-onde-investir): as ordens da análise feita no Claude Code (/onde-investir), gravadas
 // no estado. Sem a análise do mês, diz como pedir.
-function cartaoOndeInvestir(estado, mes, abrir) {
-  const rec = recomendacaoDoMes(estado, mes);
-  const nome = nomeDoMes(mes);
+// A análise vale para o mês em foco ou para o do calendário (o Dia de pagamento registra o mês do calendário). Com o mês
+// já registrado, as ordens viram "investido" (para ninguém comprar duas vezes).
+function cartaoOndeInvestir(estado, mes, abrir, mesCalendario) {
+  const rec = recomendacaoDoMes(estado, mes) ?? recomendacaoDoMes(estado, mesCalendario);
+  const nome = nomeDoMes(rec?.mes ?? mes);
+  if (rec && estado.meses.some((m) => m.mes === rec.mes)) {
+    return h('section', { class: 'cartao onde-investir' },
+      h('h2', {}, `Investido em ${nome} ✓`),
+      h('p', { class: 'suave' }, `As compras de ${nome} já foram registradas no Dia de pagamento. Para o próximo mês, peça `, h('b', {}, '/onde-investir'), ' no Claude Code perto do dia do salário.'),
+      h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
+  }
   if (!rec) {
     return h('section', { class: 'cartao onde-investir' },
       h('h2', {}, `Onde investir em ${nome}`),
@@ -281,7 +289,7 @@ function abaResumo({ p, resumo, estado, hoje, ctx, abrir }) {
     topo,
     itens: [
       cartaoParaInvestir(estado, hoje, ctx),
-      cartaoOndeInvestir(estado, mesDoFoco, abrir),
+      cartaoOndeInvestir(estado, mesDoFoco, abrir, hoje.slice(0, 7)),
       topo,
       fileiraDeMarcos(p),
       fraseDoAlvo(p),

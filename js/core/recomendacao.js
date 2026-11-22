@@ -2,6 +2,7 @@
 // no estado — a lista estável da carteira de renda isenta (fundos imobiliários e ações boas pagadoras, comprados
 // direto) e as ordens do mês em cotas inteiras. O app só valida, mostra e registra o que foi comprado.
 import { CLASSES } from './alocacao.js';
+import { somarMeses } from './meses.js';
 
 export const ESTRATEGIA_RENDA_ISENTA = { fiis: 0.5, acoes: 0.5 };
 const CLASSES_ISENTAS = ['fiis', 'acoes'];
@@ -27,29 +28,45 @@ export function validarRecomendacao(r) {
     if (!CLASSES_ISENTAS.includes(a.classe)) erros.push(`${a.ticker}: classe "${a.classe}" não é de renda isenta (fiis ou acoes)`);
   }
   for (const o of ordens) {
-    if (!lista.some((a) => igualCodigo(a.ticker, o.ticker))) erros.push(`${o.ticker}: a ordem está fora da lista da carteira`);
+    const naLista = lista.find((a) => igualCodigo(a.ticker, o.ticker));
+    if (!naLista) erros.push(`${o.ticker}: a ordem está fora da lista da carteira`);
+    else if (o.classe !== naLista.classe) erros.push(`${o.ticker}: a classe da ordem ("${o.classe}") não é a da lista ("${naLista.classe}")`);
     if (!(Number.isInteger(o.cotas) && o.cotas >= 1)) erros.push(`${o.ticker}: cotas precisam ser um número inteiro >= 1`);
-    if (!(o.preco > 0)) erros.push(`${o.ticker}: preço precisa ser > 0`);
-    else if (Math.abs(o.valor - o.cotas * o.preco) > Math.max(0.05, o.cotas * o.preco * 0.01)) erros.push(`${o.ticker}: o valor não bate com cotas × preço`);
+    if (!(Number.isFinite(o.preco) && o.preco > 0)) erros.push(`${o.ticker}: preço precisa ser um número > 0`);
+    if (!Number.isFinite(o.valor)) erros.push(`${o.ticker}: valor precisa ser um número`);
+    else if (Number.isFinite(o.preco) && Number.isInteger(o.cotas) && Math.abs(o.valor - o.cotas * o.preco) > Math.max(0.05, o.cotas * o.preco * 0.005)) {
+      erros.push(`${o.ticker}: o valor não bate com cotas × preço`);
+    }
   }
-  const soma = ordens.reduce((s, o) => s + (o.valor ?? 0), 0);
+  const soma = ordens.reduce((s, o) => s + (Number.isFinite(o.valor) ? o.valor : 0), 0);
   if (Number.isFinite(r.valor) && soma > r.valor + 0.01) erros.push(`as ordens (${soma.toFixed(2)}) passam do valor (${r.valor.toFixed(2)})`);
   return { ok: erros.length === 0, erros };
 }
 
-// Grava a recomendação e põe a carteira-alvo na estratégia dela (o motor usa os pesos na divisão por classe; o primeiro
-// da lista de cada classe fica como o investimento padrão dela).
+// Grava a recomendação e põe a carteira-alvo na estratégia fixa (o motor usa os pesos na divisão por classe; o primeiro
+// da lista de cada classe fica como o investimento padrão dela). A estratégia não vem da recomendação: é sempre a fixa.
 export function aplicarRecomendacao(estado, r) {
-  const estrategia = r.estrategia ?? ESTRATEGIA_RENDA_ISENTA;
+  const estrategia = ESTRATEGIA_RENDA_ISENTA;
   const carteiraAlvo = Object.fromEntries(CLASSES.map((c) => {
     const primeiro = (r.lista ?? []).find((a) => a.classe === c);
     const antes = estado.carteiraAlvo?.[c] ?? {};
     return [c, { ...antes, peso: estrategia[c] ?? 0, ...(primeiro ? { ticker: primeiro.ticker, frase: FRASES[c] ?? antes.frase } : {}) }];
   }));
-  return { ...estado, recomendacao: structuredClone(r), carteiraAlvo };
+  return { ...estado, recomendacao: { ...structuredClone(r), estrategia: { ...estrategia } }, carteiraAlvo };
 }
 
 export const recomendacaoDoMes = (estado, mes) => (estado?.recomendacao?.mes === mes ? estado.recomendacao : null);
+
+// O mês do próximo Dia de pagamento (é o mês das ordens): o do calendário enquanto ele não foi registrado; depois, o
+// seguinte. O Dia de pagamento registra sempre o mês do calendário.
+export function mesDoProximoPagamento(estado, hoje) {
+  const mes = hoje.slice(0, 7);
+  return (estado?.meses ?? []).some((m) => m.mes === mes) ? somarMeses(mes, 1) : mes;
+}
+
+// O que as cotas inteiras não cobriram do valor da carteira: vai para a caixa de oportunidade (fica investido e conta
+// para a meta), em vez de ficar parado na conta.
+export const restoDasOrdens = (r, paraCarteira) => Math.max(0, Math.round((paraCarteira - (r?.ordens ?? []).reduce((s, o) => s + o.valor, 0)) * 100) / 100);
 
 // As ordens no formato do aplicado do Dia de pagamento: o destino é o código (o motor acha o investimento ou o cria).
 export const aplicadoDasOrdens = (r) => (r?.ordens ?? []).map((o) => ({
