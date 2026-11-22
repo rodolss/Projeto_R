@@ -33,6 +33,17 @@ condição (fundo só para investidor qualificado, oferta fechada, cota cara dem
 - **App**: os textos da Carteira passam a dizer que a análise sai sozinha no dia 26 (o pedido manual continua valendo);
   o cartão sem ordens mostra `semOrdens` (sem ele, o texto da reserva de hoje). Versão 90.
 
+## A rotina
+Rotina do Claude Code "Onde investir (dia 26)": cron `0 22 26 * *` (UTC), repositórios Projeto_R e Projeto_R-dados,
+ferramentas Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch e Skill. O prompt:
+
+> Rode a skill do projeto /onde-investir (`.claude/skills/onde-investir/SKILL.md`) em **modo automático**: ninguém vai
+> responder perguntas. Trabalhe em `/tmp/onde-investir` e rode os comandos do script a partir da raiz do repositório
+> Projeto_R. Pesquise na web os dados de hoje (preço de fechamento, público-alvo, média negociada por dia) para conferir
+> a lista e montar as ordens. Não faça commit, push nem PR em nenhum repositório: a única gravação é o `enviar` do
+> script. Não escreva valores do usuário fora do repositório de dados. Termine com um resumo curto: o mês, as ordens (ou
+> o motivo de não haver) e se o envio deu certo.
+
 ## Fora
 Notificação no celular; rodar de novo sozinho depois que o Balanço for completado (ele pede `/onde-investir` ou roda a
 rotina na hora pelo claude.ai).

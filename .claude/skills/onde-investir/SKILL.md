@@ -14,12 +14,17 @@ Os dados são pessoais e ficam no repositório privado: trabalhe numa pasta da p
 repositório público. **Não faça commit nem push no repositório público.**
 
 ## Modo automático (rotina na nuvem, todo dia 26 às 19h — desenho `2026-11-22-onde-investir-agendado`)
-Ninguém está olhando: **não pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`). Se faltar algo
-para montar as ordens (`quantoInvestir.incompleto`, preço que não achou), grave mesmo assim a recomendação **sem
-ordens**, com `semOrdens` dizendo em uma frase o que falta e que basta pedir `/onde-investir` (ou rodar a rotina) depois
-de completar — o cartão da Carteira mostra esse texto. Se `enviar` disser que o app gravou no meio, repita baixar →
-gravar → enviar, até 3 vezes. Qualquer outro erro: pare e termine com o erro (o registro da execução mostra). A revisão
-de 90 dias da lista também é sua: troque só com motivo forte e explique a troca no `resumo`.
+Vale quando o pedido diz **"modo automático"** (o prompt da rotina, guardado no desenho). Ninguém está olhando: **não
+pergunte nada e não chute**. Use o mês que o `contexto` der (sem `--mes`).
+- Com `quantoInvestir.incompleto`: grave mesmo assim, com `"valor": 0`, `"ordens": []` e `semOrdens` dizendo em uma
+  frase, com o nome do mês ("dezembro", não "2026-12"), o que falta e que basta pedir `/onde-investir` (ou rodar a
+  rotina de novo no claude.ai) depois de completar — o cartão da Carteira mostra esse texto. A lista vai do mesmo jeito.
+- Preço que não achou: pule só aquele ativo neste mês (as outras ordens seguem).
+- Se `gravar` recusar, corrija o que ele apontou (confira de novo, troque o ativo que não passa) e grave de novo.
+- Se `enviar` disser que o app gravou no meio, repita baixar → gravar → enviar, até 3 vezes. Erro do GitHub ou do `gh`
+  que não seja esse: pare e termine com o erro (o registro da execução mostra).
+- O que os passos mandam "dizer ao usuário" vai no `resumo` (é o que ele lê no app); a troca de um ativo da lista
+  também (só com motivo forte).
 
 ## Passos
 
@@ -35,13 +40,15 @@ de 90 dias da lista também é sua: troque só com motivo forte e explique a tro
    carteira atual, a lista atual e a liquidez mínima (`liquidezMinima`).
    - Pedido à mão, com o mês do calendário já fechado e sem o Dia de pagamento dele: rode de novo com
      `--mes <mesEmFoco>`. Na dúvida, pergunte qual Dia de pagamento ele vai fazer (no modo automático, não pergunte).
-   - `quantoInvestir.incompleto`: sem ordens, com `semOrdens` ("Faltam os salários de <mês> no Balanço; ..."). Num
-     pedido à mão, diga também ao usuário o que falta.
+   - `quantoInvestir.incompleto`: `"valor": 0`, `"ordens": []` e `semOrdens` ("Faltam os salários de dezembro no
+     Balanço; ..."). Num pedido à mão, diga também ao usuário o que falta.
    - `paraCarteira` zero (tudo foi para a reserva): as ordens ficam vazias (o cartão diz que vai para a reserva), mas
      ainda grave a lista.
 
-2. **A lista da carteira** (estável): monte só se `listaAtual` for nula, se `ultimaAnalise.geradaEm` tiver mais de
-   90 dias ou se o usuário pedir revisão. Senão, mantenha a lista (mudanças só com motivo forte, dito ao usuário).
+2. **A lista da carteira** (estável): monte ou reveja só quando o `contexto` disser `revisarLista: true` (sem lista,
+   algum ativo sem conferência válida ou a conferência mais antiga com mais de 90 dias) ou quando o usuário pedir.
+   Rever é conferir de novo cada ativo (regras abaixo, com o `conferido` de hoje) e trocar o que não passar. Senão,
+   mantenha a lista (mudanças só com motivo forte, dito ao usuário).
    Pesquise na web (dados atuais: Status Invest, Investidor10, Funds Explorer, RI das empresas) e escolha:
    - **8 a 10 FIIs** de tipos diferentes: logística, shoppings, lajes corporativas, renda urbana e de papel (CRI high
      grade); patrimônio e liquidez altos, muitos cotistas (a isenção exige ≥ 100 cotistas e negociação em bolsa),
@@ -60,8 +67,8 @@ de 90 dias da lista também é sua: troque só com motivo forte e explique a tro
      3. cota ou ação cujo preço não cabe no dinheiro de um lado (FIIs ou ações) de um mês típico;
      4. pouco negociado: média diária abaixo de `liquidezMinima` (R$ 1 milhão nos FIIs, R$ 5 milhões nas ações).
      Registre a conferência em cada ativo: `"conferido": { "publicoGeral": true, "liquidezDiaria": <média diária em
-     R$>, "em": "AAAA-MM-DD" }`. `gravar` recusa ativo sem conferência, com liquidez abaixo do mínimo ou conferido há mais
-     de 120 dias: na revisão de 90 dias (ou se faltar), confira de novo cada um.
+     R$>, "em": "AAAA-MM-DD" }` (`em` = o `hoje` do `contexto`). `gravar` recusa ativo sem conferência, com liquidez
+     abaixo do mínimo ou conferido há mais de 120 dias.
 
 3. **As ordens do mês**
    - Busque o preço de hoje de cada ativo da lista (cotação na B3).

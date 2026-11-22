@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarRecomendacao, aplicarRecomendacao, recomendacaoDoMes, aplicadoDasOrdens, mesDoProximoPagamento, restoDasOrdens,
-  LIQUIDEZ_MINIMA, mesDasOrdens, motivoSemOrdens,
+  LIQUIDEZ_MINIMA, mesDasOrdens, motivoSemOrdens, precisaRevisarLista,
 } from '../../js/core/recomendacao.js';
 import { arredondarDistribuicao } from '../../js/core/alocacao.js';
 
@@ -131,6 +131,28 @@ test('validarRecomendacao: a conferência vale 120 dias e não pode ser depois d
 test('validarRecomendacao: semOrdens, quando vem, é um texto', () => {
   assert.equal(validarRecomendacao({ ...recomendacao(), ordens: [], semOrdens: 'Faltam os salários de dezembro no Balanço.' }).ok, true);
   assert.ok(validarRecomendacao({ ...recomendacao(), semOrdens: '' }).erros.some((e) => /semOrdens/.test(e)));
+});
+
+test('validarRecomendacao: lista e ordens precisam ser listas (sem ordens é [], não ausente)', () => {
+  const semOrdens = recomendacao();
+  delete semOrdens.ordens;
+  assert.ok(validarRecomendacao(semOrdens).erros.some((e) => /ordens/.test(e)));
+  assert.ok(validarRecomendacao({ ...recomendacao(), lista: 'x' }).erros.some((e) => /lista/.test(e)));
+});
+
+test('precisaRevisarLista: sem lista, ativo sem conferência válida ou conferência com mais de 90 dias', () => {
+  const lista = recomendacao().lista; // conferidos em 2026-11-26 e 2026-09-01
+  assert.equal(precisaRevisarLista(lista, '2026-11-26'), false);
+  assert.equal(precisaRevisarLista(lista, '2026-11-30'), false, '90 dias da mais antiga');
+  assert.equal(precisaRevisarLista(lista, '2026-12-01'), true, '91 dias');
+  assert.equal(precisaRevisarLista(null, '2026-11-26'), true);
+  assert.equal(precisaRevisarLista([], '2026-11-26'), true);
+  const semConferir = structuredClone(lista);
+  delete semConferir[1].conferido; // a lista feita à mão em 22/11 não tem conferência
+  assert.equal(precisaRevisarLista(semConferir, '2026-11-26'), true);
+  const poucoNegociado = structuredClone(lista);
+  poucoNegociado[0].conferido.liquidezDiaria = 10;
+  assert.equal(precisaRevisarLista(poucoNegociado, '2026-11-26'), true);
 });
 
 test('motivoSemOrdens: o que a análise disse, ou a reserva de emergência', () => {

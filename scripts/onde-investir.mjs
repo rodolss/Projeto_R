@@ -11,7 +11,7 @@
 // de novo, grave de novo e envie (nada se perde).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrar } from '../js/core/esquema.js';
 import { migrarCasa } from '../js/core/casa.js';
@@ -20,9 +20,10 @@ import { regraDaSobra } from '../js/core/investir-sobra.js';
 import { calcularMes } from '../js/core/motor.js';
 import { LAZER } from '../js/core/balanco.js';
 import { resumoDaCarteira } from '../js/core/carteira.js';
-import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesDasOrdens, LIQUIDEZ_MINIMA } from '../js/core/recomendacao.js';
+import { validarRecomendacao, aplicarRecomendacao, ESTRATEGIA_RENDA_ISENTA, mesDasOrdens, LIQUIDEZ_MINIMA, precisaRevisarLista } from '../js/core/recomendacao.js';
 import { somarMeses } from '../js/core/meses.js';
 import { donoDaUrl } from './github-dono.mjs';
+import { dentroDe } from './caminhos.mjs';
 
 const REPO = 'Projeto_R-dados';
 const args = process.argv.slice(2);
@@ -44,8 +45,8 @@ function falhar(texto) {
 if (!pasta) falhar('Falta --pasta <dir> (use a pasta de rascunho da sessão).');
 // Os dados são pessoais: nunca dentro do repositório público (que não os ignora).
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dentro = relative(raiz, resolve(pasta));
-if (!dentro.startsWith('..') && !isAbsolute(dentro)) falhar(`--pasta está dentro do repositório público (${raiz}): use a pasta de rascunho da sessão.`);
+if (dentroDe(raiz, pasta)) falhar(`--pasta está dentro do repositório público (${raiz}): use a pasta de rascunho da sessão.`);
+if (opcao('recomendacao') && dentroDe(raiz, opcao('recomendacao'))) falhar(`--recomendacao está dentro do repositório público (${raiz}): escreva-a na pasta de rascunho.`);
 
 if (comando === 'baixar') {
   mkdirSync(pasta, { recursive: true });
@@ -88,6 +89,7 @@ if (comando === 'baixar') {
     totalNaCarteira: carteira.carteira,
     divisaoAtual: carteira.alocacao.filter((a) => a.valor > 0 || ESTRATEGIA_RENDA_ISENTA[a.classe]).map((a) => ({ classe: a.classe, valor: a.valor, pct: Math.round(a.pct * 1000) / 10 })),
     listaAtual: estado.recomendacao?.lista ?? null,
+    revisarLista: precisaRevisarLista(estado.recomendacao?.lista, hoje),
     ultimaAnalise: estado.recomendacao ? { mes: estado.recomendacao.mes, geradaEm: estado.recomendacao.geradaEm } : null,
     liquidezMinima: LIQUIDEZ_MINIMA,
   }, null, 2));

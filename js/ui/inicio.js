@@ -98,9 +98,8 @@ function cartaoOndeInvestir(estado, mes, abrir, mesCalendario) {
   if (!rec) {
     return h('section', { class: 'cartao onde-investir' },
       h('h2', {}, `Onde investir em ${nome}`),
-      h('p', { class: 'suave' }, estado.recomendacao ? `A última análise foi para ${nomeDoMes(estado.recomendacao.mes)}. ` : '',
-        'A análise roda sozinha todo dia 26, à noite, com os preços do dia, e diz o que comprar: fundos imobiliários e ações que pagam renda isenta. Para antes, peça ',
-        h('b', {}, '/onde-investir'), ' no Claude Code.'),
+      h('p', { class: 'suave' }, 'A análise roda sozinha todo dia 26, à noite, com os preços do dia, e diz o que comprar: fundos imobiliários e ações que pagam renda isenta. ',
+        estado.recomendacao ? `A última foi para ${nomeDoMes(estado.recomendacao.mes)}. ` : '', 'Para antes, peça ', h('b', {}, '/onde-investir'), ' no Claude Code.'),
       estado.recomendacao && h('button', { type: 'button', class: 'botao-link', onclick: () => abrir('carteira-recomendada') }, 'Ver a carteira recomendada'));
   }
   const total = rec.ordens.reduce((s, o) => s + o.valor, 0);

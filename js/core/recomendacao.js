@@ -43,9 +43,12 @@ export function validarRecomendacao(r) {
   if (!MES.test(r.mes ?? '')) erros.push('mes precisa ser AAAA-MM');
   if (!DATA.test(r.geradaEm ?? '')) erros.push('geradaEm precisa ser AAAA-MM-DD');
   if (!(Number.isFinite(r.valor) && r.valor >= 0)) erros.push('valor precisa ser um número >= 0');
+  // O app lê lista e ordens como listas: sem ordens é [], nunca o campo ausente (a Carteira e o Dia de pagamento caem).
+  if (!Array.isArray(r.ordens)) erros.push('ordens precisa ser uma lista ([] quando não há ordens)');
+  if (!Array.isArray(r.lista)) erros.push('lista precisa ser uma lista');
   const lista = Array.isArray(r.lista) ? r.lista : [];
   const ordens = Array.isArray(r.ordens) ? r.ordens : [];
-  if (!lista.length) erros.push('a lista da carteira está vazia');
+  if (Array.isArray(r.lista) && !lista.length) erros.push('a lista da carteira está vazia');
   for (const a of lista) {
     if (!a.ticker || !a.nome || !a.motivo) erros.push(`${a.ticker ?? '?'}: a lista precisa de ticker, nome e motivo`);
     if (!CLASSES_ISENTAS.includes(a.classe)) erros.push(`${a.ticker}: classe "${a.classe}" não é de renda isenta (fiis ou acoes)`);
@@ -95,6 +98,15 @@ export function mesDasOrdens(estado, hoje) {
   const proximo = mesDoProximoPagamento(estado, hoje);
   const ultima = estado?.recomendacao?.mes;
   return MES.test(ultima ?? '') && ultima > proximo ? ultima : proximo;
+}
+
+// Hora de montar ou rever a lista (a análise do dia 26 decide sozinha): sem lista, algum ativo sem conferência válida
+// (inclusive a lista antiga, de antes da trava) ou a conferência mais antiga com mais de 90 dias — antes que o
+// validador a recuse aos 120.
+const REVISAO_DA_LISTA = 90;
+export function precisaRevisarLista(lista, hoje) {
+  if (!Array.isArray(lista) || !lista.length) return true;
+  return lista.some((a) => errosDaConferencia(a, hoje).length > 0 || diasEntre(a.conferido.em, hoje) > REVISAO_DA_LISTA);
 }
 
 // O que o cartão diz quando o mês não tem ordens: o motivo que a análise gravou, ou o caso comum (tudo para a reserva).
