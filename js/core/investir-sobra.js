@@ -21,6 +21,19 @@ function investidoDoSalario(estado, mes) {
   return centavos(Math.max(0, aplicado - (r.proventos ?? 0)));
 }
 
+// O potencial de investimento (desenho 2026-11-22-para-investir): o quanto investir neste mês (a regra abaixo) e a
+// média dos últimos `meses` Dias de pagamento com os dados do Balanço completos — o que costuma sobrar por mês.
+export function potencialDeInvestimento({ casa, estado, pessoaId, mes, hoje, meses = 3 }) {
+  const atual = regraDaSobra({ casa, estado, pessoaId, mes, hoje });
+  const valores = [];
+  for (let k = 0; k < meses; k++) {
+    const r = k === 0 ? atual : regraDaSobra({ casa, estado, pessoaId, mes: somarMeses(mes, -k), hoje });
+    if (!r.incompleto) valores.push(r.investir);
+  }
+  const media = valores.length ? centavos(valores.reduce((s, v) => s + v, 0) / valores.length) : null;
+  return { atual, media, quantos: valores.length };
+}
+
 export function regraDaSobra({ casa, estado, pessoaId, mes, hoje }) {
   const anterior = somarMeses(mes, -1);
   const b = balancoDoMes(casa, anterior, pessoaId, hoje);

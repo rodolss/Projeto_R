@@ -907,6 +907,11 @@ a.barra-item:active { background: var(--cartao-2); }
 .chave-grupo.grande { width: 14px; height: 14px; border-radius: 4px; }
 .fora-da-carteira { margin-top: 14px; }
 .link-meta { display: inline-block; margin-top: 10px; }
+/* Para investir este mês (desenho 2026-11-22-para-investir). */
+.para-investir .valor-grande { font-size: 32px; margin: 2px 0 4px; }
+.para-investir p { margin: 0; }
+.para-investir-media { margin-top: 8px !important; font-size: 14px; }
+.para-investir .botoes { margin-top: 12px; }
 .fora-da-carteira h3 { margin: 0 0 4px; font-size: 14px; color: var(--suave); }
 /* Ativos: grupo com total; cada ativo com um selo de iniciais na cor da classe. */
 .grupo-topo { display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px; }

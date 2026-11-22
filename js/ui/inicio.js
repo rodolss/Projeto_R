@@ -16,6 +16,7 @@ import { cartaoDoPagamento, dataCurta, nomeDoMes, saldosParaGravar } from '../co
 import { lerRascunho } from './mes-rascunho.js';
 import { parametroDoHash, folhaAberta, depoisDeSalvar } from './rotas.js';
 import { resumoDaCarteira, evolucao, proventosDaCarteira } from '../core/carteira.js';
+import { potencialDeInvestimento } from '../core/investir-sobra.js';
 import { graficoEvolucao, colunasProventos, barraDivisao } from './carteira-graficos.js';
 import { abaAtivos, folhaDeAtivos, NOMES_GRUPO } from './carteira-ativos.js';
 
@@ -43,6 +44,34 @@ function cartaoPagamento(estado, hoje, ctx) {
     h('div', {}, h('h3', {}, c.tipo === 'continuar' ? `Dia de pagamento? · ${c.quantas} de ${c.total} feitos` : 'Dia de pagamento?'),
       h('p', { class: 'suave' }, 'Veja quanto investir este mês e onde.')),
     h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar' : 'Abrir'));
+}
+
+// O quanto investir este mês (desenho 2026-11-22-para-investir): a sobra do Balanço do mês anterior menos o lazer — a
+// mesma conta do Dia de pagamento —, e o potencial (a média dos últimos meses). Substitui o "Dia de pagamento?"; com o
+// mês já registrado (ou fora da visão única, sem o Balanço), fica o cartão do pagamento.
+function cartaoParaInvestir(estado, hoje, ctx) {
+  const mes = hoje.slice(0, 7);
+  const entrada = estado.meses.find((m) => m.mes === mes);
+  const c = cartaoDoPagamento({ entrada, rascunho: lerRascunho(mes), semSalario: true });
+  if (c.tipo === 'registrado' || !ctx.unica || !ctx.perfil?.visto || !ctx.casa) return cartaoPagamento(estado, hoje, ctx);
+  const { atual, media, quantos } = potencialDeInvestimento({ casa: ctx.casa, estado, pessoaId: ctx.perfil.visto.id, mes, hoje });
+  const anterior = nomeDoMes(atual.mes);
+  const corpo = atual.incompleto
+    ? [h('p', { class: 'suave' }, `Para calcular, faltam os salários de ${anterior} no Balanço.`),
+      h('a', { class: 'botao-link', href: `#/casa-balanco?mes=${atual.mes}` }, `Abrir o balanço de ${anterior}`)]
+    : [h('div', { class: 'valor-grande' }, formatarBRL(Math.max(0, atual.investir))),
+      h('p', { class: 'suave' }, [
+        `Sobra de ${anterior}: ${formatarBRL(atual.sobra)}${atual.previsao ? ' (previsão)' : ''}`,
+        atual.lazer > 0 && `${formatarBRL(atual.lazer)} para lazer`,
+        atual.jaInvestido > 0 && `${formatarBRL(atual.jaInvestido)} já investidos`,
+        atual.deficit > 0 && `${formatarBRL(atual.deficit)} cobrem meses no vermelho`,
+      ].filter(Boolean).join(' · ')),
+      atual.investir <= 0 && h('p', {}, h('b', {}, 'Este mês não sobra para investir.'))];
+  return h('section', { class: 'cartao para-investir' },
+    h('div', { class: 'rotulo' }, `Para investir em ${nomeDoMes(mes)}`),
+    ...corpo,
+    quantos >= 2 && h('p', { class: 'para-investir-media' }, 'Seu potencial: ', h('b', {}, `${formatarBRL(media)} por mês`), ` (média de ${quantos} meses)`),
+    h('div', { class: 'botoes' }, h('a', { class: 'botao', href: '#/mes' }, c.tipo === 'continuar' ? 'Continuar o Dia de pagamento' : 'Investir agora')));
 }
 
 const abreviado = (v) => `R$ ${abreviar(v)}`;
@@ -188,10 +217,10 @@ function abaResumo({ p, resumo, estado, hoje, ctx }) {
   return {
     topo,
     itens: [
+      cartaoParaInvestir(estado, hoje, ctx),
       topo,
       fileiraDeMarcos(p),
       fraseDoAlvo(p),
-      cartaoPagamento(estado, hoje, ctx),
       cartaoEvolucao(evolucao(estado, hoje)),
       cartaoDivisao(resumo),
       precisaRevisarOrcamento(estado.config.ultimaRevisaoOrcamento, hoje.slice(0, 7))
