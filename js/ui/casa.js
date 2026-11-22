@@ -47,14 +47,15 @@ export const mesPadraoDaCasa = (ctx) => mesEmFoco(ctx.casa, ctx.hoje, ctx.perfil
 
 // O seletor de mês do Mês e do Balanço (os mesmos limites): do primeiro mês com dados (ou o atual) até 12 meses depois do
 // atual. Fora do mês em foco, o atalho "Ir para <mês>" leva de volta a ele.
+export const limitesDoMes = ({ primeiro, mesAtual }) => ({ min: primeiro < mesAtual ? primeiro : mesAtual, max: somarMeses(mesAtual, 12) });
+
 export function seletorDoMes({ mes, primeiro, mesAtual, foco, irPara }) {
-  const min = primeiro < mesAtual ? primeiro : mesAtual;
-  const max = somarMeses(mesAtual, 12);
+  const { min, max } = limitesDoMes({ primeiro, mesAtual });
   return seletorDePeriodo({
     rotulo: tituloDoMes(mes),
     anterior: { aria: 'Mês anterior', desligado: mes <= min, ir: () => irPara(somarMeses(mes, -1)) },
     proximo: { aria: 'Próximo mês', desligado: mes >= max, ir: () => irPara(somarMeses(mes, 1)) },
-    grade: () => gradeDeMeses({ atual: mes, min, max, irPara }),
+    grade: gradeDeMeses({ atual: mes, min, max, irPara }),
     atalho: mes !== foco && { texto: `Ir para ${nomeDoMes(foco)}`, ir: () => irPara(foco) },
   });
 }

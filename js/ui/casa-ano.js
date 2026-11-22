@@ -44,7 +44,7 @@ function desenhar(container, ctx) {
     rotulo: String(ano),
     anterior: { aria: 'Ano anterior', desligado: ano <= anos[0], ir: () => irPara(ano - 1) },
     proximo: { aria: 'Próximo ano', desligado: ano >= anos.at(-1), ir: () => irPara(ano + 1) },
-    grade: anos.length > 1 && (() => gradeDeAnos({ atual: ano, anos, irPara })),
+    grade: anos.length > 1 && gradeDeAnos({ atual: ano, anos, irPara }),
   });
   const ate = r.ate && Number(mesAtual.slice(0, 4)) === ano && r.ate.slice(5) !== '12'
     && h('p', { class: 'nota', style: 'margin-top:-6px' }, `Até ${nomeDoMes(r.ate)}.`);

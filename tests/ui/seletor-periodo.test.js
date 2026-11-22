@@ -1,7 +1,20 @@
 // Seletor de mês (desenho 2026-11-22-seletor-de-mes).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mesesDaGrade, temMesNoAno } from '../../js/ui/seletor-periodo.js';
+import { mesesDaGrade, temMesNoAno, anoDaGrade } from '../../js/ui/seletor-periodo.js';
+import { limitesDoMes } from '../../js/ui/casa.js';
+
+test('limitesDoMes: do primeiro mês com dados (ou o atual, se vier antes) até 12 meses depois do atual', () => {
+  assert.deepEqual(limitesDoMes({ primeiro: '2025-03', mesAtual: '2026-11' }), { min: '2025-03', max: '2027-11' });
+  assert.deepEqual(limitesDoMes({ primeiro: '2026-12', mesAtual: '2026-11' }), { min: '2026-11', max: '2027-11' });
+});
+
+test('anoDaGrade: a grade abre no ano do mês mostrado, trazido para dentro dos limites', () => {
+  const limites = { min: '2025-03', max: '2027-11' };
+  assert.equal(anoDaGrade('2026-05', limites), 2026);
+  assert.equal(anoDaGrade('2023-05', limites), 2025, 'endereço velho, antes do primeiro mês');
+  assert.equal(anoDaGrade('2030-01', limites), 2027);
+});
 
 test('temMesNoAno: a seta de um ano só liga se ele tiver algum mês dentro dos limites', () => {
   const limites = { min: '2026-10', max: '2027-11' };

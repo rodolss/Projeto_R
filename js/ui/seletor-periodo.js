@@ -19,6 +19,11 @@ export function mesesDaGrade(ano, { min, max, atual }) {
 // O ano tem algum mês dentro dos limites? (a seta para ele só liga assim)
 export const temMesNoAno = (ano, { min, max }) => `${ano}-12` >= min && `${ano}-01` <= max;
 
+// O ano em que a grade abre: o do mês mostrado, trazido para dentro dos limites (um endereço velho não abre um ano vazio).
+export const anoDaGrade = (atual, { min, max }) => Math.min(Math.max(Number(atual.slice(0, 4)), Number(min.slice(0, 4))), Number(max.slice(0, 4)));
+
+const NOMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
 const seta = (lado, { aria, desligado, ir }) => h('button', {
   type: 'button', class: `seta-periodo ${lado}`, 'aria-label': aria, disabled: desligado, onclick: ir,
 }, icone('chevron'));
@@ -48,25 +53,25 @@ export function seletorDePeriodo({ rotulo, anterior, proximo, grade, atalho }) {
     atalho && h('button', { type: 'button', class: 'botao-link seletor-atalho', onclick: atalho.ir }, atalho.texto));
 }
 
-// A grade dos meses, com o ano e setas para trocar de ano.
-export function gradeDeMeses({ atual, min, max, irPara }) {
-  let ano = Number(atual.slice(0, 4));
+// A grade dos meses, com o ano e setas para trocar de ano. Tocar no mês que já está aberto só fecha a grade.
+export const gradeDeMeses = ({ atual, min, max, irPara }) => (fechar) => {
+  let ano = anoDaGrade(atual, { min, max });
   const caixa = h('div', { class: 'grade-periodo' });
   const desenhar = () => caixa.replaceChildren(
     h('div', { class: 'grade-ano' },
       seta('antes', { aria: 'Ano anterior', desligado: !temMesNoAno(ano - 1, { min, max }), ir: () => { ano -= 1; desenhar(); } }),
       h('b', {}, String(ano)),
       seta('depois', { aria: 'Próximo ano', desligado: !temMesNoAno(ano + 1, { min, max }), ir: () => { ano += 1; desenhar(); } })),
-    h('div', { class: 'grade-meses' }, ...mesesDaGrade(ano, { min, max, atual }).map((m) => h('button', {
-      type: 'button', disabled: m.desligado, 'aria-current': m.atual ? 'true' : null, onclick: () => irPara(m.mes),
+    h('div', { class: 'grade-meses' }, ...mesesDaGrade(ano, { min, max, atual }).map((m, k) => h('button', {
+      type: 'button', disabled: m.desligado, 'aria-current': m.atual ? 'true' : null, 'aria-label': `${NOMES[k]} de ${ano}`,
+      onclick: () => (m.atual ? fechar() : irPara(m.mes)),
     }, m.rotulo))));
   desenhar();
   return caixa;
-}
+};
 
 // A grade dos anos (aba Ano).
-export function gradeDeAnos({ atual, anos, irPara }) {
-  return h('div', { class: 'grade-periodo' }, h('div', { class: 'grade-meses' }, ...anos.map((a) => h('button', {
-    type: 'button', 'aria-current': a === atual ? 'true' : null, onclick: () => irPara(a),
+export const gradeDeAnos = ({ atual, anos, irPara }) => (fechar) => h('div', { class: 'grade-periodo' },
+  h('div', { class: 'grade-meses' }, ...anos.map((a) => h('button', {
+    type: 'button', 'aria-current': a === atual ? 'true' : null, onclick: () => (a === atual ? fechar() : irPara(a)),
   }, String(a)))));
-}

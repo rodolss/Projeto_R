@@ -453,25 +453,23 @@ details.detalhes[open] > summary::after { content: "−"; }
 @keyframes veu-entra { from { opacity: 0; } }
 
 /* ---------- Contas da casa (desenho de 2026-11-19) ---------- */
-.casa-mes { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.casa-mes h1 { margin: 0; flex: 1; text-align: center; font-size: 24px; letter-spacing: -0.02em; }
 .seta-mes { flex: none; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--borda); background: var(--cartao); color: var(--texto);
   font: inherit; font-size: 22px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 3px; box-shadow: var(--sombra);
   transition: transform 140ms ease, background 200ms ease; }
 .seta-mes:not(:disabled):active { transform: scale(0.9); background: var(--cartao-2); }
 .seta-mes:disabled { opacity: 0.3; cursor: default; }
-.casa-voltar { align-self: center; padding: 0 4px; margin-top: -6px; }
 /* Seletor de mês (desenho 2026-11-22-seletor-de-mes): pílula no centro com setas pequenas coladas ao nome; nada no
    canto de cima à esquerda, onde os apps põem o "Voltar". Tocar no nome abre a grade logo abaixo. */
 .seletor-periodo { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .seletor-pilula { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 4px; border-radius: 999px; background: var(--cartao); border: 1px solid var(--borda); box-shadow: var(--sombra); }
 .seletor-pilula h1 { margin: 0; min-width: 0; font-size: 17px; letter-spacing: -0.01em; }
-.seletor-nome { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; max-width: 100%; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--texto); font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+/* Com a fonte grande do celular, o nome quebra em duas linhas em vez de invadir a seta. */
+.seletor-nome { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; max-width: 100%; padding: 4px 10px; border: 0; border-radius: 22px; background: none; color: var(--texto); font: inherit; font-weight: 700; line-height: 1.2; text-align: center; cursor: pointer; overflow-wrap: anywhere; }
 button.seletor-nome:active { background: var(--cartao-2); }
 span.seletor-nome { cursor: default; }
 .seletor-abre svg { display: block; width: 16px; height: 16px; color: var(--suave); transition: transform 200ms ease; }
 .seletor-nome[aria-expanded="true"] .seletor-abre svg { transform: rotate(180deg); }
-.seta-periodo { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--destaque); cursor: pointer; }
+.seta-periodo { flex: none; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--destaque); cursor: pointer; }
 .seta-periodo svg { width: 20px; height: 20px; }
 .seta-periodo.antes svg { transform: rotate(90deg); }
 .seta-periodo.depois svg { transform: rotate(-90deg); }
@@ -486,7 +484,7 @@ span.seletor-nome { cursor: default; }
 .grade-meses button:not(:disabled):active { background: var(--cartao-2); }
 .grade-meses button[aria-current="true"] { background: var(--destaque); border-color: var(--destaque); color: var(--destaque-texto); }
 .grade-meses button:disabled { opacity: 0.35; cursor: default; }
-.seletor-atalho { padding: 0 4px; }
+.seletor-atalho { min-height: 44px; padding: 0 12px; }
 @media (prefers-reduced-motion: reduce) { .seletor-grade { animation: none; } .seletor-abre svg { transition: none; } }
 .selo { display: inline-block; font-size: 12px; font-weight: 600; line-height: 1.5; padding: 2px 10px; border-radius: 99px; letter-spacing: 0.01em;
   background: var(--atencao-fundo); color: var(--atencao); white-space: nowrap; }

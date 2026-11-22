@@ -345,7 +345,7 @@ function desenharFatura(container, ctx, cfg, casaVisivel) {
     rotulo: `Fatura de ${nomeDoMes(fatura)}`,
     anterior: { aria: 'Fatura anterior', desligado: fatura <= primeira, ir: () => irPara(somarMeses(fatura, -1)) },
     proximo: { aria: 'Próxima fatura', desligado: fatura >= ultima, ir: () => irPara(somarMeses(fatura, 1)) },
-    grade: () => gradeDeMeses({ atual: fatura, min: primeira, max: ultima, irPara }),
+    grade: gradeDeMeses({ atual: fatura, min: primeira, max: ultima, irPara }),
     atalho: fatura !== aberta && { texto: 'Ir para a fatura aberta', ir: () => irPara(aberta) },
   });
   const sub = h('p', { class: 'suave cartao-sub' },
