@@ -5,7 +5,7 @@
 import { h, cartao, botao, campoMoeda, mostrarFolha, esconderFolha } from './dom.js';
 import { formatarBRL, formatarPct, formatarDuracao } from '../core/formato.js';
 import { somarMeses, diffMeses } from '../core/meses.js';
-import { primeiroMes, salarioNoMes } from '../core/casa.js';
+import { primeiroMes, salarioNoMes, pessoasNoMes } from '../core/casa.js';
 import { definirSalario, extraDoMes } from '../core/salario.js';
 import { balancoDoMes, compararComPlano, dadosCompletos, divisaoDaSobra, LAZER } from '../core/balanco.js';
 import { calcularPainel } from '../core/motor.js';
@@ -117,8 +117,9 @@ function desenhar(container, ctx) {
   const mesDoFoco = mesPadraoDaCasa(ctx);
   const voltarAoAtual = mes !== mesDoFoco
     && h('button', { type: 'button', class: 'botao-link casa-voltar', onclick: () => irPara(mesDoFoco) }, `Voltar para ${nomeDoMes(mesDoFoco)}`);
-  const escolha = !visto && casa.pessoas.length > 1 && h('div', { class: 'chips balanco-quem', role: 'group', 'aria-label': 'De quem é o balanço' },
-    ...casa.pessoas.map((p) => h('button', {
+  const quemDivide = pessoasNoMes(casa, mes); // quem entrou ou saiu da divisão aparece só nos meses em que divide
+  const escolha = !visto && quemDivide.length > 1 && h('div', { class: 'chips balanco-quem', role: 'group', 'aria-label': 'De quem é o balanço' },
+    ...quemDivide.map((p) => h('button', {
       type: 'button', class: `chip${p.id === pessoaId ? ' ativo' : ''}`, 'aria-pressed': p.id === pessoaId ? 'true' : 'false',
       onclick: () => location.replace(endereco(mes, p.id)),
     }, p.nome)));

@@ -43,7 +43,7 @@ export function periodoDaFatura(fatura, { viraNoDia, venceNoDia }) {
   };
 }
 
-// A dona de um cartão é uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
+// A dona de um cartão é uma pessoa da casa ou um perfil (quem não divide as contas também tem cartão).
 const quemE = (casa, id) => casa.pessoas.find((p) => p.id === id) ?? (casa.perfis ?? []).find((p) => p.id === id) ?? null;
 
 // ---------- os cartões ----------

@@ -25,7 +25,7 @@ import { categoriaDe } from '../core/categorias.js';
 import { icone, iconeCategoria } from './icones.js';
 
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
-// A dona de um cartão: uma pessoa da casa ou um perfil (perfis novos têm cartão, mas não dividem as contas).
+// A dona de um cartão: uma pessoa da casa ou um perfil (quem não divide as contas também tem cartão).
 const quemE = (casa, id) => casa.pessoas.find((p) => p.id === id) ?? (casa.perfis ?? []).find((p) => p.id === id) ?? null;
 
 export function faturaDaTela(hash, padrao) {
